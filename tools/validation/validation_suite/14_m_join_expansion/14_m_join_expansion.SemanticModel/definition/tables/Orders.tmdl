@@ -1,0 +1,7 @@
+table Orders
+    column CustomerKey
+        sourceColumn: CustomerKey
+    column Amount
+        sourceColumn: Amount
+    column UnusedOrder
+        sourceColumn: UnusedOrder

@@ -193,3 +193,28 @@ keywords, so a query named `true` is not mistaken for the logical literal.
 
 References: [SelectRows](https://learn.microsoft.com/en-us/powerquery-m/table-selectrows)
 and [AddColumn](https://learn.microsoft.com/en-us/powerquery-m/table-addcolumn).
+
+### Joins and nested-table expansion
+
+`Table.Join` and `Table.NestedJoin` accept literal string keys or nonempty lists
+of unique keys with equal lengths on each side. Default join behavior and named
+inner/left-outer/right-outer/full-outer kinds are supported. Both key sets are
+always operational requirements. Flat joins conservatively send output-name
+demands to both inputs because source schemas are not assumed complete.
+
+Nested joins separate the generated nested column from ordinary left-side
+columns. If the nested column survives, its right-side contents retain broad
+protection; if it is discarded, right-side keys remain protected.
+`Table.ExpandTableColumn` resolves a directly preceding nested join through
+local aliases or `let` wrappers. Literal inner names and optional output aliases
+map to the right input; left output demands exclude those generated aliases.
+All expanded inner names remain schema requirements after projection.
+
+Unknown nested provenance, intervening transformations, dynamic/mismatched keys,
+custom comparers, join algorithms, unsupported kinds, duplicate output aliases,
+and shadowed built-ins fall back. Alias resolution shares depth/work limits with
+the lineage traversal. No join is executed and no cardinality is inferred.
+
+References: [Join](https://learn.microsoft.com/en-us/powerquery-m/table-join),
+[NestedJoin](https://learn.microsoft.com/en-us/powerquery-m/table-nestedjoin),
+and [ExpandTableColumn](https://learn.microsoft.com/en-us/powerquery-m/table-expandtablecolumn).

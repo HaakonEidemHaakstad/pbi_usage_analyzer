@@ -156,3 +156,53 @@ class MLineageTests(unittest.TestCase):
         self.assertIsNone(self.infer('Table.SelectRows(Source, #"each" [A])'))
         self.assertIsNone(self.infer('Table.SelectRows(Source, each [A] > ²)'))
         self.assertIsNone(self.infer('Table.AddColumn(Source, "A", each 1, type #"number")'))
+
+    def test_flat_join_preserves_both_keys_after_projection(self):
+        result = self.infer('Table.SelectColumns(Table.Join(Source, {"LeftKey"}, Other, {"RightKey"}, JoinKind.Inner), {"Value"})')
+        self.assertTrue(result['Source'].accepts('LeftKey'))
+        self.assertTrue(result['Other'].accepts('RightKey'))
+        self.assertTrue(result['Other'].accepts('Value'))
+        self.assertFalse(result['Source'].accepts('Unused'))
+        self.assertFalse(result['Other'].accepts('Unused'))
+
+    def test_nested_join_expansion_resolves_alias_and_source_ownership(self):
+        result = self.infer('let Joined = Table.NestedJoin(Source, {"LeftKey"}, Other, {"RightKey"}, "Details", JoinKind.LeftOuter), Alias = Joined, Expanded = Table.ExpandTableColumn(Alias, "Details", {"Name"}, {"CustomerName"}) in Table.SelectColumns(Expanded, {"CustomerName"})')
+        self.assertTrue(result['Source'].accepts('LeftKey'))
+        self.assertFalse(result['Source'].accepts('Name'))
+        self.assertFalse(result['Source'].accepts('CustomerName'))
+        self.assertTrue(result['Other'].accepts('RightKey'))
+        self.assertTrue(result['Other'].accepts('Name'))
+        self.assertFalse(result['Other'].accepts('Unrelated'))
+
+    def test_nested_join_discarded_result_still_protects_keys(self):
+        result = self.infer('Table.SelectColumns(Table.NestedJoin(Source, "LeftKey", Other, "RightKey", "Details"), {"Value"})')
+        self.assertTrue(result['Other'].accepts('RightKey'))
+        self.assertFalse(result['Other'].accepts('Unused'))
+        self.assertTrue(result['Source'].accepts('Value'))
+
+    def test_unexpanded_nested_table_retains_all_right_columns(self):
+        result = self.infer('Table.NestedJoin(Source, "LeftKey", Other, "RightKey", "Details")')
+        self.assertTrue(result['Other'].accepts('AnyColumn'))
+
+    def test_join_unknown_shapes_fall_back(self):
+        for source in (
+            'Table.Join(Source, {"A"}, Other, {"B", "C"})',
+            'Table.Join(Source, {"A"}, Other, {"B"}, DynamicKind)',
+            'Table.Join(Source, {"A"}, Other, {"B"}, JoinKind.Inner, 0)',
+            'Table.ExpandTableColumn(Source, "Details", {"A"})',
+            'Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Wrong", {"Name"})',
+            'Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Details", {"Name"}, {"X", "Y"})',
+            'let JoinKind.Inner = Other in Table.Join(Source, "A", Other, "B", JoinKind.Inner)',
+            'Table.ExpandTableColumn(Table.SelectRows(Table.NestedJoin(Source, "A", Other, "B", "Details"), each [A] > 0), "Details", {"Name"})',
+            'let A = B, B = A in Table.ExpandTableColumn(A, "Details", {"Name"})',
+            'let Table.NestedJoin = Other in Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Details", {"Name"})',
+        ):
+            with self.subTest(source=source):
+                self.assertIsNone(self.infer(source))
+
+    def test_expanded_schema_and_composite_keys_survive_empty_projection(self):
+        result = self.infer('Table.SelectColumns(Table.ExpandTableColumn(Table.NestedJoin(Source, {"A", "B"}, Other, {"C", "D"}, "Details"), "Details", {"Name"}), {})')
+        self.assertTrue(all(result['Source'].accepts(c) for c in ('A', 'B')))
+        self.assertTrue(all(result['Other'].accepts(c) for c in ('C', 'D', 'Name')))
+        self.assertFalse(result['Source'].accepts('Name'))
+        self.assertFalse(result['Other'].accepts('Unrelated'))

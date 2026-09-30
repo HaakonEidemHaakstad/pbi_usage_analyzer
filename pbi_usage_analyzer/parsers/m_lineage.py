@@ -126,6 +126,21 @@ class _Parser:
             raise _Unsupported()
         self.index += 1
 
+    def column_names(self, allow_single=False) -> tuple[str, ...]:
+        if allow_single and self.at('string'):
+            return (norm(self.take('string')),)
+        self.take('{')
+        names = []
+        while not self.at('}'):
+            names.append(norm(self.take('string')))
+            if not self.at(','):
+                break
+            self.take(',')
+        self.take('}')
+        if not names or len(set(names)) != len(names):
+            raise _Unsupported()
+        return tuple(names)
+
     def row_expression(self, depth=0) -> frozenset[str]:
         """Collect reads from a closed scalar expression, never arbitrary M."""
         if depth > 80:
@@ -238,6 +253,44 @@ class _Parser:
         if not self.at('('):
             return ('ref', name)
         self.take('(')
+        if name in {'Table.Join', 'Table.NestedJoin'}:
+            left = self.expression(depth + 1)
+            self.take(',')
+            left_keys = self.column_names(allow_single=True)
+            self.take(',')
+            right = self.expression(depth + 1)
+            self.take(',')
+            right_keys = self.column_names(allow_single=True)
+            if len(left_keys) != len(right_keys):
+                raise _Unsupported()
+            nested = None
+            if name == 'Table.NestedJoin':
+                self.take(',')
+                nested = norm(self.take('string'))
+            join_kind = None
+            if self.at(','):
+                self.take(',')
+                join_kind = self.take('identifier')
+                if join_kind not in {'JoinKind.Inner', 'JoinKind.LeftOuter',
+                                      'JoinKind.RightOuter', 'JoinKind.FullOuter'}:
+                    raise _Unsupported()
+            self.take(')')
+            return ('join' if nested is None else 'nestedjoin', left, right,
+                    frozenset(left_keys), frozenset(right_keys), nested, join_kind)
+        if name == 'Table.ExpandTableColumn':
+            upstream = self.expression(depth + 1)
+            self.take(',')
+            column = norm(self.take('string'))
+            self.take(',')
+            fields = self.column_names()
+            outputs = fields
+            if self.at(','):
+                self.take(',')
+                outputs = self.column_names()
+            if len(fields) != len(outputs) or column in outputs:
+                raise _Unsupported()
+            self.take(')')
+            return ('expand', upstream, column, fields, outputs)
         if name == 'Table.Combine':
             self.take('{')
             inputs = []
@@ -322,6 +375,28 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
         active = set()
         remaining_visits = 10000
 
+        def resolve_nested(node, scope, depth=0):
+            """Resolve only aliases/let wrappers; other intervening operations fall back."""
+            nonlocal remaining_visits
+            remaining_visits -= 1
+            if depth > 80 or remaining_visits < 0:
+                raise _Unsupported()
+            if node[0] == 'ref' and node[1] in scope:
+                expression, binding_scope = scope[node[1]]
+                return resolve_nested(expression, binding_scope, depth + 1)
+            if node[0] == 'let':
+                nested = dict(scope)
+                for name, expression in node[1].items():
+                    nested[name] = (expression, nested)
+                return resolve_nested(node[2], nested, depth + 1)
+            if node[0] != 'nestedjoin':
+                raise _Unsupported()
+            if 'Table.NestedJoin' in scope or norm('Table.NestedJoin') in model_tables:
+                raise _Unsupported()
+            if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
+                raise _Unsupported()
+            return node, scope
+
         def visit(node, demand, scope, depth=0):
             nonlocal remaining_visits
             remaining_visits -= 1
@@ -331,7 +406,8 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
             intrinsic = {'combine': 'Table.Combine', 'select': 'Table.SelectColumns',
                          'remove': 'Table.RemoveColumns', 'rename': 'Table.RenameColumns',
                          'types': 'Table.TransformColumnTypes', 'filter': 'Table.SelectRows',
-                         'add': 'Table.AddColumn'}.get(kind)
+                         'add': 'Table.AddColumn', 'join': 'Table.Join',
+                         'nestedjoin': 'Table.NestedJoin', 'expand': 'Table.ExpandTableColumn'}.get(kind)
             if intrinsic and (intrinsic in scope or norm(intrinsic) in model_tables):
                 raise _Unsupported()
             if kind in {'select', 'remove', 'rename'} and node[3] and (
@@ -396,6 +472,35 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 # Keep generator reads conservatively even if the output is dropped.
                 visit(node[1], ColumnDemand(included, demand.excluded | added,
                                            (demand.required - added) | node[3]), scope, depth + 1)
+            elif kind in {'join', 'nestedjoin'}:
+                if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
+                    raise _Unsupported()
+                left_demand = demand
+                right_demand = demand
+                if kind == 'nestedjoin':
+                    generated = frozenset({node[5]})
+                    left_demand = ColumnDemand(
+                        None if demand.included is None else demand.included - generated,
+                        demand.excluded | generated, demand.required - generated)
+                    right_demand = ColumnDemand() if demand.accepts(node[5]) else ColumnDemand(frozenset())
+                visit(node[1], ColumnDemand(left_demand.included, left_demand.excluded,
+                                           left_demand.required | node[3]), scope, depth + 1)
+                visit(node[2], ColumnDemand(right_demand.included, right_demand.excluded,
+                                           right_demand.required | node[4]), scope, depth + 1)
+            elif kind == 'expand':
+                joined, join_scope = resolve_nested(node[1], scope)
+                if node[2] != joined[5]:
+                    raise _Unsupported()
+                generated = frozenset(node[4]) | {node[2]}
+                left_demand = ColumnDemand(
+                    None if demand.included is None else demand.included - generated,
+                    demand.excluded | generated, (demand.required - generated) | joined[3])
+                # Every expanded name remains a schema requirement, even when
+                # a later projection drops its output alias. Expansion also
+                # depends on matching rows, so both join keys always survive.
+                right_demand = ColumnDemand(frozenset(node[3]), required=joined[4] | frozenset(node[3]))
+                visit(joined[1], left_demand, join_scope, depth + 1)
+                visit(joined[2], right_demand, join_scope, depth + 1)
 
         visit(root, ColumnDemand(), {})
         return result

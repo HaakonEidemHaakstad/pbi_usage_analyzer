@@ -1,0 +1,13 @@
+table Output
+    column Amount
+        sourceColumn: Amount
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details", JoinKind.LeftOuter),
+                Expanded = Table.ExpandTableColumn(Joined, "Details", {"Name"}, {"CustomerName"}),
+                Selected = Table.SelectColumns(Expanded, {"Amount", "CustomerName"})
+            in
+                Selected

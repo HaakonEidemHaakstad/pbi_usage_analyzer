@@ -141,7 +141,8 @@ V2 distinguishes query-level lineage from column-level lineage. A query-level de
 The analyzer traces source-column requirements through complete expressions using
 `Table.SelectColumns`, `Table.RemoveColumns`, `Table.Combine`,
 `Table.RenameColumns`, `Table.TransformColumnTypes`, `Table.SelectRows`, and
-`Table.AddColumn`, including named
+`Table.AddColumn`, `Table.Join`, `Table.NestedJoin`, and
+`Table.ExpandTableColumn`, including named
 steps and nested calls. Column lists must be literal lists. Select/remove support
 an optional `MissingField.Ignore` argument. Requirements from multiple M
 partitions are combined.
@@ -171,13 +172,22 @@ projection. Computed outputs map back to their input fields; generator reads are
 retained conservatively even when the output is dropped. Function calls, dynamic
 field access, nested record access, and external bindings retain fallback behavior.
 
+Joins support literal single/composite keys and default, inner, left outer,
+right outer, or full outer kinds. Both input keys remain protected. Flat joins
+conservatively apply output-name demands to both inputs. Nested expansion maps
+explicit output aliases to the right-hand source when its input resolves directly
+to a nested join through aliases or `let` wrappers. Expanded fields remain schema
+requirements even if later discarded. Unexpanded nested results protect all
+right-hand columns when retained.
+
+Dynamic keys, comparers, join algorithms, semi/anti joins, and transformations
+between nested join and expansion remain unsupported and retain fallback.
+
 ## Next planned improvement
 
-Extend lineage to joins and expanded nested tables, preserving join keys and
-resolving output-column ownership. Broaden row-expression support incrementally
-with explicit function semantics. General M
-expressions, dynamic column lists, and connector-specific schemas remain outside
-the current bounded implementation.
+Broaden row-expression support with explicit semantics for common scalar
+functions, then support more transformations between nested joins and expansion.
+Keep adding regression fixtures before reducing conservative protection.
 
 ## Development
 

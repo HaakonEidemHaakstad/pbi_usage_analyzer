@@ -1,0 +1,13 @@
+{
+  "expected_status": {
+    "Column|Orders|CustomerKey": "Needs manual review",
+    "Column|Orders|Amount": "Needs manual review",
+    "Column|Orders|UnusedOrder": "Likely unused",
+    "Column|Customers|Key": "Needs manual review",
+    "Column|Customers|Name": "Needs manual review",
+    "Column|Customers|UnusedCustomer": "Likely unused",
+    "Column|Output|Amount": "Used",
+    "Column|Output|CustomerName": "Used"
+  },
+  "notes": "Nested join keys survive projection and expanded aliases resolve to the right source only."
+}

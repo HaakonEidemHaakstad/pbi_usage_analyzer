@@ -544,6 +544,43 @@ table Output
                   "Filter inputs and computed-column inputs survive projection; unrelated columns are not protected.")
 
 
+def build_m_join_expansion(root: Path):
+    name = "14_m_join_expansion"
+    p, report, model = project(root, name)
+    for table, columns in (("Orders", ("CustomerKey", "Amount", "UnusedOrder")),
+                           ("Customers", ("Key", "Name", "UnusedCustomer"))):
+        text = f"table {table}\n"
+        for column in columns:
+            text += f"    column {column}\n        sourceColumn: {column}\n"
+        write(model / "definition" / "tables" / f"{table}.tmdl", text)
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Amount
+        sourceColumn: Amount
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details", JoinKind.LeftOuter),
+                Expanded = Table.ExpandTableColumn(Joined, "Details", {"Name"}, {"CustomerName"}),
+                Selected = Table.SelectColumns(Expanded, {"Amount", "CustomerName"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Amount"))
+    add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
+    save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
+                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|UnusedOrder": "Likely unused",
+                      "Column|Customers|Key": "Needs manual review",
+                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|UnusedCustomer": "Likely unused",
+                      "Column|Output|Amount": "Used",
+                      "Column|Output|CustomerName": "Used"},
+                  "Nested join keys survive projection and expanded aliases resolve to the right source only.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -569,6 +606,7 @@ def main():
         build_m_lineage_fallback,
         build_m_rename_types,
         build_m_rows_and_computed,
+        build_m_join_expansion,
     ]
     for builder in builders:
         builder(root)
