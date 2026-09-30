@@ -8,7 +8,7 @@ from .model import ProjectPaths
 def discover_project(project_folder: Path) -> ProjectPaths:
     project_folder = project_folder.expanduser().resolve()
     if not project_folder.is_dir():
-        raise NotADirectoryError(f"Prosjektmappen finnes ikke eller er ikke en mappe: {project_folder}")
+        raise NotADirectoryError(f"The project folder does not exist or is not a directory: {project_folder}")
 
     report_folders = sorted(p for p in project_folder.glob("*.Report") if p.is_dir())
     model_folders = sorted(p for p in project_folder.glob("*.SemanticModel") if p.is_dir())
@@ -28,7 +28,7 @@ def discover_project(project_folder: Path) -> ProjectPaths:
         project_name = report_folder.name[:-len('.Report')]
     else:
         raise RuntimeError(
-            "Kunne ikke identifisere ett entydig .Report/.SemanticModel-par i prosjektmappen."
+            "Could not identify a single unambiguous .Report/.SemanticModel pair in the project folder."
         )
 
     expected_pbip = project_folder / f"{project_name}.pbip"

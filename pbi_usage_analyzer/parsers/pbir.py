@@ -109,7 +109,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
         try:
             data = load_json(path)
         except Exception as exc:
-            result.warnings.append(f"Kunne ikke lese {path}: {exc}")
+            result.warnings.append(f"Could not read {path}: {exc}")
             continue
         mappings: dict[str, str] = {}
         _source_mappings(data, mappings)
@@ -131,6 +131,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
                 if target.object_type == ObjectType.COLUMN:
                     accounted_columns.add(target)
                 continue
+            # These localized Power BI identifiers are input data, not UI text.
             if typ in {"Hierarchy", "HierarchyLevel"} and field.casefold() in {"år", "måned", "kvartal", "dag", "datohierarki"}:
                 result.auto_date.append({"Type": typ, "Table": table, "Field": field, "Source file": str(path.relative_to(report_folder))})
                 continue

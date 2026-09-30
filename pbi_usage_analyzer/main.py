@@ -16,7 +16,7 @@ def run(project_folder: Path) -> tuple[Path, Path]:
     print("=" * 70)
     print("POWER BI USAGE ANALYZER V2")
     print("=" * 70)
-    print(f"Prosjekt:       {project.project_name}")
+    print(f"Project:       {project.project_name}")
     print(f"Report:         {project.report_folder.name}")
     print(f"Semantic model: {project.model_folder.name}")
     print()
@@ -30,19 +30,19 @@ def run(project_folder: Path) -> tuple[Path, Path]:
 
     cols = [f for f in findings if f.ref.object_type == ObjectType.COLUMN]
     measures = [f for f in findings if f.ref.object_type == ObjectType.MEASURE]
-    print(f"Kolonner: {len(cols)}")
+    print(f"Columns: {len(cols)}")
     print(f"  Used: {sum(f.status == Status.USED for f in cols)}")
     print(f"  Needs manual review: {sum(f.status == Status.MANUAL_REVIEW for f in cols)}")
     print(f"  Likely unused: {sum(f.status == Status.LIKELY_UNUSED for f in cols)}")
     print(f"Measures: {len(measures)}")
     print(f"  Likely unused: {sum(f.status == Status.LIKELY_UNUSED for f in measures)}")
     if ctx.powerquery:
-        print(f"Power Query-avhengigheter: {len(ctx.powerquery.dependencies)}")
+        print(f"Power Query dependencies: {len(ctx.powerquery.dependencies)}")
         for row in ctx.powerquery.dependencies:
             print(f"  {row['Query']} <- {row['Depends on query']}")
     print()
-    print(f"Brukerrapport: {project.text_output}")
-    print(f"Teknisk rapport: {project.excel_output}")
+    print(f"Text report: {project.text_output}")
+    print(f"Technical report: {project.excel_output}")
     return project.text_output, project.excel_output
 
 

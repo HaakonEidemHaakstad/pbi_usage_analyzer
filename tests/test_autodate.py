@@ -42,7 +42,7 @@ class AutoDateTests(unittest.TestCase):
                         if e.evidence_type == EvidenceType.POWERQUERY_COLUMN_DEPENDENCY]
         self.assertEqual([e.target.name for e in column_edges], ['Date'])
         self.assertTrue(column_edges[0].source_file)
-        self.assertIn('2 av 3 kolonner (66.7 %)', generate_text('test', findings, ctx))
+        self.assertIn('2 of 3 columns (66.7 %)', generate_text('test', findings, ctx))
         output = Path(self.tmp.name) / 'audit.xlsx'
         write_excel(output, 'test', findings, ctx)
         book = load_workbook(output)

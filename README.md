@@ -24,130 +24,127 @@ python -m unittest discover -s tests -v
 
 ## Power BI Usage Analyzer V2
 
-Dette er en ny, modulær versjon av analyseverktøyet for Power BI PBIP/PBIR-prosjekter.
+This is a modular version of the analyzer for Power BI PBIP/PBIR projects.
 
-Målet er å finne oppryddingskandidater i den semantiske modellen uten å feilaktig foreslå sletting av objekter som rapporten eller modellen trenger.
+The goal is to identify cleanup candidates in the semantic model without incorrectly suggesting the deletion of objects required by the report or model.
 
-V2 er bygget rundt en eksplisitt dependency graph i stedet for at hver parser selv bestemmer om et objekt er brukt eller ubrukt.
+V2 uses an explicit dependency graph. Parsers identify objects and dependencies, while a separate classifier determines whether objects are used.
 
-## Arkitektur
+## Architecture
 
-Analyseflyten er:
+The analysis pipeline is:
 
-    PBIR + TMDL + DAX + relasjoner + hierarkier + Power Query/M
+    PBIR + TMDL + DAX + relationships + hierarchies + Power Query/M
                               |
                               v
                        Dependency graph
                               |
                               v
-                      Brukspropagering
+                       Usage propagation
                               |
                               v
-                        Klassifisering
+                        Classification
                               |
                  +------------+------------+
                  |                         |
                  v                         v
-          TXT brukerrapport          Excel audit
+          TXT summary report          Excel audit
 
-Statusene er:
+The classifications are:
 
-    Used
-        Det finnes sterk evidens for at objektet er nødvendig.
+- **Used**: Strong evidence shows that the object is required.
+- **Needs manual review**: A credible dependency or reference exists, but the analysis cannot confidently establish active use.
+- **Likely unused**: No known report usage or relevant dependency was found.
+- **Internal / auto-generated**: An internal Power BI object.
 
-    Needs manual review
-        Det finnes en troverdig avhengighet eller referanse, men analysen kan ikke sikkert avgjøre om objektet er aktivt nødvendig.
+"Likely unused" does not mean "guaranteed safe to delete."
 
-    Likely unused
-        Ingen kjent rapportbruk eller relevant avhengighet ble funnet.
+## Installation
 
-    Internal / auto-generated
-        Power BI-internt objekt.
+Python 3 is required. Ubuntu/Linux is the primary development platform.
 
-"Likely unused" betyr ikke "garantert trygt å slette".
-
-## Installasjon
-
-Python 3 kreves. Ubuntu/Linux er primær utviklingsplattform.
-
-Opprett et lokalt Python-miljø og installer avhengigheter:
+Create a local Python environment and install dependencies:
 
 ```bash
 make setup
 ```
 
-Se [Ubuntu-oppsett](docs/UBUNTU_SETUP.md). Docker er valgfritt for vanlige tester, selv om `make check` rapporterer det som en manglende forutsetning.
+See [Ubuntu setup](docs/UBUNTU_SETUP.md). Docker is optional for normal tests, although `make check` reports it as a missing prerequisite when it is unavailable.
 
-## Kjøring
+## Running the analyzer
 
-Fra denne mappen:
-
-```bash
-make analyze PROJECT="/sti/til/PBIP-prosjekt"
-```
-
-Alternativt, med prosjektets virtuelle Python-miljø:
+From the repository root:
 
 ```bash
-.venv/bin/python run_analyzer.py "/sti/til/PBIP-prosjekt"
+make analyze PROJECT="/path/to/PBIP-project"
 ```
 
-Forventet prosjektstruktur er normalt:
+Alternatively, use the project's Python virtual environment:
 
-    Prosjekt.pbip
-    Prosjekt.Report\
-    Prosjekt.SemanticModel\
+```bash
+.venv/bin/python run_analyzer.py "/path/to/PBIP-project"
+```
+
+The expected project structure is typically:
+
+```text
+Project.pbip
+Project.Report/
+Project.SemanticModel/
+```
 
 ## Output
 
-Verktøyet oppretter:
+The analyzer creates:
 
-    <Prosjekt>_usage_summary_v2.txt
-    <Prosjekt>_usage_analysis_v2.xlsx
+```text
+<Project>_usage_summary_v2.txt
+<Project>_usage_analysis_v2.xlsx
+```
 
-## Viktige analysekilder
+## Analysis sources
 
-V2 undersøker blant annet:
+V2 inspects:
 
-- visual-, side- og rapportreferanser i PBIR
-- measures og kolonner i TMDL
-- DAX-avhengigheter
-- relasjoner
-- hierarkier
-- Sort by column
-- Power BI auto-date-objekter
-- field parameters / NAMEOF der de kan identifiseres
-- enkelte RLS/calculation-group-referanser
-- Power Query/M-avhengigheter mellom spørringer
-- rå PBIR-referanser som sikkerhetsnett
+- visual, page, and report references in PBIR
+- measures and columns in TMDL
+- DAX dependencies
+- relationships
+- hierarchies
+- sort-by-column metadata
+- Power BI auto-date objects
+- field parameters / `NAMEOF` where identifiable
+- some RLS and calculation-group references
+- Power Query/M dependencies between queries
+- raw PBIR references as a safety net
 
 ## Power Query / M
 
-M-parseren skal bare trekke query-avhengigheter fra faktiske M-uttrykk i partisjonenes `source =`-blokker.
+The M parser infers query dependencies only from actual M expressions in partition `source =` blocks.
 
-Eksempel:
+For example, this expression in a `Ledger` query:
 
-    Table.Combine({#"Fjernede kolonner", #"Hovedbok 2024"})
+```powerquery
+Table.Combine({#"Removed Columns", #"Ledger 2024"})
+```
 
-skal gi:
+should identify `Ledger` as depending on `Ledger 2024`.
 
-    Hovedbok <- Hovedbok 2024
+A table name appearing only in metadata, DAX, a string, or a comment must not create a Power Query dependency.
 
-Et tabellnavn som bare finnes i metadata, DAX, en tekststreng eller kommentar skal ikke skape en Power Query-avhengighet.
+Internal `LocalDateTable_*` and `DateTableTemplate_*` objects are excluded from business-object counts. They protect only specifically identified columns through relationships or supported `Table.SelectColumns` expressions. Unresolved auto-date lineage produces warnings.
 
-Interne `LocalDateTable_*`- og `DateTableTemplate_*`-objekter holdes utenfor forretningstellingen. De beskytter bare konkret identifiserte kolonner gjennom relasjoner eller støttede `Table.SelectColumns`-uttrykk. Uavklart auto-date-lineage gir advarsler.
+V2 distinguishes query-level lineage from column-level lineage. A query-level dependency from a normal model table currently protects upstream columns conservatively as "Needs manual review." This does not mean that every column is required.
 
-V2 skiller mellom query-level og column-level lineage. En query-level dependency fra en vanlig modelltabell beskytter foreløpig upstream-kolonner konservativt som "Needs manual review". Det betyr ikke at alle kolonnene nødvendigvis er nødvendige.
+## Next planned improvement
 
-## Neste planlagte forbedring
+The main planned improvement is column-level lineage through Power Query/M. The goal is to understand transformations such as `Table.SelectColumns`, `Table.RemoveColumns`, and `Table.Combine` so the analyzer can determine which upstream columns actually propagate to the result.
 
-Den viktigste videreutviklingen er kolonnenivå-lineage gjennom Power Query/M. Målet er å forstå transformasjoner som Table.SelectColumns, Table.RemoveColumns og Table.Combine slik at verktøyet kan avgjøre hvilke upstream-kolonner som faktisk propagerer videre.
+## Development
 
-## Utvikling
+Agent and development guidelines are in [AGENTS.md](AGENTS.md).
 
-Agent- og utviklingsreglene ligger i [AGENTS.md](AGENTS.md).
-
-Kjør tester med:
+Run the checks with:
 
 ```bash
 make compile
@@ -155,7 +152,7 @@ make test
 make validate
 ```
 
-Regresjonstestene skal utvides hver gang en ny feilklasse oppdages.
+Extend regression coverage whenever a new class of bug is discovered.
 
 
 ## Optional MariaDB integration

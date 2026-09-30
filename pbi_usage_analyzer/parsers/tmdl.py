@@ -178,7 +178,7 @@ def parse_model(model_folder: Path) -> TmdlModel:
     definition = model_folder / "definition"
     tables_folder = definition / "tables"
     if not tables_folder.exists():
-        raise FileNotFoundError(f"Fant ikke TMDL-tabellmappen: {tables_folder}")
+        raise FileNotFoundError(f"TMDL tables folder not found: {tables_folder}")
 
     result = TmdlModel()
     for path in sorted(tables_folder.glob("*.tmdl")):
@@ -190,5 +190,5 @@ def parse_model(model_folder: Path) -> TmdlModel:
                 if obj.ref.object_type == ObjectType.TABLE:
                     result.table_files[obj.ref.table] = path
         except Exception as exc:
-            result.warnings.append(f"Kunne ikke parse {path.name}: {exc}")
+            result.warnings.append(f"Could not parse {path.name}: {exc}")
     return result

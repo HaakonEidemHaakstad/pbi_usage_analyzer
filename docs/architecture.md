@@ -65,10 +65,10 @@ Power Query query lineage is currently query-level.
 
 For example:
 
-    Hovedbok
-      -> Hovedbok 2024
+    Ledger
+      -> Ledger 2024
 
-If this edge is proven from the M partition source, columns in `Hovedbok 2024` are protected as `Needs manual review` unless stronger evidence exists.
+If this edge is proven from the M partition source, columns in `Ledger 2024` are protected as `Needs manual review` unless stronger evidence exists.
 
 This is deliberately conservative because query-level lineage does not prove every upstream column is propagated.
 
@@ -78,14 +78,14 @@ The next major feature should model schemas through transformations.
 
 For example:
 
-    Source = #"Hovedbok 2024",
-    Selected = Table.SelectColumns(Source, {"Konto", "beløp", "firma"})
+    Source = #"Ledger 2024",
+    Selected = Table.SelectColumns(Source, {"Account", "Amount", "Company"})
 
 should eventually create column-level edges only for:
 
-- Hovedbok 2024[Konto]
-- Hovedbok 2024[beløp]
-- Hovedbok 2024[firma]
+- Ledger 2024[Account]
+- Ledger 2024[Amount]
+- Ledger 2024[Company]
 
 This will reduce false negatives without reintroducing risky false positives.
 
