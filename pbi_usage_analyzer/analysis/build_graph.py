@@ -3,22 +3,26 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import DependencyGraph, Evidence, EvidenceType, ModelObject, ObjectRef, ObjectType
 from ..parsers.dax import dax_dependencies
+from ..parsers.dax_lexer import mask_dax
+from ..parsers.special_dax import special_dax_evidence
 from ..parsers.pbir import ReportParseResult, parse_report
 from ..parsers.powerquery import PowerQueryResult, parse_power_query_dependencies
-from ..parsers.relationships import parse_relationships
+from ..parsers.relationships import Relationship, parse_relationship_metadata, relationship_evidence
 from ..parsers.tmdl import TmdlModel, parse_model
-from ..util import is_internal_table, norm_key
+from ..util import is_internal_table, norm_key, read_source_text
 
 
-class AnalysisContext:
+class AnalysisContext(DiagnosticCollection):
     def __init__(self) -> None:
         self.graph = DependencyGraph()
+        self.relationships: list[Relationship] = []
         self.tmdl: TmdlModel | None = None
         self.report: ReportParseResult | None = None
         self.powerquery: PowerQueryResult | None = None
-        self.warnings: list[str] = []
+        self.diagnostics: list[Diagnostic] = []
 
 
 def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
@@ -26,7 +30,7 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
     tmdl = parse_model(model_folder)
     ctx.tmdl = tmdl
     ctx.graph.add_objects(tmdl.objects)
-    ctx.warnings.extend(tmdl.warnings)
+    ctx.diagnostics.extend(tmdl.diagnostics)
 
     columns: dict[tuple[str, str], ObjectRef] = {}
     measures: dict[tuple[str, str], ObjectRef] = {}
@@ -57,8 +61,30 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
     # DAX edges.
     for ref, obj in list(ctx.graph.objects.items()):
         if ref.object_type in {ObjectType.COLUMN, ObjectType.MEASURE} and obj.expression:
+            unterminated = mask_dax(obj.expression).unterminated
+            if unterminated:
+                ctx.diagnostics.append(Diagnostic(
+                    "DAX_UNTERMINATED_LITERAL", DiagnosticSeverity.WARNING,
+                    f"DAX expression for {ref.label} has an unterminated {unterminated}; "
+                    "references after it were kept as dependency evidence.",
+                    source_file=obj.source_file, object_ref=ref,
+                ))
             for ev in dax_dependencies(ref, obj.expression, columns, measures):
                 ctx.graph.add_evidence(ev)
+
+    # Evidence hidden by unparseable or undecodable TMDL stays reviewable.
+    for path in tmdl.failed_files:
+        owner = ObjectRef(ObjectType.TABLE, path.stem)
+        for ev in dax_dependencies(owner, read_source_text(path)[0], columns, measures):
+            ctx.graph.add_evidence(Evidence(
+                None, ev.target, EvidenceType.INCOMPLETE_SOURCE,
+                f"Referenced in unparsed TMDL file {path.name}", str(path), "low"))
+    for ref, obj in ctx.graph.objects.items():
+        if ref.object_type in {ObjectType.COLUMN, ObjectType.MEASURE} and "\ufffd" in ref.table + ref.name:
+            ctx.graph.add_evidence(Evidence(
+                None, ref, EvidenceType.INCOMPLETE_SOURCE,
+                "Name contains undecodable bytes; references to it cannot be matched",
+                obj.source_file, "low"))
 
     # Hierarchy edges.
     for hierarchy, members in tmdl.hierarchies.items():
@@ -75,36 +101,24 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                 ctx.graph.add_evidence(Evidence(ref, target, EvidenceType.SORT_DEPENDENCY, f"SortByColumn for {ref.label}", obj.source_file, "high"))
 
     # Relationships.
-    for ev in parse_relationships(model_folder, columns):
+    ctx.relationships = parse_relationship_metadata(model_folder)
+    for ev in relationship_evidence(ctx.relationships, columns):
         ctx.graph.add_evidence(ev)
 
-    # Field parameters / NAMEOF, roles/RLS, calculation groups: scan only relevant TMDL areas,
-    # but mark as explicit evidence when a valid DAX reference is resolvable.
-    for path in (model_folder / "definition").rglob("*.tmdl"):
-        text = path.read_text(encoding="utf-8")
-        lower = text.casefold()
-        special_types: list[EvidenceType] = []
-        if "nameof(" in lower:
-            special_types.append(EvidenceType.FIELD_PARAMETER_DEPENDENCY)
-        if "calculationgroup" in lower or "calculation group" in lower:
-            special_types.append(EvidenceType.CALCULATION_GROUP_DEPENDENCY)
-        if "role " in lower or "roles" in path.parts:
-            special_types.append(EvidenceType.RLS_DEPENDENCY)
-        if special_types:
-            fake_owner = ObjectRef(ObjectType.TABLE, f"Special:{path.name}")
-            for ev in dax_dependencies(fake_owner, text, columns, measures):
-                for et in special_types:
-                    ctx.graph.add_evidence(Evidence(fake_owner, ev.target, et, f"Referenced by {et.value} in {path.name}", str(path), "medium"))
+    # Parse relevant declaration expressions before resolving special evidence.
+    for path in sorted((model_folder / "definition").rglob("*.tmdl")):
+        for evidence in special_dax_evidence(path, columns, measures):
+            ctx.graph.add_evidence(evidence)
 
     report = parse_report(report_folder, columns, measures, hierarchies)
     ctx.report = report
-    ctx.warnings.extend(report.warnings)
+    ctx.diagnostics.extend(report.diagnostics)
     for ev in report.evidence:
         ctx.graph.add_evidence(ev)
 
     pq = parse_power_query_dependencies(model_folder, table_names)
     ctx.powerquery = pq
-    ctx.warnings.extend(pq.warnings)
+    ctx.diagnostics.extend(pq.diagnostics)
     for ev in pq.evidence:
         ctx.graph.add_evidence(ev)
 
@@ -120,10 +134,12 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
         if ev.source and is_internal_table(ev.source.table):
             selected = pq.projected_columns.get((ev.source.table, upstream))
             if selected is None:
-                ctx.warnings.append(
+                ctx.diagnostics.append(Diagnostic(
+                    "AUTODATE_BACKING_COLUMN_UNRESOLVED", DiagnosticSeverity.WARNING,
                     f"Auto-date query {ev.source.table} references {upstream}, but its backing "
-                    "column could not be resolved from M; inspect the query and relationships."
-                )
+                    "column could not be resolved from M; inspect the query and relationships.",
+                    source_file=ev.source_file, object_ref=ev.source,
+                ))
             else:
                 for name in sorted(selected):
                     # M selects source names, which may differ from model display names.
@@ -131,7 +147,10 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                                if norm_key(upstream, ctx.graph.objects[col].source_column or col.name)
                                == norm_key(upstream, name)]
                     if not matches:
-                        ctx.warnings.append(f"Unresolved auto-date source column: {upstream}[{name}]")
+                        ctx.diagnostics.append(Diagnostic(
+                            "AUTODATE_SOURCE_COLUMN_UNRESOLVED", DiagnosticSeverity.WARNING,
+                            f"Unresolved auto-date source column: {upstream}[{name}]",
+                            source_file=ev.source_file, object_ref=ev.source))
                     for col in matches:
                         ctx.graph.add_evidence(Evidence(
                             ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,

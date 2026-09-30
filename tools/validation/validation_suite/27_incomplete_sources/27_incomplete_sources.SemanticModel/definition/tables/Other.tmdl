@@ -1,0 +1,5 @@
+table Other
+    column Beløp
+        sourceColumn: Beløp
+    column Plain
+        sourceColumn: Plain

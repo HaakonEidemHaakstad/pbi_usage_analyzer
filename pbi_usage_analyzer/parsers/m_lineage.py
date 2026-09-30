@@ -400,33 +400,90 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
             if any(name in scope or norm(name) in model_tables for name in calls):
                 raise _Unsupported()
 
-        def resolve_nested(node, scope, depth=0):
-            """Resolve aliases, let wrappers and row filters without losing reads."""
+        def schema_demand(node, demand):
+            kind = node[0]
+            if kind == 'select':
+                columns = node[2]
+                selected = columns if demand.included is None else columns & demand.included
+                return ColumnDemand(selected - demand.excluded, required=demand.required | (frozenset() if node[3] else columns))
+            elif kind == 'remove':
+                return ColumnDemand(demand.included, demand.excluded | node[2], demand.required | (frozenset() if node[3] else node[2]))
+            elif kind == 'rename':
+                inverse = {new: old for old, new in node[2]}
+                old_names = frozenset(inverse.values())
+
+                def back(names):
+                    mapped = frozenset(inverse.get(name, name) for name in names)
+                    # With Ignore, the old name may be absent and the new name
+                    # may already exist. Both possible origins remain protected.
+                    return mapped | names if node[3] else mapped
+
+                included = None if demand.included is None else back(demand.included)
+                excluded = frozenset(name for name in demand.excluded if name not in old_names)
+                excluded = frozenset(inverse.get(name, name) for name in excluded)
+                required = back(demand.required) | (frozenset() if node[3] else old_names)
+                return ColumnDemand(included, excluded, required)
+
+        def type_demand(node, demand, scope):
+            symbols = {'Table.TransformColumnTypes'} | node[3]
+            if any(name in scope or norm(name) in model_tables for name in symbols):
+                raise _Unsupported()
+            return ColumnDemand(demand.included, demand.excluded, demand.required | node[2])
+
+        def resolve_nested(node, scope, nested_name, demand, reads=frozenset(), depth=0):
+            """Trace nested identity and left-side demands back to their join."""
             nonlocal remaining_visits
             remaining_visits -= 1
             if depth > 80 or remaining_visits < 0:
                 raise _Unsupported()
             if node[0] == 'ref' and node[1] in scope:
                 expression, binding_scope = scope[node[1]]
-                return resolve_nested(expression, binding_scope, depth + 1)
+                return resolve_nested(expression, binding_scope, nested_name, demand, reads, depth + 1)
             if node[0] == 'let':
                 nested = dict(scope)
                 for name, expression in node[1].items():
                     nested[name] = (expression, nested)
-                return resolve_nested(node[2], nested, depth + 1)
+                return resolve_nested(node[2], nested, nested_name, demand, reads, depth + 1)
             if node[0] == 'filter':
                 if 'Table.SelectRows' in scope or norm('Table.SelectRows') in model_tables:
                     raise _Unsupported()
                 check_row_calls(node[3], scope)
-                joined, join_scope, reads = resolve_nested(node[1], scope, depth + 1)
-                return joined, join_scope, reads | node[2]
+                return resolve_nested(node[1], scope, nested_name, demand, reads | node[2], depth + 1)
+            if node[0] == 'types':
+                if nested_name in node[2]:
+                    raise _Unsupported()
+                return resolve_nested(node[1], scope, nested_name,
+                                      type_demand(node, demand, scope), reads, depth + 1)
+            if node[0] in {'select', 'remove', 'rename'}:
+                intrinsic = {'select': 'Table.SelectColumns', 'remove': 'Table.RemoveColumns',
+                             'rename': 'Table.RenameColumns'}[node[0]]
+                if intrinsic in scope or norm(intrinsic) in model_tables:
+                    raise _Unsupported()
+                if node[3] and ('MissingField.Ignore' in scope or norm('MissingField.Ignore') in model_tables):
+                    raise _Unsupported()
+                if node[0] == 'select' and nested_name not in node[2]:
+                    raise _Unsupported()
+                if node[0] == 'remove' and nested_name in node[2]:
+                    raise _Unsupported()
+                if node[0] == 'rename':
+                    inverse = {new: old for old, new in node[2]}
+                    # Ignore makes the origin of an affected nested name ambiguous.
+                    if nested_name in inverse.values() or (node[3] and nested_name in inverse):
+                        raise _Unsupported()
+                    nested_name = inverse.get(nested_name, nested_name)
+                    mapped = frozenset(inverse.get(name, name) for name in reads)
+                    reads = mapped | reads if node[3] else mapped
+                return resolve_nested(node[1], scope, nested_name,
+                                      schema_demand(node, demand), reads, depth + 1)
             if node[0] != 'nestedjoin':
                 raise _Unsupported()
             if 'Table.NestedJoin' in scope or norm('Table.NestedJoin') in model_tables:
                 raise _Unsupported()
             if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
                 raise _Unsupported()
-            return node, scope, frozenset()
+            if nested_name != node[5]:
+                raise _Unsupported()
+            return node, scope, demand, reads
 
         def visit(node, demand, scope, depth=0):
             nonlocal remaining_visits
@@ -467,32 +524,10 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
             elif kind == 'combine':
                 for expression in node[1]:
                     visit(expression, demand, scope, depth + 1)
-            elif kind == 'select':
-                columns = node[2]
-                selected = columns if demand.included is None else columns & demand.included
-                visit(node[1], ColumnDemand(selected - demand.excluded, required=demand.required | (frozenset() if node[3] else columns)), scope, depth + 1)
-            elif kind == 'remove':
-                visit(node[1], ColumnDemand(demand.included, demand.excluded | node[2], demand.required | (frozenset() if node[3] else node[2])), scope, depth + 1)
-            elif kind == 'rename':
-                inverse = {new: old for old, new in node[2]}
-                old_names = frozenset(inverse.values())
-
-                def back(names):
-                    mapped = frozenset(inverse.get(name, name) for name in names)
-                    # With Ignore, the old name may be absent and the new name
-                    # may already exist. Both possible origins remain protected.
-                    return mapped | names if node[3] else mapped
-
-                included = None if demand.included is None else back(demand.included)
-                excluded = frozenset(name for name in demand.excluded if name not in old_names)
-                excluded = frozenset(inverse.get(name, name) for name in excluded)
-                required = back(demand.required) | (frozenset() if node[3] else old_names)
-                visit(node[1], ColumnDemand(included, excluded, required), scope, depth + 1)
+            elif kind in {'select', 'remove', 'rename'}:
+                visit(node[1], schema_demand(node, demand), scope, depth + 1)
             elif kind == 'types':
-                if any(name in scope or norm(name) in model_tables for name in node[3]):
-                    raise _Unsupported()
-                visit(node[1], ColumnDemand(demand.included, demand.excluded,
-                                           demand.required | node[2]), scope, depth + 1)
+                visit(node[1], type_demand(node, demand, scope), scope, depth + 1)
             elif kind == 'filter':
                 check_row_calls(node[3], scope)
                 # Row membership depends on predicate columns regardless of output.
@@ -521,19 +556,22 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 visit(node[2], ColumnDemand(right_demand.included, right_demand.excluded,
                                            right_demand.required | node[4]), scope, depth + 1)
             elif kind == 'expand':
-                joined, join_scope, filter_reads = resolve_nested(node[1], scope)
-                if node[2] != joined[5]:
-                    raise _Unsupported()
                 generated = frozenset(node[4]) | {node[2]}
                 left_demand = ColumnDemand(
                     None if demand.included is None else demand.included - generated,
-                    demand.excluded | generated, (demand.required - generated) | joined[3]
-                    | (filter_reads - {node[2]}))
+                    demand.excluded | generated, demand.required - generated)
+                joined, join_scope, left_demand, filter_reads = resolve_nested(
+                    node[1], scope, node[2], left_demand)
+                nested = frozenset({joined[5]})
+                left_demand = ColumnDemand(
+                    None if left_demand.included is None else left_demand.included - nested,
+                    left_demand.excluded | nested,
+                    (left_demand.required | filter_reads) - nested | joined[3])
                 # Every expanded name remains a schema requirement, even when
                 # a later projection drops its output alias. Expansion also
                 # depends on matching rows, so both join keys always survive.
                 right_demand = ColumnDemand(frozenset(node[3]), required=joined[4] | frozenset(node[3]))
-                if node[2] in filter_reads:
+                if joined[5] in filter_reads:
                     right_demand = ColumnDemand(required=joined[4] | frozenset(node[3]))
                 visit(joined[1], left_demand, join_scope, depth + 1)
                 visit(joined[2], right_demand, join_scope, depth + 1)

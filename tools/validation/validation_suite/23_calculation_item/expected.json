@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Measure|Sales|Revenue": "Needs manual review",
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Sales|Region": "Needs manual review",
+    "Column|Sales|Unrelated": "Likely unused"
+  },
+  "notes": "Calculation-item references are credible dependencies, but item activation is not proven; keep manual review rather than claiming use."
+}

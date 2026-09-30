@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Column|Sales|Region": "Used",
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Sales|Unrelated": "Likely unused",
+    "Measure|Sales|Revenue": "Needs manual review"
+  },
+  "notes": "Only actual special expressions and NAMEOF arguments create special evidence; unrelated references, comments, strings and annotations do not promote usage."
+}

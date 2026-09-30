@@ -1,0 +1,4 @@
+role North
+    modelPermission: read
+    annotation Note = "'Sales'[Unrelated]"
+    tablePermission Sales = 'Sales'[Region] = "North" // 'Sales'[Unrelated]

@@ -1,0 +1,15 @@
+{
+  "expected_status": {
+    "Measure|Sales|Margin": "Used",
+    "Measure|Sales|Net": "Used",
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Cost": "Used",
+    "Column|Sales|Discount": "Used",
+    "Column|Sales|Legacy": "Likely unused",
+    "Column|Sales|Old Margin": "Likely unused",
+    "Column|Sales|Commented Only": "Likely unused",
+    "Measure|Sales|Draft": "Likely unused",
+    "Column|Sales|Draft Source": "Needs manual review"
+  },
+  "notes": "DAX strings and comments do not create dependencies; genuine references around them remain transitive. An unterminated string keeps its trailing reference as evidence."
+}

@@ -4,6 +4,9 @@ from pathlib import Path
 import pandas as pd
 
 from ..analysis.build_graph import AnalysisContext
+from ..health.model import HealthFinding
+from ..health.filtering import HealthFilterScope
+from .health_scope import health_scope_rows
 from ..model import Finding, ObjectType, Status
 
 
@@ -22,7 +25,7 @@ def _finding_rows(findings: list[Finding], obj_type: ObjectType) -> list[dict]:
     return rows
 
 
-def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: AnalysisContext) -> None:
+def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: AnalysisContext, health_findings: tuple[HealthFinding, ...] = (), health_filter_scope: HealthFilterScope | None = None) -> None:
     cols = [f for f in findings if f.ref.object_type == ObjectType.COLUMN and f.status != Status.INTERNAL]
     measures = [f for f in findings if f.ref.object_type == ObjectType.MEASURE and f.status != Status.INTERNAL]
     summary = pd.DataFrame([
@@ -35,7 +38,7 @@ def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: Ana
         {"Metric": "Manual review measures", "Value": sum(f.status == Status.MANUAL_REVIEW for f in measures)},
         {"Metric": "Graph evidence edges", "Value": len(ctx.graph.evidence)},
         {"Metric": "Power Query dependencies", "Value": len(ctx.powerquery.dependencies) if ctx.powerquery else 0},
-    ])
+    ] + [{"Metric": label, "Value": value} for label, value in health_scope_rows(health_filter_scope)])
 
     evidence_rows = [{
         "Source": ev.source.label if ev.source else "",
@@ -53,6 +56,12 @@ def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: Ana
         pd.DataFrame(_finding_rows(findings, ObjectType.MEASURE)).to_excel(writer, sheet_name="Measure analysis", index=False)
         pd.DataFrame([r for r in _finding_rows(findings, ObjectType.MEASURE) if r["Status"] == Status.LIKELY_UNUSED.value]).to_excel(writer, sheet_name="Likely unused measures", index=False)
         pd.DataFrame(evidence_rows).to_excel(writer, sheet_name="Dependency evidence", index=False)
+        health_columns = ["Rule ID", "Category", "Severity", "Confidence", "Scope", "Title",
+                          "Explanation", "Evidence", "Recommendation", "Source file", "Line"]
+        health_rows = [[f.rule_id, f.category, f.severity.value, f.confidence, f.scope, f.title,
+                        f.explanation, " | ".join(f.evidence), f.recommendation, f.source_file, f.line]
+                       for f in health_findings]
+        pd.DataFrame(health_rows, columns=health_columns).to_excel(writer, sheet_name="Model health", index=False)
         if ctx.report:
             pd.DataFrame(ctx.report.structured_refs).to_excel(writer, sheet_name="Report usage", index=False)
             pd.DataFrame(ctx.report.raw_hits).to_excel(writer, sheet_name="Raw report safety net", index=False)

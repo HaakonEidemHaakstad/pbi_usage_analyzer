@@ -1,0 +1,14 @@
+table Selector
+    column Label
+        sourceColumn: [Value1]
+    column Fields
+        sourceColumn: [Value2]
+        extendedProperty ParameterMetadata = {"version":3,"kind":2}
+    column Order
+        sourceColumn: [Value3]
+    partition Selector = calculated
+        source =
+            {
+                ("Revenue", NAMEOF('Sales'[Revenue]), 0),
+                ("Region", NAMEOF('Sales'[Region]), 1)
+            }

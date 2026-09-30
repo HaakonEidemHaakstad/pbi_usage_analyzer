@@ -1,0 +1,7 @@
+table Calculations
+    calculationGroup
+        precedence: 10
+        calculationItem North = CALCULATE('Sales'[Revenue], 'Sales'[Region] = "North")
+    column Name
+        dataType: string
+        sourceColumn: Name

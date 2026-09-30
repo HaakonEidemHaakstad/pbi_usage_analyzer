@@ -1,0 +1,7 @@
+table Customers
+    column Key
+        sourceColumn: Key
+    column Name
+        sourceColumn: Name
+    column UnusedCustomer
+        sourceColumn: UnusedCustomer

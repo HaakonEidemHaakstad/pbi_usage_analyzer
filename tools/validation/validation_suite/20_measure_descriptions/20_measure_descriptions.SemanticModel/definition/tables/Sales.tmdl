@@ -1,0 +1,9 @@
+table Sales
+    /// Revenue in local currency.
+    /// Excludes tax.
+    measure Documented = 1
+    measure Missing = 2
+    ///
+    measure Blank = 3
+    measure Legacy = 4
+        description: Existing description

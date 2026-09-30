@@ -4,8 +4,10 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import ModelObject, ObjectRef, ObjectType
-from ..util import clean_name, indentation
+from ..util import clean_name, indentation, read_source_text
+from .dax_lexer import mask_dax_literals
 
 TABLE_HEADER = re.compile(r"^\s*table\s+(.+?)\s*$", re.I)
 COLUMN_HEADER = re.compile(r"^(\s*)column\s+(.+?)\s*$", re.I)
@@ -16,15 +18,20 @@ PROPERTY_PREFIXES = (
     "dataType:", "formatString:", "lineageTag:", "summarizeBy:", "sourceColumn:",
     "displayFolder:", "description:", "dataCategory:", "sortByColumn:", "changedProperty",
     "annotation ", "variation ", "hierarchy ", "partition ", "isHidden",
+    "extendedProperty ", "formatStringDefinition",
 )
+# A TMDL property begins its line with `name:`. DAX has no such syntax, but DAX
+# strings/comments can contain colons, so the check runs on masked text.
+PROPERTY_LINE = re.compile(r"^[A-Za-z][A-Za-z0-9]*\s*:")
 
 
 @dataclass
-class TmdlModel:
+class TmdlModel(DiagnosticCollection):
     objects: list[ModelObject] = field(default_factory=list)
     hierarchies: dict[ObjectRef, set[ObjectRef]] = field(default_factory=dict)
     table_files: dict[str, Path] = field(default_factory=dict)
-    warnings: list[str] = field(default_factory=list)
+    failed_files: list[Path] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
 
 
 def split_object_definition(text: str) -> tuple[str, bool, str]:
@@ -67,7 +74,8 @@ def extract_expression(inline_expression: str, block: list[str], base_indent: in
 
     out: list[str] = []
     inside_fence = inline_expression == "```"
-    for line in block:
+    masked_lines = mask_dax_literals("\n".join(block)).split("\n")
+    for line, masked in zip(block, masked_lines):
         stripped = line.strip()
         if not stripped:
             continue
@@ -81,14 +89,34 @@ def extract_expression(inline_expression: str, block: list[str], base_indent: in
             out.append(stripped)
             continue
         if current_indent <= base_indent + 8:
-            if stripped.startswith(PROPERTY_PREFIXES) or ": " in stripped or stripped.endswith(":"):
+            masked = masked.strip()
+            if masked.startswith(PROPERTY_PREFIXES) or PROPERTY_LINE.match(masked):
                 break
         out.append(stripped)
     return "\n".join(out).strip()
 
 
+def measure_description(lines: list[str], index: int, block: list[str]) -> str | None:
+    """Read adjacent TMDL description comments; unknown alternate syntax is skipped."""
+    descriptions = []
+    preceding = index - 1
+    while preceding >= 0:
+        line = lines[preceding]
+        if indentation(line) != indentation(lines[index]) or not line.strip().startswith("///"):
+            break
+        descriptions.append(line.strip()[3:].strip())
+        preceding -= 1
+    if descriptions:
+        return "\n".join(reversed(descriptions))
+    # Do not report missing documentation when an alternate description form
+    # exists but its value has not been parsed confidently.
+    if any(line.strip().startswith("description:") for line in block):
+        return None
+    return ""
+
+
 def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, set[ObjectRef]]]:
-    text = path.read_text(encoding="utf-8")
+    text, _ = read_source_text(path)
     lines = text.splitlines()
     table = None
     for line in lines:
@@ -115,6 +143,8 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, set
                 source_file=str(path),
                 calculated=True,
                 expression=expression,
+                description=measure_description(lines, i, block),
+                source_line=i + 1,
             ))
             i = next_i
             continue
@@ -181,6 +211,12 @@ def parse_model(model_folder: Path) -> TmdlModel:
         raise FileNotFoundError(f"TMDL tables folder not found: {tables_folder}")
 
     result = TmdlModel()
+    for path in sorted(definition.rglob("*.tmdl")):
+        if read_source_text(path)[1]:
+            result.diagnostics.append(Diagnostic(
+                "TMDL_DECODE_REPLACED", DiagnosticSeverity.WARNING,
+                f"{path.name} is not valid UTF-8; undecodable bytes were replaced. "
+                "References containing them cannot be resolved.", source_file=str(path)))
     for path in sorted(tables_folder.glob("*.tmdl")):
         try:
             objects, hierarchies = parse_table_file(path)
@@ -190,5 +226,8 @@ def parse_model(model_folder: Path) -> TmdlModel:
                 if obj.ref.object_type == ObjectType.TABLE:
                     result.table_files[obj.ref.table] = path
         except Exception as exc:
-            result.warnings.append(f"Could not parse {path.name}: {exc}")
+            result.failed_files.append(path)
+            result.diagnostics.append(Diagnostic(
+                "TMDL_PARSE_FAILED", DiagnosticSeverity.WARNING,
+                f"Could not parse {path.name}: {exc}", source_file=str(path)))
     return result

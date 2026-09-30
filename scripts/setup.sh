@@ -23,7 +23,7 @@ echo "Upgrading pip ..."
 "$PY" -m pip install --upgrade pip
 
 echo "Installing Python dependencies ..."
-"$PY" -m pip install -r requirements.txt
+"$PY" -m pip install -r requirements-dev.txt
 
 echo "Making repository shell scripts executable ..."
 chmod +x scripts/*.sh || true

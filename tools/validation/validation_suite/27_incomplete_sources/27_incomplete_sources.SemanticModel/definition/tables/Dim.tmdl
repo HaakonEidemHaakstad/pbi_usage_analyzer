@@ -1,0 +1,3 @@
+﻿table Dim
+    column Code
+        sourceColumn: Code

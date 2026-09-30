@@ -1,0 +1,11 @@
+{
+  "expected_status": {
+    "Measure|Sales|Margin": "Used",
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Line Total": "Used",
+    "Column|Sales|Quantity": "Used",
+    "Column|Sales|Cost": "Used",
+    "Column|Sales|Folder Text": "Likely unused"
+  },
+  "notes": "Multiline expressions continue past DAX lines containing ': ' in strings or comments; TMDL properties still end the expression."
+}

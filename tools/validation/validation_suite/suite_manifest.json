@@ -14,7 +14,19 @@
     "12_m_rename_types",
     "13_m_rows_and_computed",
     "14_m_join_expansion",
-    "15_m_scalar_filtered_join"
+    "15_m_scalar_filtered_join",
+    "16_m_nested_schema",
+    "17_m_nested_types",
+    "18_relationship_health",
+    "19_many_to_many_health",
+    "20_measure_descriptions",
+    "21_field_parameter",
+    "22_rls",
+    "23_calculation_item",
+    "24_special_dax_scope",
+    "25_dax_lexical_scope",
+    "26_tmdl_expression_boundaries",
+    "27_incomplete_sources"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Column|Sales|Region": "Used",
+    "Column|Sales|Unrelated": "Likely unused",
+    "Measure|Sales|Revenue": "Likely unused",
+    "Column|Sales|Amount": "Needs manual review"
+  },
+  "notes": "Role-only Region is protected without report usage. Unused Revenue retains its DAX dependency as manual review."
+}

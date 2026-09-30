@@ -1,6 +1,7 @@
-.PHONY: help check setup compile test validate fixtures db-up db-down db-reset analyze clean
+.PHONY: help check setup compile test validate validate-json check-fixtures check-runtime fixtures db-up db-down db-reset analyze clean
 
 PY := .venv/bin/python
+EXPORT ?=
 PROJECT ?=
 
 help:
@@ -10,8 +11,11 @@ help:
 	@echo "  make setup                 Create .venv and install dependencies"
 	@echo "  make compile               Compile-check Python sources"
 	@echo "  make test                  Run unit/regression tests"
+	@echo "  make check-runtime         Smoke-test runtime-only dependencies"
+	@echo "  make check-fixtures        Check generated fixture reproducibility"
 	@echo "  make fixtures              Regenerate synthetic validation fixtures"
 	@echo "  make validate              Run synthetic validation suite"
+	@echo "  make validate-json EXPORT=... Validate a saved JSON export"
 	@echo "  make db-up                 Start disposable MariaDB"
 	@echo "  make db-down               Stop disposable MariaDB"
 	@echo "  make db-reset              Recreate MariaDB from synthetic seed"
@@ -30,11 +34,24 @@ compile:
 test:
 	$(PY) -m unittest discover -s tests -v
 
+check-runtime:
+	$(PY) tools/validation/check_runtime.py
+
+check-fixtures:
+	$(PY) tools/validation/check_fixture_drift.py
+
 fixtures:
 	$(PY) tools/validation/generate_validation_suite.py tools/validation/validation_suite --clean
 
 validate:
 	$(PY) tools/validation/validate_analyzer.py . tools/validation/validation_suite
+
+validate-json:
+	@if [ -z "$(EXPORT)" ]; then \
+		echo "Usage: make validate-json EXPORT=/path/to/analysis.json"; \
+		exit 2; \
+	fi
+	$(PY) tools/validation/validate_json_export.py "$(EXPORT)"
 
 db-up:
 	./scripts/integration-up.sh

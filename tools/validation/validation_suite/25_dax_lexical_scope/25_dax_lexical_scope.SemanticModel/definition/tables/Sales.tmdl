@@ -1,0 +1,28 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Cost
+        sourceColumn: Cost
+    column Discount
+        sourceColumn: Discount
+    column Legacy
+        sourceColumn: Legacy
+    column 'Old Margin'
+        sourceColumn: Old Margin
+    column 'Commented Only'
+        sourceColumn: Commented Only
+    column 'Draft Source'
+        sourceColumn: Draft Source
+
+    measure Margin = ```
+            // Previously SUM('Sales'[Old Margin])
+            [Net] - SUM(Sales[Cost]) /* was 'Sales'[Legacy]
+               before the 2024 change */
+            & IF(FALSE(), "'Sales'[Legacy] ""[Old Margin]"" retired")
+            ```
+
+    measure Net =
+            SUM('Sales'[Amount]) -- excludes 'Sales'[Commented Only]
+            - SUM('Sales'[Discount])
+
+    measure Draft = "unterminated 'Sales'[Draft Source]

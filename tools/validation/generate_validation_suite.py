@@ -200,6 +200,104 @@ relationship Rel1
     }, "Relationship endpoints are used even without report references.")
 
 
+def build_relationship_health(root: Path):
+    name = "18_relationship_health"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Dim.tmdl", """
+table Dim
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Label
+        dataType: string
+        sourceColumn: Label
+""")
+    write(model / "definition" / "tables" / "Fact.tmdl", """
+table Fact
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Value
+        dataType: double
+        sourceColumn: Value
+""")
+    write(model / "definition" / "relationships.tmdl", """
+relationship Rel1
+    fromColumn: Fact.Key
+    toColumn: Dim.Key
+    crossFilteringBehavior: bothDirections
+relationship Inactive
+    fromColumn: Fact.Value
+    toColumn: Dim.Label
+    crossFilteringBehavior: bothDirections
+    isActive: false
+""")
+    save_expected(p, {
+        "Column|Dim|Key": "Used",
+        "Column|Fact|Key": "Used",
+        "Column|Dim|Label": "Used",
+        "Column|Fact|Value": "Used",
+    }, "Relationship endpoints are used even without report references.")
+
+
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_BIDIRECTIONAL", "scope": "Rel1"}]
+    write_json(expected_path, expected)
+
+
+def build_many_to_many_health(root: Path):
+    name = "19_many_to_many_health"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Dim.tmdl", """
+table Dim
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Label
+        dataType: string
+        sourceColumn: Label
+""")
+    write(model / "definition" / "tables" / "Fact.tmdl", """
+table Fact
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Value
+        dataType: double
+        sourceColumn: Value
+""")
+    write(model / "definition" / "relationships.tmdl", """
+relationship Rel1
+    fromColumn: Fact.Key
+    toColumn: Dim.Key
+    fromCardinality: many
+    toCardinality: many
+relationship Inactive
+    fromColumn: Fact.Value
+    toColumn: Dim.Label
+    fromCardinality: many
+    toCardinality: many
+    isActive: false
+""")
+    save_expected(p, {
+        "Column|Dim|Key": "Used",
+        "Column|Fact|Key": "Used",
+        "Column|Dim|Label": "Used",
+        "Column|Fact|Value": "Used",
+    }, "Relationship endpoints are used even without report references.")
+
+
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_MANY_TO_MANY", "scope": "Rel1"}]
+    write_json(expected_path, expected)
+
+
 def build_sort_by(root: Path):
     name = "04_sort_by"
     p, report, model = project(root, name)
@@ -621,6 +719,369 @@ table Output
                   "Scalar function arguments and pre-expansion filter reads remain protected alongside both join keys.")
 
 
+def build_m_nested_schema(root: Path):
+    name = "16_m_nested_schema"
+    p, report, model = project(root, name)
+    for table, columns in (("Orders", ("CustomerKey", "Region", "Amount", "Discarded", "UnusedOrder")),
+                           ("Customers", ("Key", "Name", "UnusedCustomer"))):
+        text = f"table {table}\n"
+        for column in columns:
+            text += f"    column {column}\n        sourceColumn: {column}\n"
+        write(model / "definition" / "tables" / f"{table}.tmdl", text)
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Rounded
+        sourceColumn: Rounded
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details"),
+                Renamed = Table.RenameColumns(Joined, {{"Details", "Rows"}, {"Region", "Area"}}),
+                Removed = Table.RemoveColumns(Renamed, {"Discarded"}),
+                Projected = Table.SelectColumns(Removed, {"Rows", "Area", "Amount"}),
+                Filtered = Table.SelectRows(Projected, each Text.StartsWith(Text.Upper(Text.Trim([Area])), "N")),
+                Expanded = Table.ExpandTableColumn(Filtered, "Rows", {"Name"}, {"CustomerName"}),
+                Calculated = Table.AddColumn(Expanded, "Rounded", each Number.Round(Number.Abs([Amount]), 2)),
+                Selected = Table.SelectColumns(Calculated, {"Rounded", "CustomerName"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Rounded"))
+    add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
+    save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
+                      "Column|Orders|Region": "Needs manual review",
+                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Discarded": "Needs manual review",
+                      "Column|Orders|UnusedOrder": "Likely unused",
+                      "Column|Customers|Key": "Needs manual review",
+                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|UnusedCustomer": "Likely unused",
+                      "Column|Output|Rounded": "Used",
+                      "Column|Output|CustomerName": "Used"},
+                  "Nested column identity survives schema transformations; schema requirements, predicate reads and join keys remain protected.")
+
+
+def build_m_nested_types(root: Path):
+    name = "17_m_nested_types"
+    p, report, model = project(root, name)
+    for table, columns in (("Orders", ("CustomerKey", "Region", "Amount", "Discarded", "Converted", "UnusedOrder")),
+                           ("Customers", ("Key", "Name", "UnusedCustomer"))):
+        text = f"table {table}\n"
+        for column in columns:
+            text += f"    column {column}\n        sourceColumn: {column}\n"
+        write(model / "definition" / "tables" / f"{table}.tmdl", text)
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Rounded
+        sourceColumn: Rounded
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details"),
+                Renamed = Table.RenameColumns(Joined, {{"Details", "Rows"}, {"Region", "Area"}}),
+                Typed = Table.TransformColumnTypes(Renamed, {{"Converted", type number}}, "en-US"),
+                Removed = Table.RemoveColumns(Typed, {"Discarded"}),
+                Projected = Table.SelectColumns(Removed, {"Rows", "Area", "Amount"}),
+                Filtered = Table.SelectRows(Projected, each Text.StartsWith(Text.Upper(Text.Trim([Area])), "N")),
+                Expanded = Table.ExpandTableColumn(Filtered, "Rows", {"Name"}, {"CustomerName"}),
+                Calculated = Table.AddColumn(Expanded, "Rounded", each Number.Round(Number.Abs([Amount]), 2)),
+                Selected = Table.SelectColumns(Calculated, {"Rounded", "CustomerName"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Rounded"))
+    add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
+    save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
+                      "Column|Orders|Region": "Needs manual review",
+                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Discarded": "Needs manual review",
+                      "Column|Orders|Converted": "Needs manual review",
+                      "Column|Orders|UnusedOrder": "Likely unused",
+                      "Column|Customers|Key": "Needs manual review",
+                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|UnusedCustomer": "Likely unused",
+                      "Column|Output|Rounded": "Used",
+                      "Column|Output|CustomerName": "Used"},
+                  "Type conversion inputs remain dependencies after projection before nested expansion; unrelated columns remain unused.")
+
+
+def build_measure_descriptions(root: Path):
+    p, report, model = project(root, "20_measure_descriptions")
+    write(model / "definition/tables/Sales.tmdl", """
+table Sales
+    /// Revenue in local currency.
+    /// Excludes tax.
+    measure Documented = 1
+    measure Missing = 2
+    ///
+    measure Blank = 3
+    measure Legacy = 4
+        description: Existing description
+""")
+    write(model / "definition/tables/LocalDateTable_test.tmdl", """
+table LocalDateTable_test
+    measure Helper = 1
+""")
+    save_expected(p, {
+        "Measure|Sales|Documented": "Likely unused",
+        "Measure|Sales|Missing": "Likely unused",
+        "Measure|Sales|Blank": "Likely unused",
+        "Measure|Sales|Legacy": "Likely unused",
+        "Measure|LocalDateTable_test|Helper": "Internal / auto-generated",
+    }, "Missing and blank descriptions are informational; documented, uncertain and internal measures are skipped.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "MEASURE_DESCRIPTION_MISSING", "scope": "Sales[Missing]"},
+        {"rule_id": "MEASURE_DESCRIPTION_MISSING", "scope": "Sales[Blank]"},
+    ]
+    write_json(expected_path, expected)
+
+
+def special_dax_project(root: Path, name: str):
+    p, report, model = project(root, name)
+    write(model / "definition/tables/Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Unrelated
+        sourceColumn: Unrelated
+    /// Revenue total.
+    measure Revenue = SUM('Sales'[Amount])
+""")
+    return p, report, model
+
+
+def build_field_parameter(root: Path):
+    p, report, model = special_dax_project(root, "21_field_parameter")
+    write(model / "definition/tables/Selector.tmdl", """
+table Selector
+    column Label
+        sourceColumn: [Value1]
+    column Fields
+        sourceColumn: [Value2]
+        extendedProperty ParameterMetadata = {"version":3,"kind":2}
+    column Order
+        sourceColumn: [Value3]
+    partition Selector = calculated
+        source =
+            {
+                ("Revenue", NAMEOF('Sales'[Revenue]), 0),
+                ("Region", NAMEOF('Sales'[Region]), 1)
+            }
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Selector", "Label"))
+    save_expected(p, {
+        "Measure|Sales|Revenue": "Used",
+        "Column|Sales|Amount": "Used",
+        "Column|Sales|Region": "Used",
+        "Column|Sales|Unrelated": "Likely unused",
+        "Column|Selector|Label": "Used",
+    }, "NAMEOF references protect measure/column targets; measure usage propagates to Amount. This fixture does not establish complete field-parameter metadata semantics.")
+
+
+def build_rls(root: Path):
+    p, report, model = special_dax_project(root, "22_rls")
+    write(model / "definition/roles/North.tmdl", """
+role North
+    modelPermission: read
+    tablePermission Sales = 'Sales'[Region] = "North"
+""")
+    save_expected(p, {
+        "Column|Sales|Region": "Used",
+        "Column|Sales|Unrelated": "Likely unused",
+        "Measure|Sales|Revenue": "Likely unused",
+        "Column|Sales|Amount": "Needs manual review",
+    }, "Role-only Region is protected without report usage. Unused Revenue retains its DAX dependency as manual review.")
+
+
+def build_calculation_item(root: Path):
+    p, report, model = special_dax_project(root, "23_calculation_item")
+    write(model / "definition/tables/Calculations.tmdl", """
+table Calculations
+    calculationGroup
+        precedence: 10
+        calculationItem North = CALCULATE('Sales'[Revenue], 'Sales'[Region] = "North")
+    column Name
+        dataType: string
+        sourceColumn: Name
+""")
+    save_expected(p, {
+        "Measure|Sales|Revenue": "Needs manual review",
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Sales|Region": "Needs manual review",
+        "Column|Sales|Unrelated": "Likely unused",
+    }, "Calculation-item references are credible dependencies, but item activation is not proven; keep manual review rather than claiming use.")
+
+
+def build_special_dax_scope(root: Path):
+    p, report, model = special_dax_project(root, "24_special_dax_scope")
+    write(model / "definition/roles/North.tmdl", """
+role North
+    modelPermission: read
+    annotation Note = "'Sales'[Unrelated]"
+    tablePermission Sales = 'Sales'[Region] = "North" // 'Sales'[Unrelated]
+""")
+    write(model / "definition/tables/Calculations.tmdl", """
+/*
+role Fake
+    tablePermission Sales = 'Sales'[Unrelated] = 1
+*/
+table Calculations
+    annotation Note = "NAMEOF('Sales'[Unrelated])"
+    calculationGroup
+        annotation Nested =
+            calculationItem Fake = 'Sales'[Unrelated]
+        calculationItem Actual = 'Sales'[Revenue] + IF("'Sales'[Unrelated]" = "", 0, 1)
+    column Name
+        sourceColumn: Name
+""")
+    write(model / "definition/tables/Selector.tmdl", """
+table Selector
+    column Label
+        sourceColumn: [Value1]
+    partition Selector = calculated
+        source = { ("NAMEOF('Sales'[Unrelated])", NAMEOF ('Sales'[Region]), 'Sales'[Amount]) }
+""")
+    save_expected(p, {
+        "Column|Sales|Region": "Used",
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Sales|Unrelated": "Likely unused",
+        "Measure|Sales|Revenue": "Needs manual review",
+    }, "Only actual special expressions and NAMEOF arguments create special evidence; unrelated references, comments, strings and annotations do not promote usage.")
+
+
+def build_dax_lexical_scope(root: Path):
+    name = "25_dax_lexical_scope"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Cost
+        sourceColumn: Cost
+    column Discount
+        sourceColumn: Discount
+    column Legacy
+        sourceColumn: Legacy
+    column 'Old Margin'
+        sourceColumn: Old Margin
+    column 'Commented Only'
+        sourceColumn: Commented Only
+    column 'Draft Source'
+        sourceColumn: Draft Source
+
+    measure Margin = ```
+            // Previously SUM('Sales'[Old Margin])
+            [Net] - SUM(Sales[Cost]) /* was 'Sales'[Legacy]
+               before the 2024 change */
+            & IF(FALSE(), "'Sales'[Legacy] ""[Old Margin]"" retired")
+            ```
+
+    measure Net =
+            SUM('Sales'[Amount]) -- excludes 'Sales'[Commented Only]
+            - SUM('Sales'[Discount])
+
+    measure Draft = "unterminated 'Sales'[Draft Source]
+""")
+    add_visual(report, "Page1", "Visual1", visual_measure("Sales", "Margin"))
+    save_expected(p, {
+        "Measure|Sales|Margin": "Used",
+        "Measure|Sales|Net": "Used",
+        "Column|Sales|Amount": "Used",
+        "Column|Sales|Cost": "Used",
+        "Column|Sales|Discount": "Used",
+        "Column|Sales|Legacy": "Likely unused",
+        "Column|Sales|Old Margin": "Likely unused",
+        "Column|Sales|Commented Only": "Likely unused",
+        "Measure|Sales|Draft": "Likely unused",
+        "Column|Sales|Draft Source": "Needs manual review",
+    }, "DAX strings and comments do not create dependencies; genuine references around them remain transitive. An unterminated string keeps its trailing reference as evidence.")
+
+
+def build_tmdl_expression_boundaries(root: Path):
+    name = "26_tmdl_expression_boundaries"
+    p, report, model = project(root, name)
+    # Power BI Desktop writes tab-indented TMDL.
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Cost
+        sourceColumn: Cost
+    column Quantity
+        sourceColumn: Quantity
+    column 'Folder Text'
+        sourceColumn: Folder Text
+    column 'Line Total' =
+            // note: quantity times cost
+            Sales[Quantity] * Sales[Cost]
+        dataType: double
+        summarizeBy: sum
+    measure Margin =
+            VAR label = "Margin: "
+            -- status: reviewed
+            RETURN SUM(Sales[Amount]) - SUMX(Sales, Sales[Line Total])
+        formatString: #,0
+        displayFolder: Sales[Folder Text]
+        lineageTag: 0b1c
+""".replace("    ", "\t"))
+    add_visual(report, "Page1", "Visual1", visual_measure("Sales", "Margin"))
+    save_expected(p, {
+        "Measure|Sales|Margin": "Used",
+        "Column|Sales|Amount": "Used",
+        "Column|Sales|Line Total": "Used",
+        "Column|Sales|Quantity": "Used",
+        "Column|Sales|Cost": "Used",
+        "Column|Sales|Folder Text": "Likely unused",
+    }, "Multiline expressions continue past DAX lines containing ': ' in strings or comments; TMDL properties still end the expression.")
+
+
+def build_incomplete_sources(root: Path):
+    name = "27_incomplete_sources"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    write(tables / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Unused
+        sourceColumn: Unused
+    measure Revenue = SUM(Sales[Amount])
+""")
+    # A leading byte-order mark must not hide the table or a visual.
+    write(tables / "Dim.tmdl", "table Dim\n    column Code\n        sourceColumn: Code")
+    (tables / "Dim.tmdl").write_bytes(b"\xef\xbb\xbf" + (tables / "Dim.tmdl").read_bytes())
+    # Latin-1 bytes are invalid UTF-8; the damaged name cannot be matched elsewhere.
+    (tables / "Other.tmdl").write_bytes(
+        b"table Other\n    column Bel\xf8p\n        sourceColumn: Bel\xf8p\n"
+        b"    column Plain\n        sourceColumn: Plain\n")
+    add_visual(report, "Page1", "Visual1", visual_column("Sales", "Amount"))
+    add_visual(report, "Page1", "Visual3", visual_column("Dim", "Code"))
+    bom_visual = report / "definition/pages/Page1/visuals/Visual3/visual.json"
+    bom_visual.write_bytes(b"\xef\xbb\xbf" + bom_visual.read_bytes())
+    # Truncated JSON: structured parsing fails, raw text remains reviewable.
+    broken = json.dumps([visual_column("Sales", "Region"), visual_measure("Sales", "Revenue")], indent=2)
+    write(report / "definition/pages/Page1/visuals/Visual2/visual.json", broken[:-2])
+    save_expected(p, {
+        "Column|Sales|Amount": "Used",
+        "Column|Sales|Region": "Needs manual review",
+        "Measure|Sales|Revenue": "Needs manual review",
+        "Column|Sales|Unused": "Likely unused",
+        "Column|Dim|Code": "Used",
+        "Column|Other|Bel\ufffdp": "Needs manual review",
+        "Column|Other|Plain": "Likely unused",
+    }, "Unreadable report JSON is raw-scanned for manual-review evidence; BOMs are tolerated; invalid UTF-8 TMDL is decoded with replacement and only objects with damaged names are downgraded.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -648,6 +1109,18 @@ def main():
         build_m_rows_and_computed,
         build_m_join_expansion,
         build_m_scalar_filtered_join,
+        build_m_nested_schema,
+        build_m_nested_types,
+        build_relationship_health,
+        build_many_to_many_health,
+        build_measure_descriptions,
+        build_field_parameter,
+        build_rls,
+        build_calculation_item,
+        build_special_dax_scope,
+        build_dax_lexical_scope,
+        build_tmdl_expression_boundaries,
+        build_incomplete_sources,
     ]
     for builder in builders:
         builder(root)

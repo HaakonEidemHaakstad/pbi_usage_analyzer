@@ -1,0 +1,20 @@
+{
+  "expected_status": {
+    "Measure|Sales|Documented": "Likely unused",
+    "Measure|Sales|Missing": "Likely unused",
+    "Measure|Sales|Blank": "Likely unused",
+    "Measure|Sales|Legacy": "Likely unused",
+    "Measure|LocalDateTable_test|Helper": "Internal / auto-generated"
+  },
+  "notes": "Missing and blank descriptions are informational; documented, uncertain and internal measures are skipped.",
+  "expected_health": [
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Missing]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Blank]"
+    }
+  ]
+}

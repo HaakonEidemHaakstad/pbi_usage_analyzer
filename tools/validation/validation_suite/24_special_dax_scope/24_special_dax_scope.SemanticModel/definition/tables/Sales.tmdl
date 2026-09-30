@@ -1,0 +1,9 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Unrelated
+        sourceColumn: Unrelated
+    /// Revenue total.
+    measure Revenue = SUM('Sales'[Amount])

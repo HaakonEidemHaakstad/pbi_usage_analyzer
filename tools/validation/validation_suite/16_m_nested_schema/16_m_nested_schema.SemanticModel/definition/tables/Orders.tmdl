@@ -1,0 +1,11 @@
+table Orders
+    column CustomerKey
+        sourceColumn: CustomerKey
+    column Region
+        sourceColumn: Region
+    column Amount
+        sourceColumn: Amount
+    column Discarded
+        sourceColumn: Discarded
+    column UnusedOrder
+        sourceColumn: UnusedOrder

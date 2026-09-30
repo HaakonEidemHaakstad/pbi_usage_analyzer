@@ -3,10 +3,13 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 
 from ..analysis.build_graph import AnalysisContext
+from ..health.model import HealthFinding
+from ..health.filtering import HealthFilterScope
+from .health_scope import health_scope_rows
 from ..model import Finding, ObjectType, Status
 
 
-def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisContext) -> str:
+def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisContext, health_findings: tuple[HealthFinding, ...] = (), health_filter_scope: HealthFilterScope | None = None) -> str:
     columns = [f for f in findings if f.ref.object_type == ObjectType.COLUMN and f.status != Status.INTERNAL]
     measures = [f for f in findings if f.ref.object_type == ObjectType.MEASURE and f.status != Status.INTERNAL]
     unused_cols = [f for f in columns if f.status == Status.LIKELY_UNUSED]
@@ -95,6 +98,17 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
             lines += ["", "AUTOMATICALLY MATCHED REFERENCES", sub]
             for row in ctx.report.fallback:
                 lines.append(f"  - {row['Report table']}[{row['Report field']}] -> {row['Matched model table']}[{row['Matched model field']}]")
+
+    if health_findings or health_filter_scope is not None:
+        lines += ["", "MODEL HEALTH", sub]
+        lines.extend(f"{label}: {value}" for label, value in health_scope_rows(health_filter_scope))
+        if not health_findings:
+            lines.append("No health findings included in this report.")
+        for finding in health_findings:
+            lines += [f"[{finding.rule_id}] {finding.scope}: {finding.title}",
+                      finding.explanation, "Evidence: " + " | ".join(finding.evidence),
+                      "Recommendation: " + finding.recommendation,
+                      f"Source: {finding.source_file}:{finding.line}"]
 
     if ctx.warnings:
         lines += ["", "WARNINGS", sub, *ctx.warnings]

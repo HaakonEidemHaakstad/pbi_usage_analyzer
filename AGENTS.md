@@ -1,5 +1,13 @@
 # AGENTS.md — Power BI Model Health Analyzer
 
+## Agent continuation
+
+Before starting work, read [docs/HANDOFF.md](docs/HANDOFF.md) for the current
+working-tree state, verification results, and next planned task. It is designed
+to replace reliance on prior chat history. Inspect `git status` as well: substantial
+completed work may be uncommitted or untracked. Preserve it. Update the handoff
+after material changes, and verify its dated claims against the current files.
+
 ## Project stage
 
 This repository has moved beyond the scope of a one-off script.

@@ -4,16 +4,17 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
-from ..util import clean_name, norm
+from ..util import clean_name, norm, read_source_text
 from .m_lineage import ColumnDemand, infer_column_demands
 
 
 @dataclass
-class PowerQueryResult:
+class PowerQueryResult(DiagnosticCollection):
     evidence: list[Evidence] = field(default_factory=list)
     dependencies: list[dict] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
     # Complete source-name projections for the bounded M shape below.
     projected_columns: dict[tuple[str, str], set[str]] = field(default_factory=dict)
     column_demands: dict[tuple[str, str], ColumnDemand] = field(default_factory=dict)
@@ -177,7 +178,7 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
     tables_folder = model_folder / "definition" / "tables"
     model_tables = {norm(t): t for t in table_names}
     for path in sorted(tables_folder.glob("*.tmdl")):
-        text = path.read_text(encoding="utf-8")
+        text, _ = read_source_text(path)
         owner = None
         for line in text.splitlines():
             if line.strip().lower().startswith("table "):
@@ -206,8 +207,10 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
                         demand = result.column_demands[key].union(demand)
                     result.column_demands[key] = demand
         if not complete and any(ev.source.table == owner for ev in result.evidence):
-            result.warnings.append(
+            result.diagnostics.append(Diagnostic(
+                "M_LINEAGE_INCOMPLETE", DiagnosticSeverity.WARNING,
                 f"Query {owner}: column lineage is incomplete; unsupported M expressions "
-                "retain conservative query-level evidence."
-            )
+                "retain conservative query-level evidence.",
+                source_file=str(path), object_ref=ObjectRef(ObjectType.QUERY, owner),
+            ))
     return result

@@ -3,16 +3,22 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .analysis.build_graph import build_graph
-from .analysis.classify import classify
-from .discovery import discover_project
-from .model import ObjectType, Status
+from .api import analyze_project
+from .health.engine import RULES
+from .health.model import HealthSeverity
 from .reporting.excel_report import write_excel
 from .reporting.text_report import generate_text
+from .reporting.json_report import write_json
 
 
-def run(project_folder: Path) -> tuple[Path, Path]:
-    project = discover_project(project_folder)
+def run(project_folder: Path, *, health_rule_ids=None, health_severities=None, json_output: bool = False) -> tuple[Path, Path]:
+    options = {}
+    if health_rule_ids is not None:
+        options["health_rule_ids"] = health_rule_ids
+    if health_severities is not None:
+        options["health_severities"] = health_severities
+    result = analyze_project(project_folder, **options)
+    project = result.project
     print("=" * 70)
     print("POWER BI USAGE ANALYZER V2")
     print("=" * 70)
@@ -21,21 +27,25 @@ def run(project_folder: Path) -> tuple[Path, Path]:
     print(f"Semantic model: {project.model_folder.name}")
     print()
 
-    ctx = build_graph(project.report_folder, project.model_folder)
-    findings = classify(ctx.graph)
+    ctx = result.context
+    findings = result.findings
 
-    text_report = generate_text(project.project_name, findings, ctx)
+    text_report = generate_text(project.project_name, findings, ctx, result.health_findings, result.health_filter_scope)
     project.text_output.write_text(text_report, encoding="utf-8")
-    write_excel(project.excel_output, project.project_name, findings, ctx)
+    write_excel(project.excel_output, project.project_name, findings, ctx, result.health_findings, result.health_filter_scope)
 
-    cols = [f for f in findings if f.ref.object_type == ObjectType.COLUMN]
-    measures = [f for f in findings if f.ref.object_type == ObjectType.MEASURE]
-    print(f"Columns: {len(cols)}")
-    print(f"  Used: {sum(f.status == Status.USED for f in cols)}")
-    print(f"  Needs manual review: {sum(f.status == Status.MANUAL_REVIEW for f in cols)}")
-    print(f"  Likely unused: {sum(f.status == Status.LIKELY_UNUSED for f in cols)}")
-    print(f"Measures: {len(measures)}")
-    print(f"  Likely unused: {sum(f.status == Status.LIKELY_UNUSED for f in measures)}")
+    json_path = project.root / f"{project.project_name}_usage_analysis_v2.json"
+    if json_output:
+        write_json(json_path, result)
+
+    cols = result.summary.columns
+    measures = result.summary.measures
+    print(f"Columns: {cols.business_total}")
+    print(f"  Used: {cols.used}")
+    print(f"  Needs manual review: {cols.manual_review}")
+    print(f"  Likely unused: {cols.likely_unused}")
+    print(f"Measures: {measures.business_total}")
+    print(f"  Likely unused: {measures.likely_unused}")
     if ctx.powerquery:
         print(f"Power Query dependencies: {len(ctx.powerquery.dependencies)}")
         for row in ctx.powerquery.dependencies:
@@ -43,14 +53,21 @@ def run(project_folder: Path) -> tuple[Path, Path]:
     print()
     print(f"Text report: {project.text_output}")
     print(f"Technical report: {project.excel_output}")
+    if json_output:
+        print(f"JSON report: {json_path}")
     return project.text_output, project.excel_output
 
 
 def cli() -> None:
     parser = argparse.ArgumentParser(description="Conservative Power BI PBIP/PBIR usage analyzer")
     parser.add_argument("project", nargs="?", default=str(Path.cwd()), help="PBIP project folder. Defaults to current directory.")
+    parser.add_argument("--health-rule", action="append", choices=[rule_id for rule_id, _, _ in RULES],
+                        help="Include this health rule (repeatable; default: all).")
+    parser.add_argument("--health-severity", action="append", choices=[s.value for s in HealthSeverity],
+                        help="Include this health severity (repeatable; default: all).")
+    parser.add_argument("--json", action="store_true", help="Also write a versioned JSON analysis report in the project folder.")
     args = parser.parse_args()
-    run(Path(args.project))
+    run(Path(args.project), health_rule_ids=args.health_rule, health_severities=args.health_severity, json_output=args.json)
 
 
 if __name__ == "__main__":

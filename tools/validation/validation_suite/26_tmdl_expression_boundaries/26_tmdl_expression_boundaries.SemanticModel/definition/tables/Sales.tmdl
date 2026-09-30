@@ -1,0 +1,21 @@
+table Sales
+	column Amount
+		sourceColumn: Amount
+	column Cost
+		sourceColumn: Cost
+	column Quantity
+		sourceColumn: Quantity
+	column 'Folder Text'
+		sourceColumn: Folder Text
+	column 'Line Total' =
+			// note: quantity times cost
+			Sales[Quantity] * Sales[Cost]
+		dataType: double
+		summarizeBy: sum
+	measure Margin =
+			VAR label = "Margin: "
+			-- status: reviewed
+			RETURN SUM(Sales[Amount]) - SUMX(Sales, Sales[Line Total])
+		formatString: #,0
+		displayFolder: Sales[Folder Text]
+		lineageTag: 0b1c

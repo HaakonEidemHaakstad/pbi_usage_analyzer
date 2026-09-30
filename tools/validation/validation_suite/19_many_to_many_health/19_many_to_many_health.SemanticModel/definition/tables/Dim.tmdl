@@ -1,0 +1,8 @@
+table Dim
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Label
+        dataType: string
+        sourceColumn: Label

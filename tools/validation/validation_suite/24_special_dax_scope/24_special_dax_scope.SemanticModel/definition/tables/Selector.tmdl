@@ -1,0 +1,5 @@
+table Selector
+    column Label
+        sourceColumn: [Value1]
+    partition Selector = calculated
+        source = { ("NAMEOF('Sales'[Unrelated])", NAMEOF ('Sales'[Region]), 'Sales'[Amount]) }

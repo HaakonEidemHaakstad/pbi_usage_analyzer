@@ -1,0 +1,15 @@
+{
+  "expected_status": {
+    "Column|Dim|Key": "Used",
+    "Column|Fact|Key": "Used",
+    "Column|Dim|Label": "Used",
+    "Column|Fact|Value": "Used"
+  },
+  "notes": "Relationship endpoints are used even without report references.",
+  "expected_health": [
+    {
+      "rule_id": "RELATIONSHIP_BIDIRECTIONAL",
+      "scope": "Rel1"
+    }
+  ]
+}

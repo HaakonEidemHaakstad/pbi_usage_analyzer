@@ -1,0 +1,67 @@
+[
+  {
+    "query": {
+      "Commands": [
+        {
+          "SemanticQueryDataShapeCommand": {
+            "Query": {
+              "Version": 2,
+              "From": [
+                {
+                  "Name": "s",
+                  "Entity": "Sales",
+                  "Type": 0
+                }
+              ],
+              "Select": [
+                {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Source": "s"
+                      }
+                    },
+                    "Property": "Region"
+                  },
+                  "Name": "Sales.Region"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "query": {
+      "Commands": [
+        {
+          "SemanticQueryDataShapeCommand": {
+            "Query": {
+              "Version": 2,
+              "From": [
+                {
+                  "Name": "s",
+                  "Entity": "Sales",
+                  "Type": 0
+                }
+              ],
+              "Select": [
+                {
+                  "Measure": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Source": "s"
+                      }
+                    },
+                    "Property": "Revenue"
+                  },
+                  "Name": "Sales.Revenue"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }

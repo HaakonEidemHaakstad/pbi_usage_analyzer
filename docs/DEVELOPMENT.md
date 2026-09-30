@@ -18,7 +18,7 @@ From PowerShell in the repository root:
     py -m venv .venv
     .\.venv\Scripts\Activate.ps1
     python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
+    python -m pip install -r requirements-dev.txt
 
 If `py` is unavailable but `python` works:
 
@@ -112,3 +112,42 @@ PowerShell helper scripts remain only for portability/legacy use. New
 development automation should prefer POSIX shell and Makefile targets unless a
 cross-platform need is explicit.
 
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs compilation, unit/regression tests, and synthetic
+validation on Ubuntu 24.04 / Python 3.12. It uses the same Make targets as local
+development and installs `requirements-dev.txt` into `.venv`. No Docker service
+or organizational credentials are needed. Pip packages are downloaded from the
+configured package index; requirements remain version ranges rather than a lockfile.
+
+The workflow triggers on pushes, pull requests, and manual dispatch. New runs
+cancel obsolete runs for the same ref. Actions are pinned by commit, and the job
+has read-only repository permissions and a 15-minute timeout. Update action pins
+when adopting reviewed upstream releases. Local validation does not establish
+that a hosted Actions run succeeded; inspect GitHub's checks after publishing.
+
+## Fixture drift checks
+
+`make check-fixtures` invokes the generator in a temporary directory and compares
+relative file names and contents against the corpus. It never cleans or rewrites
+the reference directory. Missing/extra/changed files fail the check, including
+unexpected generated analysis reports. Symlinks are rejected. Empty directories
+and file metadata are outside the comparison contract. CI includes this target.
+
+When changing fixtures, edit the generator and expected results intentionally,
+regenerate with `make fixtures`, inspect the diff, then run `make check-fixtures`
+and `make validate`. The clean regeneration target replaces the corpus; move any
+unrelated work out of that directory first.
+
+## Runtime-only smoke test
+
+Run `make check-runtime` to create a disposable venv, install only runtime
+requirements, and run API/CLI analysis plus report exports against a temporary
+fixture. The worker confirms that the development-only `jsonschema` package is
+unavailable and that library calls do not write project files. CLI exports are
+checked for health-filter scope, nonempty text, and a readable workbook archive.
+The worker runs with Python isolation and without inherited Python search paths.
+Temporary directories are removed on completion or failure. The target installs
+packages, so it needs package-index access or cached wheels. CI runs it after
+full validation; it does not replace regression or schema validation tests.

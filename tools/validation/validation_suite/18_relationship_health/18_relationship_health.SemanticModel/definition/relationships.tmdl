@@ -1,0 +1,9 @@
+relationship Rel1
+    fromColumn: Fact.Key
+    toColumn: Dim.Key
+    crossFilteringBehavior: bothDirections
+relationship Inactive
+    fromColumn: Fact.Value
+    toColumn: Dim.Label
+    crossFilteringBehavior: bothDirections
+    isActive: false

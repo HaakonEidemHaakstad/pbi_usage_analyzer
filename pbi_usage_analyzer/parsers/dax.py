@@ -4,26 +4,36 @@ import re
 
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import clean_name, norm_key
+from .dax_lexer import mask_dax
 
 QUALIFIED_DAX_REF = re.compile(
     r"""
     (?:'(?P<quoted>(?:[^']|'')+)'|(?P<plain>[A-Za-z_ÆØÅæøå][A-Za-z0-9_ÆØÅæøå .\-]*))
-    \s*\[(?P<field>[^\]]+)\]
+    \s*\[(?P<field>(?:[^\]]|\]\])+)\]
     """,
     re.VERBOSE,
 )
-UNQUALIFIED_DAX_REF = re.compile(r"(?<![\w'])\[([^\]]+)\]")
+UNQUALIFIED_DAX_REF = re.compile(r"(?<![\w'])\[((?:[^\]]|\]\])+)\]")
+
+
+def _field_name(raw: str) -> str:
+    return clean_name(raw.replace("]]", "]")) or ""
 
 
 def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str, str], ObjectRef], measures: dict[tuple[str, str], ObjectRef]) -> list[Evidence]:
     if not expression:
         return []
 
+    # Strings and comments cannot reference model objects. Malformed trailing
+    # literals stay unmasked so uncertain lexing never removes evidence.
+    expression = mask_dax(expression, keep_unterminated=True).text
     evidence: list[Evidence] = []
     consumed_spans: list[tuple[int, int]] = []
     for match in QUALIFIED_DAX_REF.finditer(expression):
-        table = clean_name(match.group("quoted") or match.group("plain")) or ""
-        field = clean_name(match.group("field")) or ""
+        quoted = match.group("quoted")
+        # The pattern excludes the outer apostrophes; restore them so '' unescapes.
+        table = clean_name(f"'{quoted}'" if quoted is not None else match.group("plain")) or ""
+        field = _field_name(match.group("field"))
         key = norm_key(table, field)
         target = columns.get(key) or measures.get(key)
         if target:
@@ -35,7 +45,7 @@ def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str,
     for match in UNQUALIFIED_DAX_REF.finditer(expression):
         if any(a <= match.start() < b for a, b in consumed_spans):
             continue
-        field = clean_name(match.group(1)) or ""
+        field = _field_name(match.group(1))
         local = measures.get(norm_key(owner.table, field))
         target = local
         if not target:

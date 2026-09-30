@@ -1,0 +1,544 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Power BI Usage Analyzer export version 1",
+  "description": "Structural contract. References and totals require semantic checks; identifiers may expand as rules are added.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "analyzer_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "$ref": "#/$defs/project"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "objects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/object"
+      }
+    },
+    "dependency_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "cleanup_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/cleanup_finding"
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    },
+    "health_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/health_finding"
+      }
+    },
+    "health_filter_scope": {
+      "$ref": "#/$defs/health_filter_scope"
+    }
+  },
+  "required": [
+    "schema_version",
+    "analyzer_version",
+    "project",
+    "summary",
+    "objects",
+    "dependency_evidence",
+    "cleanup_findings",
+    "diagnostics",
+    "health_findings",
+    "health_filter_scope"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "object_ref": {
+      "type": "object",
+      "properties": {
+        "object_type": {
+          "enum": [
+            "Table",
+            "Column",
+            "Measure",
+            "Hierarchy",
+            "Query",
+            "ReportField"
+          ]
+        },
+        "table": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_type",
+        "table",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "manual_review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "likely_unused": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "internal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "business_total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "used",
+        "manual_review",
+        "likely_unused",
+        "internal",
+        "business_total"
+      ],
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "properties": {
+        "project_name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "string"
+        },
+        "report_folder": {
+          "type": "string"
+        },
+        "model_folder": {
+          "type": "string"
+        },
+        "pbip_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "excel_output": {
+          "type": "string"
+        },
+        "text_output": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project_name",
+        "root",
+        "report_folder",
+        "model_folder",
+        "pbip_file",
+        "excel_output",
+        "text_output"
+      ],
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "$ref": "#/$defs/counts"
+        },
+        "measures": {
+          "$ref": "#/$defs/counts"
+        },
+        "query_dependencies": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "columns",
+        "measures",
+        "query_dependencies"
+      ],
+      "additionalProperties": false
+    },
+    "object": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/object_ref"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "source_line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "calculated": {
+          "type": "boolean"
+        },
+        "source_column": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "data_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expression": {
+          "type": "string"
+        },
+        "sort_by_column": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "source_file",
+        "source_line",
+        "hidden",
+        "calculated",
+        "source_column",
+        "data_type",
+        "expression",
+        "sort_by_column",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/object_ref"
+        },
+        "evidence_type": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "evidence_type",
+        "reason",
+        "source_file",
+        "confidence"
+      ],
+      "additionalProperties": false
+    },
+    "cleanup_finding": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/object_ref"
+        },
+        "status": {
+          "type": "string"
+        },
+        "status_id": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evidence_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          }
+        }
+      },
+      "required": [
+        "ref",
+        "status",
+        "status_id",
+        "reasons",
+        "evidence_types"
+      ],
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "status_id": {
+              "const": "USED"
+            },
+            "status": {
+              "const": "Used"
+            }
+          }
+        },
+        {
+          "properties": {
+            "status_id": {
+              "const": "MANUAL_REVIEW"
+            },
+            "status": {
+              "const": "Needs manual review"
+            }
+          }
+        },
+        {
+          "properties": {
+            "status_id": {
+              "const": "LIKELY_UNUSED"
+            },
+            "status": {
+              "const": "Likely unused"
+            }
+          }
+        },
+        {
+          "properties": {
+            "status_id": {
+              "const": "INTERNAL"
+            },
+            "status": {
+              "const": "Internal / auto-generated"
+            }
+          }
+        }
+      ]
+    },
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "severity": {
+          "enum": [
+            "warning"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "object_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/object_ref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "message",
+        "source_file",
+        "line",
+        "column",
+        "object_ref"
+      ],
+      "additionalProperties": false
+    },
+    "health_finding": {
+      "type": "object",
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "category": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "warning",
+            "info"
+          ]
+        },
+        "confidence": {
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "source_file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "rule_id",
+        "category",
+        "severity",
+        "confidence",
+        "scope",
+        "title",
+        "explanation",
+        "evidence",
+        "recommendation",
+        "source_file",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "health_filter_scope": {
+      "type": "object",
+      "properties": {
+        "rule_ids": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Z0-9_]*$"
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "severities": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "warning",
+                  "info"
+                ]
+              },
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "total_findings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "selected_findings": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "rule_ids",
+        "severities",
+        "total_findings",
+        "selected_findings"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

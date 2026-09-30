@@ -244,3 +244,50 @@ class MLineageTests(unittest.TestCase):
 
     def test_filtered_expansion_rejects_shadowed_predicate_function(self):
         self.assertIsNone(self.infer('let Text.Contains = Other, J = Table.NestedJoin(Source, "A", Other, "B", "Details"), F = Table.SelectRows(J, each Text.Contains([Region], "N")) in Table.ExpandTableColumn(F, "Details", {"Name"})'))
+
+    def test_schema_steps_before_expansion_track_identity_and_requirements(self):
+        result = self.infer('let J = Table.NestedJoin(Source, "Key", Other, "ID", "Details"), R = Table.RenameColumns(J, {{"Details", "Rows"}, {"Region", "Area"}}), F = Table.SelectRows(R, each [Area] <> null), D = Table.RemoveColumns(F, {"Dropped"}), S = Table.SelectColumns(D, {"Rows"}) in Table.ExpandTableColumn(S, "Rows", {"Name"})')
+        self.assertIsNotNone(result)
+        self.assertTrue(all(result['Source'].accepts(c) for c in ('Key', 'Region', 'Dropped')))
+        self.assertFalse(any(result['Source'].accepts(c) for c in ('Details', 'Rows', 'Area', 'Name', 'Unused')))
+        self.assertTrue(all(result['Other'].accepts(c) for c in ('ID', 'Name')))
+        self.assertFalse(result['Other'].accepts('Unused'))
+
+    def test_renamed_nested_predicate_retains_contents(self):
+        result = self.infer('let J = Table.NestedJoin(Source, "Key", Other, "ID", "Details"), R = Table.RenameColumns(J, {"Details", "Rows"}), F = Table.SelectRows(R, each [Rows] <> null) in Table.ExpandTableColumn(F, "Rows", {"Name"})')
+        self.assertTrue(result['Other'].accepts('Unused'))
+        self.assertFalse(result['Source'].accepts('Details'))
+
+    def test_invalid_or_ambiguous_nested_schema_falls_back(self):
+        for step in (
+            'Table.SelectColumns(J, {"Key"})',
+            'Table.RemoveColumns(J, {"Details"})',
+            'Table.RenameColumns(J, {"Details", "Rows"})',
+            'Table.RenameColumns(J, {"OtherName", "Details"}, MissingField.Ignore)',
+        ):
+            with self.subTest(step=step):
+                self.assertIsNone(self.infer('let J = Table.NestedJoin(Source, "Key", Other, "ID", "Details") in Table.ExpandTableColumn(' + step + ', "Details", {"Name"})'))
+
+    def test_types_before_expansion_preserve_dropped_conversion_inputs(self):
+        result = self.infer('let J = Table.NestedJoin(Source, "Key", Other, "ID", "Details"), R = Table.RenameColumns(J, {{"Details", "Rows"}, {"Amount", "Value"}}), T = Table.TransformColumnTypes(R, {{"Value", Currency.Type}}, "en-US"), S = Table.SelectColumns(T, {"Rows"}) in Table.ExpandTableColumn(S, "Rows", {"Name"})')
+        self.assertIsNotNone(result)
+        self.assertTrue(all(result['Source'].accepts(c) for c in ('Key', 'Amount')))
+        self.assertFalse(any(result['Source'].accepts(c) for c in ('Value', 'Rows', 'Details', 'Unused')))
+        self.assertTrue(all(result['Other'].accepts(c) for c in ('ID', 'Name')))
+        self.assertFalse(result['Other'].accepts('Unused'))
+
+    def test_types_before_expansion_reject_unsupported_provenance(self):
+        for prefix, conversions in (
+            ('', '{{"Details", type text}}'),
+            ('Table.TransformColumnTypes = Other, ', '{{"Value", type number}}'),
+            ('Currency.Type = Other, ', '{{"Value", Currency.Type}}'),
+            ('', '{{"Value", CustomType}}'),
+        ):
+            with self.subTest(prefix=prefix, conversions=conversions):
+                self.assertIsNone(self.infer('let ' + prefix + 'J = Table.NestedJoin(Source, "Key", Other, "ID", "Details"), T = Table.TransformColumnTypes(J, ' + conversions + ') in Table.ExpandTableColumn(T, "Details", {"Name"})'))
+
+    def test_types_before_filtered_expansion_preserve_nested_reads(self):
+        result = self.infer('let J = Table.NestedJoin(Source, "Key", Other, "ID", "Details"), T = Table.TransformColumnTypes(J, {{"Amount", type nullable number}}), F = Table.SelectRows(T, each [Details] <> null) in Table.ExpandTableColumn(F, "Details", {"Name"})')
+        self.assertIsNotNone(result)
+        self.assertTrue(result['Source'].accepts('Amount'))
+        self.assertTrue(result['Other'].accepts('Unused'))

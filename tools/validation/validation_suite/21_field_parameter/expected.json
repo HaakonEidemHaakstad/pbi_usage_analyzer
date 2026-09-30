@@ -1,0 +1,10 @@
+{
+  "expected_status": {
+    "Measure|Sales|Revenue": "Used",
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Region": "Used",
+    "Column|Sales|Unrelated": "Likely unused",
+    "Column|Selector|Label": "Used"
+  },
+  "notes": "NAMEOF references protect measure/column targets; measure usage propagates to Amount. This fixture does not establish complete field-parameter metadata semantics."
+}

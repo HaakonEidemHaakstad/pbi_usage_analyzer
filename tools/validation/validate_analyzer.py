@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import json
 import sys
 from pathlib import Path
+
+if __package__:
+    from .export_consistency import consistency_errors
+else:
+    from export_consistency import consistency_errors
 
 
 def key_for_finding(finding) -> str:
@@ -23,9 +27,12 @@ def main():
 
     sys.path.insert(0, str(analyzer_root))
 
-    from pbi_usage_analyzer.discovery import discover_project
-    from pbi_usage_analyzer.analysis.build_graph import build_graph
-    from pbi_usage_analyzer.analysis.classify import classify
+    from pbi_usage_analyzer import analyze_project, analysis_to_dict
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads((analyzer_root / "schemas/analysis-result-v1.schema.json").read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    schema_validator = Draft202012Validator(schema)
 
     scenarios = sorted(p for p in suite_root.iterdir() if p.is_dir() and (p / "expected.json").exists())
     failures = 0
@@ -39,17 +46,32 @@ def main():
         expected_doc = json.loads((scenario / "expected.json").read_text(encoding="utf-8"))
         expected = expected_doc["expected_status"]
 
-        project = discover_project(scenario)
-        ctx = build_graph(project.report_folder, project.model_folder)
-        findings = classify(ctx.graph)
+        result = analyze_project(scenario)
+        findings = result.findings
         actual = {key_for_finding(f): f.status.value for f in findings}
 
         scenario_failures = []
+        checks += 1
+        document = analysis_to_dict(result)
+        schema_errors = list(schema_validator.iter_errors(document))
+        for error in schema_errors:
+            location = "/".join(str(part) for part in error.absolute_path)
+            scenario_failures.append((f"JSON schema: {location}", "valid version 1 export", error.message))
+        if not schema_errors:
+            checks += 1
+            for location, message in consistency_errors(document):
+                scenario_failures.append((f"JSON consistency: {location}", "consistent export", message))
         for key, wanted in expected.items():
             checks += 1
             got = actual.get(key)
             if got != wanted:
                 scenario_failures.append((key, wanted, got))
+
+        if "expected_health" in expected_doc:
+            checks += 1
+            actual_health = [{"rule_id": f.rule_id, "scope": f.scope} for f in result.health_findings]
+            if actual_health != expected_doc["expected_health"]:
+                scenario_failures.append(("Model health findings", expected_doc["expected_health"], actual_health))
 
         if scenario_failures:
             failures += len(scenario_failures)

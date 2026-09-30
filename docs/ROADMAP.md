@@ -27,7 +27,8 @@ stable ground truth.
 
 ## Phase 2 — Best-practice / model-health rules
 
-Add a structured rule engine separate from cleanup classification.
+Implemented a structured rule engine separate from cleanup classification,
+with an advisory bidirectional relationship rule and text/Excel/API output.
 
 Rule families:
 - source architecture
@@ -44,12 +45,13 @@ recommendations.
 
 ## Phase 3 — Stable application API
 
-Consolidate analysis into a UI-agnostic API such as:
+Implemented: a public UI-agnostic API:
 
     result = analyze_project(path)
 
-The result should expose structured findings, diagnostics, dependencies,
-statistics and evidence.
+The result exposes cleanup findings, diagnostics, dependencies, statistics and
+evidence. The CLI and synthetic validator use this entry point. Parser-specific
+diagnostic codes and available source locations are implemented.
 
 Add progress reporting/cancellation hooks if analysis duration makes them useful.
 
@@ -98,3 +100,33 @@ Future database-backed validation can cover:
 - source-column reduction
 - connector behavior
 - query-folding experiments where Power BI tooling makes them observable
+
+Completed: nested expansion now follows column selection, removal, and renaming,
+with schema requirements and renamed predicate reads retained. Ambiguous nested
+identity falls back conservatively. Bounded type conversions before expansion are also complete, with conversion
+requirements preserved and nested-column conversions rejected. The public structured analysis API is now implemented.
+Parser-specific diagnostic codes and available source locations are implemented.
+The first relationship rule and separate model-health engine are implemented.
+Explicit many-to-many relationship findings are implemented.
+Missing measure descriptions now produce informational documentation findings.
+Rule-ID and severity filtering in the API and CLI is implemented.
+Applied filter scope and before/after finding counts are recorded in results
+and exported reports. Versioned JSON export is implemented for automation.
+JSON Schema version 1 is published and checked by regression/synthetic validation.
+Standalone saved-export validation is implemented.
+Semantic checks for exported totals, references and filter scope are implemented.
+Continuous integration for compilation, regression and synthetic validation is
+configured, including a non-mutating generated fixture drift check.
+Runtime-dependencies-only API/CLI and export smoke testing is included in CI.
+The [format coverage matrix](FORMAT_COVERAGE.md) documents tested subsets and
+known alpha gaps. Dedicated field-parameter, RLS and calculation-item fixtures
+now verify positive references, evidence provenance and classification boundaries.
+Special DAX scanning is scoped to relevant expressions with negative regressions.
+Ordinary DAX dependency extraction masks strings and comments (scenario 25) and
+unescapes `''`/`]]` in identifiers.
+Multiline TMDL expressions end only at property-shaped lines evaluated on
+DAX-masked text (scenario 26); colons in DAX strings/comments no longer truncate them.
+Damaged sources add scoped manual-review evidence (scenario 27): unreadable report
+JSON is raw-scanned (columns and measures), failed TMDL table files are scanned for
+DAX references, and BOM/invalid UTF-8 no longer abort or hide files.
+Next: unqualified column references in DAX (calculated columns, row context).

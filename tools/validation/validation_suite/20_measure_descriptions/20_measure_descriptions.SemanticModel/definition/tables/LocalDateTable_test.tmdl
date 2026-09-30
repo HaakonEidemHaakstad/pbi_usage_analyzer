@@ -1,0 +1,2 @@
+table LocalDateTable_test
+    measure Helper = 1

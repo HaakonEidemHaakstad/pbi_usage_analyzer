@@ -1,0 +1,11 @@
+relationship Rel1
+    fromColumn: Fact.Key
+    toColumn: Dim.Key
+    fromCardinality: many
+    toCardinality: many
+relationship Inactive
+    fromColumn: Fact.Value
+    toColumn: Dim.Label
+    fromCardinality: many
+    toCardinality: many
+    isActive: false

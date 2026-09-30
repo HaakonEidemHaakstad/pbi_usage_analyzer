@@ -1,0 +1,12 @@
+/*
+role Fake
+    tablePermission Sales = 'Sales'[Unrelated] = 1
+*/
+table Calculations
+    annotation Note = "NAMEOF('Sales'[Unrelated])"
+    calculationGroup
+        annotation Nested =
+            calculationItem Fake = 'Sales'[Unrelated]
+        calculationItem Actual = 'Sales'[Revenue] + IF("'Sales'[Unrelated]" = "", 0, 1)
+    column Name
+        sourceColumn: Name

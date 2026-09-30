@@ -5,8 +5,22 @@ from pathlib import Path
 
 
 def load_json(path: Path):
-    with path.open("r", encoding="utf-8") as fh:
+    # json rejects a leading byte-order mark; utf-8-sig tolerates one.
+    with path.open("r", encoding="utf-8-sig") as fh:
         return json.load(fh)
+
+
+def read_source_text(path: Path) -> tuple[str, bool]:
+    """Read a UTF-8 source file, tolerating a BOM and undecodable bytes.
+
+    Returns the text and whether invalid bytes were replaced with U+FFFD, so one
+    damaged file cannot abort the analysis. Callers report replacement.
+    """
+    data = path.read_bytes()
+    try:
+        return data.decode("utf-8-sig"), False
+    except UnicodeDecodeError:
+        return data.decode("utf-8-sig", errors="replace"), True
 
 
 def clean_name(name: object | None) -> str | None:

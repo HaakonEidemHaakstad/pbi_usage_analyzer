@@ -1,0 +1,12 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Region": "Needs manual review",
+    "Measure|Sales|Revenue": "Needs manual review",
+    "Column|Sales|Unused": "Likely unused",
+    "Column|Dim|Code": "Used",
+    "Column|Other|Bel�p": "Needs manual review",
+    "Column|Other|Plain": "Likely unused"
+  },
+  "notes": "Unreadable report JSON is raw-scanned for manual-review evidence; BOMs are tolerated; invalid UTF-8 TMDL is decoded with replacement and only objects with damaged names are downgraded."
+}

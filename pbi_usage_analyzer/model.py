@@ -29,6 +29,8 @@ class EvidenceType(str, Enum):
     POWERQUERY_COLUMN_DEPENDENCY = "POWERQUERY_COLUMN_DEPENDENCY"
     FALLBACK_MATCH = "FALLBACK_MATCH"
     INTERNAL_OBJECT = "INTERNAL_OBJECT"
+    # Source that could not be parsed or decoded may hide evidence for its target.
+    INCOMPLETE_SOURCE = "INCOMPLETE_SOURCE"
 
 
 class Status(str, Enum):
@@ -62,6 +64,8 @@ class ModelObject:
     expression: str = ""
     sort_by_column: str | None = None
     metadata: dict = field(default_factory=dict)
+    description: str | None = None
+    source_line: int | None = None
 
 
 @dataclass(frozen=True)

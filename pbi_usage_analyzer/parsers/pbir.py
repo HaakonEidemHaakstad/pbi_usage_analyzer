@@ -1,21 +1,23 @@
 from __future__ import annotations
 
+from json import JSONDecodeError
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
-from ..util import clean_name, is_internal_table, load_json, norm_key
+from ..util import clean_name, is_internal_table, load_json, norm_key, read_source_text
 
 
 @dataclass
-class ReportParseResult:
+class ReportParseResult(DiagnosticCollection):
     evidence: list[Evidence] = field(default_factory=list)
     stale: list[dict] = field(default_factory=list)
     fallback: list[dict] = field(default_factory=list)
     auto_date: list[dict] = field(default_factory=list)
     raw_hits: list[dict] = field(default_factory=list)
     structured_refs: list[dict] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    diagnostics: list[Diagnostic] = field(default_factory=list)
 
 
 def _source_mappings(obj, mappings: dict[str, str]) -> None:
@@ -104,12 +106,22 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
 
     accounted_columns: set[ObjectRef] = set()
     all_json_strings: dict[Path, str] = {}
+    unreadable_text: dict[Path, str] = {}
 
     for path, scope in files:
         try:
             data = load_json(path)
         except Exception as exc:
-            result.warnings.append(f"Could not read {path}: {exc}")
+            result.diagnostics.append(Diagnostic(
+                "PBIR_READ_FAILED", DiagnosticSeverity.WARNING,
+                f"Could not read {path}: {exc}. Its raw text was scanned for "
+                "manual-review evidence only.", source_file=str(path),
+                line=exc.lineno if isinstance(exc, JSONDecodeError) else None,
+                column=exc.colno if isinstance(exc, JSONDecodeError) else None))
+            try:
+                unreadable_text[path] = read_source_text(path)[0].casefold()
+            except OSError:
+                pass
             continue
         mappings: dict[str, str] = {}
         _source_mappings(data, mappings)
@@ -155,17 +167,31 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
     for (_, field), ref in columns.items():
         field_counts[field] = field_counts.get(field, 0) + 1
 
+    def hit_files(ref: ObjectRef, blobs: dict[Path, str], counts: dict[str, int]) -> list[str]:
+        table_token, field_token = ref.table.casefold(), ref.name.casefold()
+        if not field_token:
+            return []
+        return [str(path.relative_to(report_folder)) for path, blob in blobs.items()
+                if field_token in blob and (table_token in blob or counts.get(field_token, 0) == 1)]
+
     for (_, _), ref in columns.items():
         if ref in accounted_columns or is_internal_table(ref.table):
             continue
-        table_token, field_token = ref.table.casefold(), ref.name.casefold()
-        if not field_token:
-            continue
-        hits: list[str] = []
-        for path, blob in all_json_strings.items():
-            if field_token in blob and (table_token in blob or field_counts.get(field_token, 0) == 1):
-                hits.append(str(path.relative_to(report_folder)))
+        hits = hit_files(ref, {**all_json_strings, **unreadable_text}, field_counts)
         if hits:
             result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Unparsed report reference detected", " | ".join(hits), "low"))
-            result.raw_hits.append({"Table": ref.table, "Column": ref.name, "Source files": " | ".join(hits)})
+            result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(hits)})
+
+    # Structured parsing covers measures in readable files. An unreadable file has
+    # no structured references, so its raw text is also checked for measures.
+    measure_counts: dict[str, int] = {}
+    for (_, field), ref in measures.items():
+        measure_counts[field] = measure_counts.get(field, 0) + 1
+    for (_, _), ref in measures.items():
+        if is_internal_table(ref.table):
+            continue
+        hits = hit_files(ref, unreadable_text, measure_counts)
+        if hits:
+            result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Reference in unreadable report file", " | ".join(hits), "low"))
+            result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(hits)})
     return result

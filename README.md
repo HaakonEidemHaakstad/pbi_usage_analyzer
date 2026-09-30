@@ -5,6 +5,7 @@ This repository is intended to be opened as a project in VS Code.
 Start here:
 
 - [AGENTS.md](AGENTS.md)
+- [Agent handoff and current state](docs/HANDOFF.md)
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/ROADMAP.md](docs/ROADMAP.md)
@@ -176,7 +177,7 @@ Joins support literal single/composite keys and default, inner, left outer,
 right outer, or full outer kinds. Both input keys remain protected. Flat joins
 conservatively apply output-name demands to both inputs. Nested expansion maps
 explicit output aliases to the right-hand source when its input resolves directly
-to a nested join through aliases, `let` wrappers, or supported row filters. Expanded fields remain schema
+to a nested join through aliases, `let` wrappers, supported row filters, column selection/removal/renaming, or supported scalar type conversions. Expanded fields remain schema
 requirements even if later discarded. Unexpanded nested results protect all
 right-hand columns when retained.
 
@@ -194,10 +195,217 @@ culture/rounding options, and shadowed functions remain unsupported.
 Filters between a nested join and expansion retain their predicate dependencies.
 A predicate reading the nested value conservatively protects its contents.
 
+Type conversions before expansion retain converted input columns even when later
+projected away. Conversions targeting the nested column, unknown types, and
+shadowed conversion functions or type constants retain conservative fallback.
+
+## Python library API
+
+```python
+from pbi_usage_analyzer import analyze_project
+
+result = analyze_project("/path/to/PBIP-project")
+print(result.summary.columns.business_total)
+for finding in result.findings:
+    print(finding.ref.label, finding.status.value)
+```
+
+`analyze_project()` accepts a project-folder string or `Path` and returns an
+`AnalysisResult` containing project paths, cleanup findings, graph objects and
+evidence, diagnostics, and summary counts. It does not print or write reports.
+Internal objects are counted separately from business columns and measures.
+Fatal discovery/read errors propagate to the caller; recoverable parser warnings
+carry stable codes, source files, optional object references, and JSON error
+line/column positions when available. Existing renderers can use
+`result.context`. Results own mutable graph/finding data; they are not deeply
+immutable or a JSON serialization format. Progress/cancellation hooks are not yet implemented.
+
+## Model health
+
+`result.health_findings` contains advisory findings separately from cleanup
+classifications. Text reports include a Model health section; Excel includes a
+Model health sheet. Each finding has a stable rule ID, relationship scope,
+severity, confidence, evidence, recommendation, and source file/line.
+
+The first rule, `RELATIONSHIP_BIDIRECTIONAL`, flags active relationships with
+explicit `crossFilteringBehavior: bothDirections`. It recommends reviewing the
+need for that setting, not automatically changing it. Inactive relationships and
+unknown filter settings are skipped. High confidence describes the detected
+configuration, not certainty of a performance problem. Findings do not modify
+cleanup status. See [Microsoft's guidance](https://learn.microsoft.com/en-us/power-bi/guidance/relationships-bidirectional-filtering).
+
+`RELATIONSHIP_MANY_TO_MANY` flags active relationships only when both
+`fromCardinality` and `toCardinality` explicitly say `many`. Omitted or unknown
+cardinalities are not inferred. Recommendations distinguish shared dimensions,
+bridge designs, and legitimate higher-grain facts; the rule does not inspect
+source data or prove incorrect totals. Inactive relationships are skipped.
+See [Microsoft's many-to-many guidance](https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many).
+
+`MEASURE_DESCRIPTION_MISSING` is an informational documentation opportunity for
+business measures with absent or blank descriptions. The parser reads adjacent
+TMDL `///` description lines, including multiline descriptions. Internal auto-date
+measures and uncertain alternate description syntax are skipped. The finding
+does not imply an incorrect calculation or change cleanup status.
+
+## Filtering model-health findings
+
+```bash
+.venv/bin/python run_analyzer.py /path/to/project --health-severity warning
+.venv/bin/python run_analyzer.py /path/to/project --health-rule MEASURE_DESCRIPTION_MISSING --health-severity info
+```
+
+Both options are repeatable. Selections within an option are combined with OR;
+rule and severity selections are combined with AND. Omitting an option includes
+all values. Unknown IDs or severities are rejected. Filters affect health findings
+in text/Excel exports, not cleanup classifications, diagnostics, or graph evidence.
+
+```python
+from pbi_usage_analyzer import analyze_project, filter_health_findings
+
+result = analyze_project("/path/to/project", health_severities=["warning"])
+selected = filter_health_findings(result.health_findings,
+                                 rule_ids=["RELATIONSHIP_MANY_TO_MANY"])
+```
+
+API filters accept an iterable or a single string; severity enums also work.
+`None` means unrestricted, while an empty iterable selects no findings. Filtering
+preserves result order. To change filters without rerunning analysis, keep an
+unfiltered result and use `filter_health_findings()` on it.
+
+`result.health_filter_scope` records canonical rule/severity selections and the
+health-finding counts before and after filtering. Text reports show this scope
+in Model health; Excel includes it in Summary, even when zero findings are
+selected. `None` selections mean all values; empty tuples mean no values.
+
+When calling report writers directly, pass both `result.health_findings` and
+`result.health_filter_scope`. Calls without scope metadata are labeled “Not
+recorded.” If you filter findings again in memory, the original result's scope
+still describes the original selection; do not reuse it for a different subset.
+
+## JSON export
+
+```bash
+.venv/bin/python run_analyzer.py /path/to/project --json --health-severity warning
+```
+
+This also writes `<project>_usage_analysis_v2.json` in the project folder. Without
+`--json`, the CLI continues to produce text and Excel only. Existing output files
+with these report names are replaced on subsequent runs.
+
+```python
+from pbi_usage_analyzer import analyze_project, analysis_to_dict, generate_json, write_json
+
+result = analyze_project("/path/to/project")
+document = analysis_to_dict(result)  # JSON-compatible dictionary
+content = generate_json(result)     # UTF-8-compatible Unicode string; no file writes
+write_json("analysis.json", result)
+```
+
+JSON schema version 1 includes project paths, summary counts, model objects,
+dependency evidence, cleanup findings, diagnostics, health findings, and recorded
+filter scope. Cleanup entries include `status_id` (such as `LIKELY_UNUSED`) and a
+display `status`. Optional values use JSON `null`; empty selections use `[]`.
+The export contains local file paths and parsed expressions. Internal parser
+state and arbitrary object metadata are excluded. It is an export format, not
+a serialized Python object that can be loaded back into the analyzer.
+
+The export contract is published in
+[`schemas/analysis-result-v1.schema.json`](schemas/analysis-result-v1.schema.json)
+using JSON Schema Draft 2020-12. Unit tests and `make validate` check exports
+against it. Install development dependencies with `make setup` or
+`.venv/bin/python -m pip install -r requirements-dev.txt`; ordinary analysis and
+JSON export do not require the `jsonschema` package.
+
+The schema rejects missing/unknown fields, invalid types, invalid status pairs,
+and invalid locations. Rule and diagnostic IDs remain extensible. Structural
+validation does not prove dependency correctness or cross-field count consistency;
+regression tests check selected count invariants separately.
+
+## Validate a saved JSON export
+
+```bash
+make validate-json EXPORT="/path/to/analysis.json"
+# Direct command, useful when scripts need the exact exit status:
+.venv/bin/python tools/validation/validate_json_export.py /path/to/analysis.json
+```
+
+The standalone command reads the bundled version 1 schema without opening a PBIP
+project or modifying the export. Schema errors include JSON Pointer paths;
+malformed JSON errors include line/column positions. Duplicate keys, nonstandard
+numeric constants, and invalid UTF-8 are rejected.
+
+Exit statuses for the direct command are `0` for a valid export, `1` for invalid
+JSON/schema content (including unsupported versions), and `2` for usage, missing
+files, schema-loading failures, or missing validation dependencies. GNU Make may
+map a failed recipe to its own exit status. Install validation dependencies with
+`make setup` or `.venv/bin/python -m pip install -r requirements-dev.txt`.
+Validation checks structure and internal consistency; it does not rerun analysis
+or prove the original dependency analysis correct.
+
+Saved-export validation also checks summary counts against cleanup findings,
+unique object/finding references, classification coverage, dependency endpoints,
+query-dependency totals, and health filter membership/counts. Report-field sources
+and known synthetic special owners are allowed outside the model-object list.
+Diagnostic references may intentionally describe unresolved objects and are not
+required to resolve. Filtered-out health findings cannot be reconstructed, so the
+pre-filter total is checked for bounds rather than independently recounted.
+
+## Continuous integration
+
+[Analyzer checks](.github/workflows/ci.yml) runs on pushes, pull requests, and
+manual dispatch using Ubuntu 24.04 and Python 3.12. It installs development
+dependencies in `.venv`, then runs `make compile`, `make test`, and `make validate`.
+Actions are pinned to commit revisions; repository permissions are read-only.
+Pip download caching includes both requirements files in its cache key.
+
+Docker/database integration remains optional. CI does not run the workstation
+prerequisite check, which also checks for local tools such as VS Code.
+The workflow must be committed and pushed before GitHub can run it; required
+status checks in branch protection are configured separately.
+
+## Fixture reproducibility
+
+Run `make check-fixtures` to generate the synthetic corpus in a temporary
+directory and compare file paths and bytes with `tools/validation/validation_suite`.
+It checks source fixtures, expected results, and the manifest without rewriting
+the corpus. CI runs it before the regression tests.
+
+Changed, missing, and extra files are reported individually. Keep generated
+analysis reports outside the corpus; extra files count as drift. To accept an
+intentional generator change, review it and run `make fixtures`, which replaces
+the corpus, then run `make check-fixtures` and `make validate`.
+
+The direct command is `.venv/bin/python tools/validation/check_fixture_drift.py`.
+An optional directory argument checks a different reference corpus. Exit codes
+are 0 for a match, 1 for drift, and 2 for generation/read failures. Comparison is
+byte-exact; it does not compare empty directories, permissions, or timestamps.
+
+## Runtime dependency smoke test
+
+`make check-runtime` creates a temporary virtual environment, installs only
+`requirements.txt`, and verifies that `jsonschema` is absent. It tests library
+analysis and JSON serialization, then CLI text/Excel/JSON exports and health
+filtering on a temporary fixture copy. The environment and generated reports
+are removed afterward; the repository's `.venv` and fixture corpus are unchanged.
+
+CI runs this target after the main validation suite. It requires package-index
+access (or a suitable pip cache), unlike the ordinary tests after setup. Python
+user-site packages and inherited Python search paths are excluded from the worker.
+
+## Alpha scope and known gaps
+
+See the [format coverage matrix](docs/FORMAT_COVERAGE.md) for implemented subsets,
+linked regression evidence, and known limitations. This is a supervised engineering
+alpha: DAX, special model structures, and unknown report/M forms have incomplete
+coverage. Unreadable report files and unparseable/undecodable TMDL add scoped
+manual-review evidence, but objects defined in a failed TMDL file are absent from
+results. Synthetic validation does not establish real-project accuracy.
+
 ## Next planned improvement
 
-Support column selection, removal, and renaming between nested joins and
-expansion, tracking the nested column's identity and retaining schema requirements.
+Resolve unqualified column references in DAX (for example a calculated column
+`= [Quantity] * [Price]` or `SUMX(Sales, [Amount])`). Today only unqualified
+measures resolve, so such columns can be missed and reported `Likely unused`.
 
 ## Development
 
