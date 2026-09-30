@@ -1,23 +1,28 @@
-POWER BI USAGE ANALYZER — AGENTIC DEVELOPMENT EDITION
-======================================================
+# Power BI Usage Analyzer
 
 This repository is intended to be opened as a project in VS Code.
 
 Start here:
-  AGENTS.md
-  docs/DEVELOPMENT.md
-  docs/architecture.md
-  docs/ROADMAP.md
+
+- [AGENTS.md](AGENTS.md)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/ROADMAP.md](docs/ROADMAP.md)
 
 Windows quick start:
-  powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1
+```
 
 Then run:
-  python -m unittest discover -s tests -v
+
+```shell
+python -m unittest discover -s tests -v
+```
 
 
-POWER BI USAGE ANALYZER V2
-==========================
+## Power BI Usage Analyzer V2
 
 Dette er en ny, modulær versjon av analyseverktøyet for Power BI PBIP/PBIR-prosjekter.
 
@@ -25,8 +30,7 @@ Målet er å finne oppryddingskandidater i den semantiske modellen uten å feila
 
 V2 er bygget rundt en eksplisitt dependency graph i stedet for at hver parser selv bestemmer om et objekt er brukt eller ubrukt.
 
-ARKITEKTUR
-----------
+## Arkitektur
 
 Analyseflyten er:
 
@@ -62,25 +66,31 @@ Statusene er:
 
 "Likely unused" betyr ikke "garantert trygt å slette".
 
-INSTALLASJON
-------------
+## Installasjon
 
-Python 3 kreves.
+Python 3 kreves. Ubuntu/Linux er primær utviklingsplattform.
 
-Installer avhengigheter:
+Opprett et lokalt Python-miljø og installer avhengigheter:
 
-    pip install -r requirements.txt
+```bash
+make setup
+```
 
-KJØRING
--------
+Se [Ubuntu-oppsett](docs/UBUNTU_SETUP.md). Docker er valgfritt for vanlige tester, selv om `make check` rapporterer det som en manglende forutsetning.
+
+## Kjøring
 
 Fra denne mappen:
 
-    python run_analyzer.py "C:\sti\til\PBIP-prosjekt"
+```bash
+make analyze PROJECT="/sti/til/PBIP-prosjekt"
+```
 
-Hvis scriptet kjøres fra selve prosjektmappen:
+Alternativt, med prosjektets virtuelle Python-miljø:
 
-    python run_analyzer.py .
+```bash
+.venv/bin/python run_analyzer.py "/sti/til/PBIP-prosjekt"
+```
 
 Forventet prosjektstruktur er normalt:
 
@@ -88,16 +98,14 @@ Forventet prosjektstruktur er normalt:
     Prosjekt.Report\
     Prosjekt.SemanticModel\
 
-OUTPUT
-------
+## Output
 
 Verktøyet oppretter:
 
     <Prosjekt>_usage_summary_v2.txt
     <Prosjekt>_usage_analysis_v2.xlsx
 
-VIKTIGE ANALYSEKILDER
----------------------
+## Viktige analysekilder
 
 V2 undersøker blant annet:
 
@@ -113,8 +121,7 @@ V2 undersøker blant annet:
 - Power Query/M-avhengigheter mellom spørringer
 - rå PBIR-referanser som sikkerhetsnett
 
-POWER QUERY / M
----------------
+## Power Query / M
 
 M-parseren skal bare trekke query-avhengigheter fra faktiske M-uttrykk i partisjonenes `source =`-blokker.
 
@@ -128,36 +135,41 @@ skal gi:
 
 Et tabellnavn som bare finnes i metadata, DAX, en tekststreng eller kommentar skal ikke skape en Power Query-avhengighet.
 
-V2 skiller mellom query-level og column-level lineage. En query-level dependency beskytter foreløpig upstream-kolonner konservativt som "Needs manual review". Det betyr ikke at alle kolonnene nødvendigvis er nødvendige.
+Interne `LocalDateTable_*`- og `DateTableTemplate_*`-objekter holdes utenfor forretningstellingen. De beskytter bare konkret identifiserte kolonner gjennom relasjoner eller støttede `Table.SelectColumns`-uttrykk. Uavklart auto-date-lineage gir advarsler.
 
-NESTE PLANLAGTE FORBEDRING
---------------------------
+V2 skiller mellom query-level og column-level lineage. En query-level dependency fra en vanlig modelltabell beskytter foreløpig upstream-kolonner konservativt som "Needs manual review". Det betyr ikke at alle kolonnene nødvendigvis er nødvendige.
 
-Den viktigste videreutviklingen er kolonnenivå-lineage gjennom Power Query/M. Målet er å forstå transformasjoner som Table.SelectColumns, Table.RemoveColumns og Table.Combine slik at verktøyet kan avgjøre hvilke upstream-kolonner som faktisk propagere videre.
+## Neste planlagte forbedring
 
-UTVIKLING
----------
+Den viktigste videreutviklingen er kolonnenivå-lineage gjennom Power Query/M. Målet er å forstå transformasjoner som Table.SelectColumns, Table.RemoveColumns og Table.Combine slik at verktøyet kan avgjøre hvilke upstream-kolonner som faktisk propagerer videre.
 
-Agent- og utviklingsreglene ligger i AGENT.md.
+## Utvikling
+
+Agent- og utviklingsreglene ligger i [AGENTS.md](AGENTS.md).
 
 Kjør tester med:
 
-    python -m unittest discover -s tests -v
+```bash
+make compile
+make test
+make validate
+```
 
 Regresjonstestene skal utvides hver gang en ny feilklasse oppdages.
 
 
-OPTIONAL MARIADB INTEGRATION
-----------------------------
+## Optional MariaDB integration
+
 See:
-  docs/MARIADB_INTEGRATION.md
-  docs/PRIVILEGED_ACCESS.md
+
+- [docs/MARIADB_INTEGRATION.md](docs/MARIADB_INTEGRATION.md)
+- [docs/PRIVILEGED_ACCESS.md](docs/PRIVILEGED_ACCESS.md)
 
 The MariaDB environment is disposable and Docker-based. Do not store a sudo
 password in the repository or give the coding agent a reusable OS credential.
 
-UBUNTU / VS CODE QUICK START
-----------------------------
+## Ubuntu / VS Code quick start
+
 Ubuntu is now the primary development platform.
 
     make check
@@ -172,5 +184,5 @@ Optional MariaDB integration:
     make db-reset
 
 See:
-    docs/UBUNTU_SETUP.md
 
+- [docs/UBUNTU_SETUP.md](docs/UBUNTU_SETUP.md)
