@@ -140,6 +140,19 @@ regenerate with `make fixtures`, inspect the diff, then run `make check-fixtures
 and `make validate`. The clean regeneration target replaces the corpus; move any
 unrelated work out of that directory first.
 
+## Performance check
+
+`make benchmark` generates a large synthetic model in a temporary folder
+(`tools/validation/large_model.py`: 40 tables, about 3,300 objects) and prints
+object/evidence counts and the best of three analysis times. CI runs it for
+information only. `tests/test_large_model.py` checks a smaller generated model's
+classifications by default; set `PBI_PERF=1` to also assert the full model
+analyzes in under 3 seconds. The generated model has no ground truth beyond those
+samples and is not part of the committed fixture corpus.
+
+`tests/test_determinism.py` compares full JSON exports of every scenario under two
+hash seeds. Do not iterate `set`s when producing evidence or findings.
+
 ## Runtime-only smoke test
 
 Run `make check-runtime` to create a disposable venv, install only runtime

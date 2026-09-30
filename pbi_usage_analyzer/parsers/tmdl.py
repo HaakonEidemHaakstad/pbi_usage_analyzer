@@ -28,7 +28,8 @@ PROPERTY_LINE = re.compile(r"^[A-Za-z][A-Za-z0-9]*\s*:")
 @dataclass
 class TmdlModel(DiagnosticCollection):
     objects: list[ModelObject] = field(default_factory=list)
-    hierarchies: dict[ObjectRef, set[ObjectRef]] = field(default_factory=dict)
+    # Level columns in declaration order (deterministic evidence/export order).
+    hierarchies: dict[ObjectRef, tuple[ObjectRef, ...]] = field(default_factory=dict)
     table_files: dict[str, Path] = field(default_factory=dict)
     failed_files: list[Path] = field(default_factory=list)
     diagnostics: list[Diagnostic] = field(default_factory=list)
@@ -115,7 +116,7 @@ def measure_description(lines: list[str], index: int, block: list[str]) -> str |
     return ""
 
 
-def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, set[ObjectRef]]]:
+def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, tuple[ObjectRef, ...]]]:
     text, _ = read_source_text(path)
     lines = text.splitlines()
     table = None
@@ -128,7 +129,7 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, set
         return [], {}
 
     objects: list[ModelObject] = []
-    hierarchies: dict[ObjectRef, set[ObjectRef]] = {}
+    hierarchies: dict[ObjectRef, tuple[ObjectRef, ...]] = {}
     i = 0
     while i < len(lines):
         line = lines[i]
@@ -188,13 +189,13 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, set
             name = clean_name(mh.group(2)) or ""
             block, next_i = get_object_block(lines, i, base_indent)
             href = ObjectRef(ObjectType.HIERARCHY, table, name)
-            cols: set[ObjectRef] = set()
+            cols: dict[ObjectRef, None] = {}
             for bl in block:
                 stripped = bl.strip()
                 if stripped.startswith("column:"):
                     col = clean_name(stripped.split(":", 1)[1].strip()) or ""
-                    cols.add(ObjectRef(ObjectType.COLUMN, table, col))
-            hierarchies[href] = cols
+                    cols[ObjectRef(ObjectType.COLUMN, table, col)] = None
+            hierarchies[href] = tuple(cols)
             objects.append(ModelObject(ref=href, source_file=str(path)))
             i = next_i
             continue

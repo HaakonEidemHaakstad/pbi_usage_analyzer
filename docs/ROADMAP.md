@@ -134,4 +134,8 @@ other unqualified columns are manual review (scenario 28). Keywords/variables be
 `[` no longer swallow measure references (`RETURN [Measure]`).
 The report safety net covers measures in readable files with a stricter rule
 (scenario 29).
-Next: precomputed DAX indexes and a large-model performance check.
+DAX name indexes are built once per analysis, masking uses a regex tokenizer and
+the report measure net extracts qualified names once per file: the generated
+3,300-object model went from 5.4 s to about 1 s with identical output.
+Evidence order no longer depends on the hash seed.
+Next: tighten the substring column safety net; validate on a real project.

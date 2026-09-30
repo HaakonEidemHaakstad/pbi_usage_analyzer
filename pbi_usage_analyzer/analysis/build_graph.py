@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import DependencyGraph, Evidence, EvidenceType, ModelObject, ObjectRef, ObjectType
-from ..parsers.dax import dax_dependencies
+from ..parsers.dax import DaxIndex, dax_dependencies
 from ..parsers.dax_lexer import mask_dax
 from ..parsers.special_dax import special_dax_evidence
 from ..parsers.pbir import ReportParseResult, parse_report
@@ -59,6 +59,7 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
     ctx.graph.add_objects(query_objects)
 
     # DAX edges.
+    dax_index = DaxIndex.build(columns, measures)
     for ref, obj in list(ctx.graph.objects.items()):
         if ref.object_type in {ObjectType.COLUMN, ObjectType.MEASURE} and obj.expression:
             unterminated = mask_dax(obj.expression).unterminated
@@ -70,13 +71,13 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                     source_file=obj.source_file, object_ref=ref,
                 ))
             row_table = ref.table if ref.object_type == ObjectType.COLUMN else None
-            for ev in dax_dependencies(ref, obj.expression, columns, measures, row_table=row_table):
+            for ev in dax_dependencies(ref, obj.expression, columns, measures, row_table=row_table, index=dax_index):
                 ctx.graph.add_evidence(ev)
 
     # Evidence hidden by unparseable or undecodable TMDL stays reviewable.
     for path in tmdl.failed_files:
         owner = ObjectRef(ObjectType.TABLE, path.stem)
-        for ev in dax_dependencies(owner, read_source_text(path)[0], columns, measures):
+        for ev in dax_dependencies(owner, read_source_text(path)[0], columns, measures, index=dax_index):
             ctx.graph.add_evidence(Evidence(
                 None, ev.target, EvidenceType.INCOMPLETE_SOURCE,
                 f"Referenced in unparsed TMDL file {path.name}", str(path), "low"))
@@ -108,7 +109,7 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
 
     # Parse relevant declaration expressions before resolving special evidence.
     for path in sorted((model_folder / "definition").rglob("*.tmdl")):
-        for evidence in special_dax_evidence(path, columns, measures):
+        for evidence in special_dax_evidence(path, columns, measures, dax_index):
             ctx.graph.add_evidence(evidence)
 
     report = parse_report(report_folder, columns, measures, hierarchies)

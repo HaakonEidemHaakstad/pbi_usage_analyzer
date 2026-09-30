@@ -5,7 +5,7 @@ import re
 
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import indentation, read_source_text
-from .dax import dax_dependencies
+from .dax import DaxIndex, dax_dependencies
 from .dax_lexer import mask_dax_literals
 from .tmdl import split_object_definition
 
@@ -105,11 +105,11 @@ def extract_special_expressions(text: str) -> list[SpecialExpression]:
     return found
 
 
-def special_dax_evidence(path: Path, columns, measures) -> list[Evidence]:
+def special_dax_evidence(path: Path, columns, measures, index: DaxIndex | None = None) -> list[Evidence]:
     owner = ObjectRef(ObjectType.TABLE, f'Special:{path.name}')
     evidence = []
     for item in extract_special_expressions(read_source_text(path)[0]):
-        for edge in dax_dependencies(owner, item.expression, columns, measures, row_table=item.row_table):
+        for edge in dax_dependencies(owner, item.expression, columns, measures, row_table=item.row_table, index=index):
             # Only proven references become special roots; unresolved row-context
             # guesses must not be promoted to Used.
             if edge.evidence_type != EvidenceType.DAX_DEPENDENCY:

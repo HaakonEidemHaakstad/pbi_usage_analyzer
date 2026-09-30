@@ -453,6 +453,15 @@ The [format coverage matrix](FORMAT_COVERAGE.md) distinguishes implementation
 subsets, heuristics, tested examples and unsupported forms. Architecture goals
 elsewhere in this document are not a claim of complete Power BI format support.
 
+### Performance and determinism
+
+`build_graph` builds one `DaxIndex` (table set, measures by name, non-internal
+columns by name) and passes it to ordinary, special and failed-file DAX
+resolution. `mask_dax` is a single regex tokenizer whose semantics are pinned by
+a differential test against the former character loop. The report measure net
+extracts DAX-style `Table[Field]` pairs once per file. Hierarchy levels are kept
+in declaration order; outputs must not depend on `set` iteration order.
+
 ### Unqualified DAX references
 
 `dax_dependencies(..., row_table=...)` resolves unqualified `[Name]` in order:

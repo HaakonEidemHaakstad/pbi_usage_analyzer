@@ -380,6 +380,11 @@ An optional directory argument checks a different reference corpus. Exit codes
 are 0 for a match, 1 for drift, and 2 for generation/read failures. Comparison is
 byte-exact; it does not compare empty directories, permissions, or timestamps.
 
+## Performance
+
+`make benchmark` times analysis of a generated model of about 3,300 objects
+(about 1 second on a development laptop).
+
 ## Runtime dependency smoke test
 
 `make check-runtime` creates a temporary virtual environment, installs only
@@ -403,9 +408,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Precompute DAX resolution indexes and add a large synthetic performance fixture.
-`dax_dependencies` rescans all columns and measures for each expression, which is
-quadratic in model size.
+Tighten the substring-based column safety net for readable report files. A title
+such as `Total` currently sends a uniquely named column `Budget[Total]` to manual
+review. Validation against a real PBIP project would be the most valuable step.
 
 ## Development
 

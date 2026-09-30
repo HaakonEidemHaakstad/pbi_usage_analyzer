@@ -67,13 +67,37 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Report measures | Latest change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
+| Performance | Latest change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
+| Report measures | Previous change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
 | Unqualified DAX | Previous change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
 | Damaged sources | Previous change: scoped evidence recovery for unreadable/undecodable files. Details below. |
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: measure-aware report safety net
+## Latest change: performance and determinism
+
+- Profiled a generated 3,280-object model (`tools/validation/large_model.py`):
+  5.4 s before, about 0.9–1.1 s after. Hotspots fixed:
+  - `pbir._measure_hit_files` compiled/ran a regex per measure per file. Now
+    `_qualified_field_refs` extracts `Table[Field]` pairs once per file; lookups are
+    set membership. Theoretical difference: a `Table[Field]` nested inside a longer
+    quoted table name is no longer found (the old per-measure regex could).
+  - `dax_dependencies` rebuilt the table set and scanned all measures/columns per
+    reference. `DaxIndex.build` (in `parsers/dax.py`) runs once in `build_graph`
+    and is passed via `index=`; callers without it still work (built on demand).
+  - `mask_dax` character loop replaced by one regex tokenizer. `tests/test_dax_lexical.py`
+    keeps the old loop as `_reference_mask` and compares 10,000 random inputs.
+- Found a pre-existing determinism bug while comparing: `TmdlModel.hierarchies`
+  used `set` values, so hierarchy evidence order (and JSON/Excel row order) varied
+  with `PYTHONHASHSEED`. Values are now declaration-ordered tuples.
+  `tests/test_determinism.py` compares full exports under seeds 1 and 3 (failed before).
+- Equivalence: with a fixed seed, evidence (order and content), findings,
+  diagnostics and raw-hit rows are identical to the previous commit for all 29
+  scenarios and the large model.
+- `make benchmark` (also an informational CI step); `tests/test_large_model.py`
+  checks samples on a small generated model; `PBI_PERF=1` enables a 3 s bound.
+
+## Previous change: measure-aware report safety net
 
 - Readable PBIR files previously raw-scanned only columns, so a measure referenced
   through an unrecognized structure (custom bindings, expression strings) was
@@ -228,15 +252,17 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Not started; confirm with the user before beginning. Candidate: **precomputed DAX
-indexes and a large-model performance check**. `dax_dependencies` rebuilds the table
-set and scans all measures/columns for every unqualified name in every expression
-(O(objects x expressions)); build name indexes once in `build_graph` and pass them
-in, then add a generated large synthetic model (thousands of columns/measures) with
-a timing check that is not flaky in CI (e.g. a generous bound or opt-in). Behavior
-must be identical: compare classifications and evidence across 01–29.
-Other candidates: tighten the substring-based column safety net; show objects from
-failed TMDL files; TMDL inline-expression continuation; real-project benchmark.
+Not started; confirm with the user before beginning. Highest value: **validate on a
+real PBIP project** (the user would need to provide one; record expected statuses
+for a sample and investigate every surprise). Engineering candidate: **tighten the
+substring-based column safety net** in `parse_report` (`hit_files`): `field_token in
+blob` matches substrings of any JSON text, so a title `Total` gives unique column
+`Budget[Total]` manual review. Options: whole-string/qualified matching like the
+measure rule, keeping substring matching only for unreadable files. This changes
+existing results (scenario 09 and 29 expectations); every change must be explained,
+and the risk is new false `Likely unused` if real reports encode columns in
+unrecognized substrings. Other candidates: show objects from failed TMDL files;
+TMDL inline-expression continuation.
 
 ## Verification and environment
 
@@ -260,7 +286,8 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 156 unit/regression tests passed (2026-09-30, after the report measure net).
+- 160 unit/regression tests passed, 1 opt-in timing test skipped (2026-09-30,
+  after the performance change).
 - 220 synthetic checks passed across 29 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.

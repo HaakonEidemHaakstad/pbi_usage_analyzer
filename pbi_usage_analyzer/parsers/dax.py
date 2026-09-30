@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import clean_name, is_internal_table, norm_key
@@ -50,14 +51,39 @@ def _mentioned_tables(expression: str) -> set[str]:
     return names | {m.group().casefold() for m in IDENTIFIER.finditer(text)}
 
 
+@dataclass(frozen=True)
+class DaxIndex:
+    """Name lookups for DAX resolution, built once per analysis."""
+    columns: dict[tuple[str, str], ObjectRef]
+    measures: dict[tuple[str, str], ObjectRef]
+    tables: frozenset[str]
+    measures_by_name: dict[str, tuple[ObjectRef, ...]]
+    business_columns_by_name: dict[str, tuple[ObjectRef, ...]]
+
+    @classmethod
+    def build(cls, columns: dict[tuple[str, str], ObjectRef], measures: dict[tuple[str, str], ObjectRef]) -> "DaxIndex":
+        measures_by_name: dict[str, list[ObjectRef]] = {}
+        for (_, field), ref in measures.items():
+            measures_by_name.setdefault(field, []).append(ref)
+        columns_by_name: dict[str, list[ObjectRef]] = {}
+        for (_, field), ref in columns.items():
+            if not is_internal_table(ref.table):
+                columns_by_name.setdefault(field, []).append(ref)
+        return cls(columns, measures, frozenset(t for t, _ in columns) | frozenset(t for t, _ in measures),
+                   {k: tuple(v) for k, v in measures_by_name.items()},
+                   {k: tuple(v) for k, v in columns_by_name.items()})
+
+
 def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str, str], ObjectRef],
-                     measures: dict[tuple[str, str], ObjectRef], *, row_table: str | None = None) -> list[Evidence]:
+                     measures: dict[tuple[str, str], ObjectRef], *, row_table: str | None = None,
+                     index: DaxIndex | None = None) -> list[Evidence]:
     """Extract DAX references from an expression owned by ``owner``.
 
     ``row_table`` names a table whose row context is certain for the whole
     expression (calculated columns, RLS table permissions). Unqualified column
     names outside that context cannot be bound reliably without a DAX grammar
-    and produce manual-review evidence only.
+    and produce manual-review evidence only. Pass a prebuilt ``index`` (for the
+    same ``columns``/``measures``) when resolving many expressions.
     """
     if not expression:
         return []
@@ -65,7 +91,9 @@ def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str,
     # Strings and comments cannot reference model objects. Malformed trailing
     # literals stay unmasked so uncertain lexing never removes evidence.
     expression = mask_dax(expression, keep_unterminated=True).text
-    tables = {t for t, _ in columns} | {t for t, _ in measures}
+    if index is None:
+        index = DaxIndex.build(columns, measures)
+    tables = index.tables
     evidence: list[Evidence] = []
     consumed_spans: list[tuple[int, int]] = []
     for match in QUALIFIED_DAX_REF.finditer(expression):
@@ -87,7 +115,7 @@ def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str,
         # Measures resolve first in the owner's table, then uniquely across the model.
         target = measures.get(norm_key(owner.table, field))
         if not target:
-            candidates = [ref for (t, f), ref in measures.items() if f == field.casefold()]
+            candidates = index.measures_by_name.get(field.casefold(), ())
             if len(candidates) == 1:
                 target = candidates[0]
         if target:
@@ -98,8 +126,7 @@ def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str,
                                      f"Referenced by {owner.label} in {row_table} row context", confidence="high"))
         if target or column:
             continue
-        candidates = [ref for (t, f), ref in columns.items()
-                      if f == field.casefold() and not is_internal_table(ref.table)]
+        candidates = index.business_columns_by_name.get(field.casefold(), ())
         if not candidates:
             continue
         if mentioned is None:

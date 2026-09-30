@@ -106,5 +106,74 @@ class DaxLexicalScenarioTests(unittest.TestCase):
         self.assertNotIn(('Sales[Margin]', 'Sales[Old Margin]'), edges)
 
 
+def _reference_mask(expression, keep_unterminated=False):
+    """Character-loop masker the regex tokenizer replaced; kept as an oracle."""
+    out = list(expression)
+    i = 0
+    while i < len(expression):
+        start = i
+        char = expression[i]
+        unterminated = None
+        if char in "'[":
+            end = "'" if char == "'" else ']'
+            i += 1
+            while i < len(expression):
+                if expression[i] == end:
+                    i += 1
+                    if i < len(expression) and expression[i] == end:
+                        i += 1
+                        continue
+                    break
+                i += 1
+            continue
+        if char == '"':
+            i += 1
+            unterminated = 'string'
+            while i < len(expression):
+                if expression[i] == '"':
+                    i += 1
+                    if i < len(expression) and expression[i] == '"':
+                        i += 1
+                        continue
+                    unterminated = None
+                    break
+                i += 1
+        elif expression.startswith('//', i) or expression.startswith('--', i):
+            end = expression.find('\n', i)
+            i = len(expression) if end < 0 else end
+        elif expression.startswith('/*', i):
+            end = expression.find('*/', i + 2)
+            if end < 0:
+                unterminated = 'block comment'
+                i = len(expression)
+            else:
+                i = end + 2
+        else:
+            i += 1
+            continue
+        if unterminated and keep_unterminated:
+            return ''.join(out), unterminated, start
+        for position in range(start, i):
+            if out[position] not in '\r\n':
+                out[position] = ' '
+        if unterminated:
+            return ''.join(out), unterminated, start
+    return ''.join(out), None, None
+
+
+class MaskerDifferentialTests(unittest.TestCase):
+    def test_matches_reference_on_random_inputs(self):
+        import random
+        rng = random.Random(20260930)
+        alphabet = ["'", "''", '[', ']', ']]', '"', '""', '/', '*', '-', '//', '--', '/*', '*/',
+                    '\n', '\r\n', ' ', 'a', 'Sales', '[X]']
+        for _ in range(10000):
+            text = ''.join(rng.choice(alphabet) for _ in range(rng.randint(0, 14)))
+            for keep in (False, True):
+                result = mask_dax(text, keep_unterminated=keep)
+                self.assertEqual((result.text, result.unterminated, result.unterminated_offset),
+                                 _reference_mask(text, keep), (text, keep))
+
+
 if __name__ == '__main__':
     unittest.main()

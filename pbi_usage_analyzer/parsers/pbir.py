@@ -88,17 +88,25 @@ def _unique_fallback(field: str, index: dict[tuple[str, str], ObjectRef]) -> Obj
     return unique[0] if len(unique) == 1 else None
 
 
-def _qualified_measure_pattern(ref: ObjectRef) -> re.Pattern:
-    """DAX-style 'Table'[Measure] / Table[Measure] text, casefolded."""
-    table, name = ref.table.casefold(), ref.name.casefold()
-    forms = [re.escape("'" + table.replace("'", "''") + "'")]
-    if re.fullmatch(r"[^\W\d]\w*", table):
-        forms.append(rf"(?<![\w'.]){re.escape(table)}")
-    return re.compile(rf"(?:{'|'.join(forms)})\s*{re.escape('[' + name.replace(']', ']]') + ']')}")
+QUALIFIED_FIELD_TEXT = re.compile(
+    r"(?:'(?P<quoted>(?:[^']|'')*)'|(?<![\w'.])(?P<plain>[^\W\d]\w*))\s*\[(?P<field>(?:[^\]]|\]\])*)\]")
 
 
-def _measure_hit_files(ref: ObjectRef, file_strings: dict[Path, set[str]], blobs: dict[Path, str],
-                       unique_name: bool) -> list[Path]:
+def _qualified_field_refs(text: str) -> set[tuple[str, str]]:
+    """(table, field) pairs written DAX-style ('Table'[Field] / Table[Field]) in text.
+
+    Names are returned unescaped and compared as given; callers pass casefolded text.
+    """
+    refs = set()
+    for match in QUALIFIED_FIELD_TEXT.finditer(text):
+        quoted = match.group("quoted")
+        table = quoted.replace("''", "'") if quoted is not None else match.group("plain")
+        refs.add((table, match.group("field").replace("]]", "]")))
+    return refs
+
+
+def _measure_hit_files(ref: ObjectRef, file_strings: dict[Path, set[str]],
+                       file_refs: dict[Path, set[tuple[str, str]]], unique_name: bool) -> list[Path]:
     """Files whose readable JSON credibly references a measure outside parsed nodes.
 
     Measure names are often ordinary words, so substrings are not enough: require
@@ -107,10 +115,10 @@ def _measure_hit_files(ref: ObjectRef, file_strings: dict[Path, set[str]], blobs
     file names its table.
     """
     table, name = ref.table.casefold(), ref.name.casefold()
-    pattern = _qualified_measure_pattern(ref)
+    qualified = f"{table}.{name}"
     hits = []
     for path, strings in file_strings.items():
-        if (f"{table}.{name}" in strings or pattern.search(blobs[path])
+        if (qualified in strings or (table, name) in file_refs[path]
                 or (unique_name and name in strings and table in strings)):
             hits.append(path)
     return hits
@@ -136,6 +144,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
     accounted_columns: set[ObjectRef] = set()
     accounted_measures: set[ObjectRef] = set()
     file_strings: dict[Path, set[str]] = {}
+    file_refs: dict[Path, set[tuple[str, str]]] = {}
     all_json_strings: dict[Path, str] = {}
     unreadable_text: dict[Path, str] = {}
 
@@ -196,6 +205,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
         _collect_strings(data, strings)
         all_json_strings[path] = "\n".join(strings).casefold()
         file_strings[path] = {value.strip().casefold() for value in strings}
+        file_refs[path] = _qualified_field_refs(all_json_strings[path])
 
     # Conservative raw-report safety net. Require the field token plus either its table
     # token or a unique field name. This is intentionally manual-review evidence only.
@@ -236,7 +246,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
         name = ref.name.casefold()
         unique = measure_counts.get(name, 0) + field_counts.get(name, 0) == 1
         readable = [str(path.relative_to(report_folder))
-                    for path in _measure_hit_files(ref, file_strings, all_json_strings, unique)]
+                    for path in _measure_hit_files(ref, file_strings, file_refs, unique)]
         if readable:
             result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Unparsed report measure reference detected", " | ".join(readable), "low"))
             result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(readable)})

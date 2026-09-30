@@ -38,17 +38,15 @@ class ReportMeasureSafetyNetTests(unittest.TestCase):
         self.assertEqual(consistency_errors(analysis_to_dict(self.result)), [])
 
 
-class QualifiedMeasurePatternTests(unittest.TestCase):
+class QualifiedFieldTextTests(unittest.TestCase):
     def test_escaping_and_boundaries(self):
-        from pbi_usage_analyzer.model import ObjectRef, ObjectType
-        from pbi_usage_analyzer.parsers.pbir import _qualified_measure_pattern
-        quoted = _qualified_measure_pattern(ObjectRef(ObjectType.MEASURE, "Bob's", 'Rate [%]'))
-        self.assertTrue(quoted.search("sum('bob''s'[rate [%]]])"))
-        plain = _qualified_measure_pattern(ObjectRef(ObjectType.MEASURE, 'Sales', 'Total'))
-        self.assertTrue(plain.search('x + sales [total]'))
-        for text in ('mysales[total]', 'x.sales[total]', 'sales[total amount]'):
+        from pbi_usage_analyzer.parsers.pbir import _qualified_field_refs
+        self.assertEqual(_qualified_field_refs("sum('bob''s'[rate [%]]])"), {("bob's", 'rate [%]')})
+        self.assertEqual(_qualified_field_refs('x + sales [total]'), {('sales', 'total')})
+        self.assertEqual(_qualified_field_refs('mysales[total]'), {('mysales', 'total')})
+        for text in ('x.sales[total]', "it's[total]", '[total]'):
             with self.subTest(text=text):
-                self.assertIsNone(plain.search(text))
+                self.assertEqual(_qualified_field_refs(text), set())
 
 
 if __name__ == '__main__':

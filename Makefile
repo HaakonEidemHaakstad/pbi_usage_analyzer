@@ -1,4 +1,4 @@
-.PHONY: help check setup compile test validate validate-json check-fixtures check-runtime fixtures db-up db-down db-reset analyze clean
+.PHONY: help check setup compile test validate validate-json check-fixtures check-runtime benchmark fixtures db-up db-down db-reset analyze clean
 
 PY := .venv/bin/python
 EXPORT ?=
@@ -12,6 +12,7 @@ help:
 	@echo "  make compile               Compile-check Python sources"
 	@echo "  make test                  Run unit/regression tests"
 	@echo "  make check-runtime         Smoke-test runtime-only dependencies"
+	@echo "  make benchmark             Time analysis of a large generated model"
 	@echo "  make check-fixtures        Check generated fixture reproducibility"
 	@echo "  make fixtures              Regenerate synthetic validation fixtures"
 	@echo "  make validate              Run synthetic validation suite"
@@ -36,6 +37,9 @@ test:
 
 check-runtime:
 	$(PY) tools/validation/check_runtime.py
+
+benchmark:
+	$(PY) tools/validation/large_model.py
 
 check-fixtures:
 	$(PY) tools/validation/check_fixture_drift.py

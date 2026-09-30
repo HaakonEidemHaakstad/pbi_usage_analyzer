@@ -44,3 +44,5 @@ jobs:
         run: make validate
       - name: Smoke-test runtime-only dependencies
         run: make check-runtime
+      - name: Time large generated model (informational)
+        run: make benchmark
