@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    "01_direct_visual",
+    "02_dax_transitive",
+    "03_relationship_only",
+    "04_sort_by",
+    "05_hierarchy",
+    "06_powerquery_append",
+    "07_m_false_positive_guards",
+    "08_autodate_scope_guard",
+    "09_raw_report_safety_net"
+  ],
+  "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
+}

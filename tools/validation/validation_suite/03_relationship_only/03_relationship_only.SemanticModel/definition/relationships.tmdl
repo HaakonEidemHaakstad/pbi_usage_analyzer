@@ -1,0 +1,3 @@
+relationship Rel1
+    fromColumn: Fact.Key
+    toColumn: Dim.Key

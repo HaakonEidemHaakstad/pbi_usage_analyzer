@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Column|Dim|Key": "Used",
+    "Column|Fact|Key": "Used",
+    "Column|Dim|Label": "Likely unused",
+    "Column|Fact|Value": "Likely unused"
+  },
+  "notes": "Relationship endpoints are used even without report references."
+}

@@ -1,0 +1,8 @@
+{
+  "expected_status": {
+    "Column|Dim|Label": "Used",
+    "Column|Dim|SortOrder": "Used",
+    "Column|Dim|Unused": "Likely unused"
+  },
+  "notes": "A used display column must propagate use to its sort-by column."
+}

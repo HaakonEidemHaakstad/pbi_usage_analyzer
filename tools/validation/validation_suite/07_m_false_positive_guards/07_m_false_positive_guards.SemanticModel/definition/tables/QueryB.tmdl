@@ -1,0 +1,4 @@
+table QueryB
+    column B
+        dataType: string
+        sourceColumn: B

@@ -1,0 +1,7 @@
+{
+  "expected_status": {
+    "Column|QueryA|A": "Used",
+    "Column|QueryB|B": "Likely unused"
+  },
+  "notes": "Strings, comments and local let bindings named QueryB must not create QueryA -> QueryB."
+}

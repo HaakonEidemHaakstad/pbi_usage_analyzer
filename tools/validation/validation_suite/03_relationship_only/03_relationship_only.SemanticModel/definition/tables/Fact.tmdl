@@ -1,0 +1,8 @@
+table Fact
+    column Key
+        dataType: int64
+        sourceColumn: Key
+
+    column Value
+        dataType: double
+        sourceColumn: Value

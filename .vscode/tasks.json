@@ -1,0 +1,58 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Environment: check prerequisites",
+      "type": "shell",
+      "command": "make check",
+      "problemMatcher": []
+    },
+    {
+      "label": "Environment: setup",
+      "type": "shell",
+      "command": "make setup",
+      "problemMatcher": []
+    },
+    {
+      "label": "Tests: unit/regression",
+      "type": "shell",
+      "command": "make test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Tests: synthetic validation",
+      "type": "shell",
+      "command": "make validate",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Compile check",
+      "type": "shell",
+      "command": "make compile",
+      "problemMatcher": []
+    },
+    {
+      "label": "MariaDB: up",
+      "type": "shell",
+      "command": "make db-up",
+      "problemMatcher": []
+    },
+    {
+      "label": "MariaDB: down",
+      "type": "shell",
+      "command": "make db-down",
+      "problemMatcher": []
+    },
+    {
+      "label": "MariaDB: reset",
+      "type": "shell",
+      "command": "make db-reset",
+      "problemMatcher": []
+    }
+  ]
+}

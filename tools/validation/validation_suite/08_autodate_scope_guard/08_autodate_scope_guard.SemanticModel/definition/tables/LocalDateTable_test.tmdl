@@ -1,0 +1,19 @@
+table LocalDateTable_test
+    isHidden
+
+    column Date
+        dataType: dateTime
+        sourceColumn: Date
+
+    column Year
+        dataType: int64
+        sourceColumn: Year
+
+    partition LocalDateTable_test = m
+        mode: import
+        source =
+            let
+                Source = Sales,
+                SelectedDate = Table.SelectColumns(Source, {"Date"})
+            in
+                SelectedDate

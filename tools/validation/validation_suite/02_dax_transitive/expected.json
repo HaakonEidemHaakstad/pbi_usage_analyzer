@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Measure|Sales|Measure A": "Used",
+    "Measure|Sales|Measure B": "Used",
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Unused": "Likely unused"
+  },
+  "notes": "Usage must propagate Visual -> Measure A -> Measure B -> Amount."
+}

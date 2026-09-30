@@ -1,0 +1,8 @@
+{
+  "expected_status": {
+    "Column|Dates|Year": "Used",
+    "Column|Dates|Month": "Used",
+    "Column|Dates|Unused": "Likely unused"
+  },
+  "notes": "Using a hierarchy must protect all member columns."
+}

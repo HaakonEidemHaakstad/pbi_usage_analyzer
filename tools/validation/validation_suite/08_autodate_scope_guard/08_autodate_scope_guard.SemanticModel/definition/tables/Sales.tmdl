@@ -1,0 +1,12 @@
+table Sales
+    column Date
+        dataType: dateTime
+        sourceColumn: Date
+
+    column Amount
+        dataType: double
+        sourceColumn: Amount
+
+    column Customer
+        dataType: string
+        sourceColumn: Customer

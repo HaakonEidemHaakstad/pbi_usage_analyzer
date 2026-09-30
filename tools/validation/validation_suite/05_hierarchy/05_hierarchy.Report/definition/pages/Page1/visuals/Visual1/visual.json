@@ -1,0 +1,33 @@
+{
+  "query": {
+    "Commands": [
+      {
+        "SemanticQueryDataShapeCommand": {
+          "Query": {
+            "Version": 2,
+            "From": [
+              {
+                "Name": "s",
+                "Entity": "Dates",
+                "Type": 0
+              }
+            ],
+            "Select": [
+              {
+                "Hierarchy": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Source": "s"
+                    }
+                  },
+                  "Property": "Calendar"
+                },
+                "Name": "Dates.Calendar"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

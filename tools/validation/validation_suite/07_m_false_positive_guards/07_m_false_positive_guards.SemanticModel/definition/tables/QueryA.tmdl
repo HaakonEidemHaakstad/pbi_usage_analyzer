@@ -1,0 +1,15 @@
+table QueryA
+    column A
+        dataType: string
+        sourceColumn: A
+
+    partition QueryA = m
+        mode: import
+        source =
+            let
+                Note = "QueryB",
+                // QueryB must not count as a dependency
+                QueryB = 123,
+                Source = #table({"A"}, {{"x"}})
+            in
+                Source

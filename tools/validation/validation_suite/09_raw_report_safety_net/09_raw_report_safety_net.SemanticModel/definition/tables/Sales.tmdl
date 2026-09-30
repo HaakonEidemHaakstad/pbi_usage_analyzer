@@ -1,0 +1,8 @@
+table Sales
+    column MysteryField
+        dataType: string
+        sourceColumn: MysteryField
+
+    column TrulyUnused
+        dataType: string
+        sourceColumn: TrulyUnused

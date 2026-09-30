@@ -1,0 +1,13 @@
+table Dim
+    column Label
+        dataType: string
+        sourceColumn: Label
+        sortByColumn: SortOrder
+
+    column SortOrder
+        dataType: int64
+        sourceColumn: SortOrder
+
+    column Unused
+        dataType: string
+        sourceColumn: Unused

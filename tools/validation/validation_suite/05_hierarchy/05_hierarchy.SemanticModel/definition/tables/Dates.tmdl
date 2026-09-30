@@ -1,0 +1,18 @@
+table Dates
+    column Year
+        dataType: int64
+        sourceColumn: Year
+
+    column Month
+        dataType: string
+        sourceColumn: Month
+
+    column Unused
+        dataType: string
+        sourceColumn: Unused
+
+    hierarchy Calendar
+        level Year
+            column: Year
+        level Month
+            column: Month

@@ -1,0 +1,12 @@
+table Sales
+    column Amount
+        dataType: double
+        sourceColumn: Amount
+
+    column Unused
+        dataType: string
+        sourceColumn: Unused
+
+    measure 'Measure A' = [Measure B]
+
+    measure 'Measure B' = SUM('Sales'[Amount])

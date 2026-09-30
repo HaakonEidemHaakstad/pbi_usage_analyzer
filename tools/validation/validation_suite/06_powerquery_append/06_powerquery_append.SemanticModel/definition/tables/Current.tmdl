@@ -1,0 +1,13 @@
+table Current
+    column A
+        dataType: string
+        sourceColumn: A
+
+    partition Current = m
+        mode: import
+        source =
+            let
+                Source = #table({"A"}, {{"current"}}),
+                Combined = Table.Combine({Source, #"Archive"})
+            in
+                Combined

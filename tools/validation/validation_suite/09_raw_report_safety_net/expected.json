@@ -1,0 +1,7 @@
+{
+  "expected_status": {
+    "Column|Sales|MysteryField": "Needs manual review",
+    "Column|Sales|TrulyUnused": "Likely unused"
+  },
+  "notes": "Credible raw report occurrence should trigger manual review, not Used or Likely unused."
+}

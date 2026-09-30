@@ -1,0 +1,8 @@
+{
+  "expected_status": {
+    "Column|Current|A": "Used",
+    "Column|Archive|A": "Needs manual review",
+    "Column|Archive|B": "Needs manual review"
+  },
+  "notes": "Query-level append dependency should conservatively protect Archive until column-level M lineage exists."
+}

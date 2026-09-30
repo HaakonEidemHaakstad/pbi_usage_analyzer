@@ -1,0 +1,10 @@
+{
+  "expected_status": {
+    "Column|Sales|Date": "Needs manual review",
+    "Column|Sales|Amount": "Likely unused",
+    "Column|Sales|Customer": "Likely unused",
+    "Column|LocalDateTable_test|Date": "Internal / auto-generated",
+    "Column|LocalDateTable_test|Year": "Internal / auto-generated"
+  },
+  "notes": "Deliberate regression test: an internal LocalDateTable must not cause every Sales column to be protected. Current analyzer may fail this until auto-date/column-level M lineage is fixed."
+}

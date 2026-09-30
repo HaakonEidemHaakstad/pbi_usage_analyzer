@@ -1,0 +1,8 @@
+table Sales
+    column Amount
+        dataType: double
+        sourceColumn: Amount
+
+    column Unused
+        dataType: string
+        sourceColumn: Unused

@@ -1,0 +1,13 @@
+table Archive
+    column A
+        dataType: string
+        sourceColumn: A
+
+    column B
+        dataType: string
+        sourceColumn: B
+
+    partition Archive = m
+        mode: import
+        source =
+            #table({"A", "B"}, {{"old", "x"}})

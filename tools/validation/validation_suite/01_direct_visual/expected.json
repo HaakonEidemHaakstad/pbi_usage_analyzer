@@ -1,0 +1,7 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Unused": "Likely unused"
+  },
+  "notes": "Direct PBIR column use must protect Amount only."
+}
