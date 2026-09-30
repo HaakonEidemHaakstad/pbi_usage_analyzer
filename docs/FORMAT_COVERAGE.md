@@ -28,7 +28,7 @@ warning does not establish complete coverage.
 | Area | Implemented boundary | Evidence and remaining gaps |
 | --- | --- | --- |
 | Report files | Inspects `definition/report.json`, `definition/pages/*/page.json`, and `definition/pages/*/visuals/*/visual.json`. | [PBIR parser](../pbi_usage_analyzer/parsers/pbir.py). Legacy PBIX/Layout and service-hosted models are not inputs. Missing report definitions do not automatically stop analysis. |
-| Structured report references | Recursively recognizes `Column`, `Measure`, `Hierarchy`, and some `HierarchyLevel` nodes using `Entity`/`SourceRef` and `From` mappings. Nested column nodes can cover implicit aggregation. | [Scenario 01](../tools/validation/validation_suite/01_direct_visual). File traversal does not establish complete support for every filter, tooltip, drillthrough, formatting, projection or custom-visual structure. Alias mappings are collected per file, not resolved by a full semantic-query scope model. |
+| Structured report references | Recursively recognizes `Column`, `Measure`, `Hierarchy` and `HierarchyLevel` nodes. Tables come from `SourceRef.Entity` (current visualContainer format, verified on a real project), `SourceRef.Source` aliases with `From` mappings (query-command form) or `Entity` nodes. Levels resolve through their nested hierarchy; the hierarchy protects all levels, and a level's same-named column gets direct use. `PropertyVariationSource` (auto-date over a business column) maps to that column; this shape follows PBIR and has not yet been seen in a real sample. Nested column nodes cover implicit aggregation. | [Scenario 01](../tools/validation/validation_suite/01_direct_visual), [scenario 31](../tools/validation/validation_suite/31_pbir_entity_refs), [entity tests](../tests/test_pbir_entity_refs.py). File traversal does not establish complete support for every filter, tooltip, drillthrough, formatting, projection or custom-visual structure. Alias mappings are collected per file, not resolved by a full semantic-query scope model. |
 | Stale references and fallback | Records unresolved references and may match an otherwise unique field name across tables. | [PBIR parser](../pbi_usage_analyzer/parsers/pbir.py). Fallback matching is heuristic; inspect evidence before acting. Localized auto-date hierarchy handling uses a limited identifier list. |
 | Raw report safety net | For fields not matched structurally, readable JSON counts only qualified forms (`Table.Field` with word boundaries, `'Table'[Field]`/`Table[Field]`) or the exact name as a whole string value or unqualified `[Field]` in a file whose string values include the table name; emits manual-review evidence. | [Scenario 09](../tools/validation/validation_suite/09_raw_report_safety_net), [scenario 29](../tools/validation/validation_suite/29_report_measure_safety_net), [scenario 30](../tools/validation/validation_suite/30_report_column_safety_net), [tests](../tests/test_report_measure_safety_net.py). Substrings, JSON keys and names without their table do not count, so references encoded differently in unknown structures can be missed. A title equal to a field name next to its table name still counts. Unreadable files (`PBIR_READ_FAILED`) use a looser substring rule for columns and measures ([scenario 27](../tools/validation/validation_suite/27_incomplete_sources)); names written with JSON escapes are not matched there. |
 | DAX references | Regex recognition of qualified fields, local/uniquely named unqualified measures, and unqualified columns in a certain row context (calculated column's table, RLS permission table) over text with strings and comments masked; `''`/`]]` identifier escapes are unescaped; graph propagation is transitive. | [Scenario 02](../tools/validation/validation_suite/02_dax_transitive), [scenario 25](../tools/validation/validation_suite/25_dax_lexical_scope), [graph tests](../tests/test_graph.py), [lexical tests](../tests/test_dax_lexical.py), [scenario 28](../tools/validation/validation_suite/28_dax_unqualified_columns), [unqualified tests](../tests/test_dax_unqualified.py). No DAX grammar, variable binding, or runtime evaluation. Other unqualified column names (iterators, `FILTER`, virtual `ADDCOLUMNS` columns) give `DAX_UNQUALIFIED_COLUMN_REFERENCE` manual-review evidence, narrowed to tables named in the expression; a same-named measure takes precedence and suppresses it. Words before `[` (`RETURN`, `NOT`, variables) are a table only when they end in a known table name. Unterminated strings/block comments are kept unmasked with a `DAX_UNTERMINATED_LITERAL` diagnostic. Multiline TMDL expressions end at the first property-shaped line (`name:` or a known child keyword) after string/comment masking ([scenario 26](../tools/validation/validation_suite/26_tmdl_expression_boundaries), [boundary tests](../tests/test_tmdl_expressions.py)); an inline expression is not joined with continuation lines. |
@@ -44,7 +44,7 @@ complete coverage of unknown expressions.
 
 | Shape | Supported subset | Regression evidence |
 | --- | --- | --- |
-| Query references and append | Local `let` bindings, aliases, quoted identifiers and bounded `Table.Combine`. Query dependencies survive empty column demand. | [Scenario 06](../tools/validation/validation_suite/06_powerquery_append), [scenario 07](../tools/validation/validation_suite/07_m_false_positive_guards), [M tests](../tests/test_m_lineage.py). |
+| Query references and append | Local `let` bindings, aliases, quoted identifiers and bounded `Table.Combine`. Simple identifiers match case-sensitively and not inside dotted/`#` identifiers, so `type date`, `Date.From` and `#date` are not the query `Date`. Query dependencies survive empty column demand. | [Scenario 06](../tools/validation/validation_suite/06_powerquery_append), [scenario 07](../tools/validation/validation_suite/07_m_false_positive_guards), [scenario 32](../tools/validation/validation_suite/32_m_case_sensitive_refs), [M tests](../tests/test_m_lineage.py). |
 | Selection/removal | Literal column-name lists; supported `MissingField.Ignore`; default schema requirements retained. | [Scenario 10](../tools/validation/validation_suite/10_m_column_lineage), [scenario 11 fallback](../tools/validation/validation_suite/11_m_lineage_fallback). |
 | Rename/type conversion | Bounded literal pairs, supported scalar types/type constants, literal culture for type conversion. | [Scenario 12](../tools/validation/validation_suite/12_m_rename_types). Overlapping rename pairs within one call, custom types and unsupported missing-field options fall back. |
 | Filters/computed columns | Bounded `each` expressions with literal field reads, arithmetic/comparison/logical operators, conditionals and allowed scalar calls. | [Scenario 13](../tools/validation/validation_suite/13_m_rows_and_computed), [scenario 15](../tools/validation/validation_suite/15_m_scalar_filtered_join), [scalar allowlist](../pbi_usage_analyzer/parsers/m_scalar_functions.py). Unknown functions, dynamic lookup, comparers and unsupported argument forms fall back. |
@@ -76,8 +76,8 @@ review`, even when its column scope is narrowed.
 The synthetic corpus and unit tests establish bounded regression coverage.
 Fixture drift and runtime-only smoke checks improve reproducibility. They do not
 substitute for a varied real-world corpus reviewed in Power BI. The current
-validation work has not established representative real-project accuracy or
-large-model performance. Hosted CI runs the same checks on Ubuntu; a passing run
+validation work has established accuracy on one small real project only (see
+below), not representative real-project accuracy. Hosted CI runs the same checks on Ubuntu; a passing run
 shows the synthetic suite is reproducible, not that real-project results are accurate.
 
 Basic RLS, calculation-item and field-parameter fixtures now check positive
@@ -89,6 +89,19 @@ aliases and unsupported report structures. Damaged sources produce scoped
 defined in a failed TMDL table file do not appear in results, and references whose
 text contains undecodable bytes cannot be resolved. Treat results with diagnostics
 as incomplete.
+
+### Real-project check: AdventureWorks (2026-09-30)
+
+One real PBIP project (AdventureWorks sample: 9 tables, 72 columns, 24 measures,
+6 visuals, current PBIR format, no auto-date/RLS/calculation groups) was checked
+against an independent hand-derived ground truth. It exposed two bugs, now fixed:
+`SourceRef.Entity` fields were not resolved (no measure was Used), and `type date`
+created a false M dependency on the `Date` query. After the fixes all 41 Used
+objects match; no object is wrongly `Likely unused`; 17 objects the review called
+unused are `Needs manual review` by design (referenced only by unused DAX owners or
+levels of an unused hierarchy). Expected statuses are recorded in
+[tests/integration](../tests/integration/adventureworks_expected.json); the project
+itself is not in the repository. One small project is not a representative corpus.
 
 Before expanding alpha claims, record expected statuses for representative real
 projects, investigate every unexplained classification change, and validate

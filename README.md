@@ -408,9 +408,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Validate against a real PBIP project: record expected statuses for a sample of
-objects and investigate every surprise. After that, a thin desktop GUI over
-`analyze_project()`.
+Validate on more real PBIP projects, especially ones with auto-date tables, RLS,
+calculation groups, field parameters and report/page filters (the AdventureWorks
+check covered none of these). Then a thin desktop GUI over `analyze_project()`.
 
 ## Development
 

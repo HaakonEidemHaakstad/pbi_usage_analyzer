@@ -1226,6 +1226,126 @@ table {table}
     }, "Readable report text protects a column only in a qualified form (Table.Column, Table[Column]) or as the exact name or [Name] alongside its table name; substrings, JSON keys and names without their table do not. A title equal to a column name next to its table name still counts.")
 
 
+def entity_field(kind: str, table: str, name: str) -> dict:
+    """Current PBIR visualContainer field: SourceRef names the entity directly."""
+    key = "Hierarchy" if kind == "Hierarchy" else "Property"
+    return {kind: {"Expression": {"SourceRef": {"Entity": table}}, key: name}}
+
+
+def build_pbir_entity_refs(root: Path):
+    name = "31_pbir_entity_refs"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Channel
+        sourceColumn: Channel
+    column OrderDate
+        sourceColumn: OrderDate
+    column Unused
+        sourceColumn: Unused
+    measure Revenue = SUM(Sales[Amount])
+    measure 'Filter Only' = COUNTROWS(Sales)
+    measure Idle = 1
+""")
+    write(model / "definition" / "tables" / "Dates.tmdl", """
+table Dates
+    column Year
+        sourceColumn: Year
+    column Month
+        sourceColumn: Month
+    column Day
+        sourceColumn: Day
+    column Other
+        sourceColumn: Other
+    hierarchy Calendar
+        level Year
+            column: Year
+        level Month
+            column: Month
+        level Day
+            column: Day
+""")
+    level = lambda lvl: {"HierarchyLevel": {"Expression": {"Hierarchy": {
+        "Expression": {"SourceRef": {"Entity": "Dates"}}, "Hierarchy": "Calendar"}}, "Level": lvl}}
+    add_visual(report, "Page1", "Visual1", {
+        "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+        "name": "Visual1",
+        "visual": {"visualType": "pivotTable", "query": {"queryState": {
+            "Rows": {"projections": [
+                {"field": level("Month"), "queryRef": "Dates.Calendar.Month", "active": True},
+                {"field": level("Day"), "queryRef": "Dates.Calendar.Day", "active": False}]},
+            "Values": {"projections": [
+                {"field": entity_field("Measure", "Sales", "Revenue"), "queryRef": "Sales.Revenue"}]}},
+            "sortDefinition": {"sort": [{"field": entity_field("Column", "Sales", "Region"), "direction": "Ascending"}]}}},
+        "filterConfig": {"filters": [
+            {"name": "f1", "field": entity_field("Measure", "Sales", "Filter Only"), "type": "Advanced"},
+            {"name": "f2", "field": {"Aggregation": {"Expression": entity_field("Column", "Sales", "Channel"), "Function": 0}}}]},
+    })
+    # Auto-date variation over a business column (shape per PBIR; not yet seen in a real sample).
+    add_visual(report, "Page1", "Visual2", {"visual": {"query": {"queryState": {"Category": {"projections": [{"field": {
+        "HierarchyLevel": {"Expression": {"Hierarchy": {"Expression": {"PropertyVariationSource": {
+            "Expression": {"SourceRef": {"Entity": "Sales"}}, "Name": "Variation", "Property": "OrderDate"}},
+            "Hierarchy": "Date Hierarchy"}}, "Level": "Year"}}}]}}}}})
+    save_expected(p, {
+        "Measure|Sales|Revenue": "Used",
+        "Column|Sales|Amount": "Used",
+        "Measure|Sales|Filter Only": "Used",
+        "Column|Sales|Region": "Used",
+        "Column|Sales|Channel": "Used",
+        "Column|Sales|OrderDate": "Used",
+        "Column|Dates|Year": "Used",
+        "Column|Dates|Month": "Used",
+        "Column|Dates|Day": "Used",
+        "Column|Dates|Other": "Likely unused",
+        "Column|Sales|Unused": "Likely unused",
+        "Measure|Sales|Idle": "Likely unused",
+    }, "Current PBIR visualContainer fields name the entity in SourceRef; hierarchy levels nest the hierarchy; auto-date variations reference the business column.")
+
+
+def build_m_case_sensitive_refs(root: Path):
+    name = "32_m_case_sensitive_refs"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Date.tmdl", """
+table Date
+    column Date
+        sourceColumn: Date
+    column Weekday
+        sourceColumn: Weekday
+    partition Date = m
+        mode: import
+        source =
+                let
+                    Source = Csv.Document(File.Contents("dates.csv"))
+                in
+                    Source
+""")
+    # `type date`, `Date.Year` and `#date` are M keywords/library names, not the Date query.
+    write(model / "definition" / "tables" / "Returns.tmdl", """
+table Returns
+    column ReturnDate
+        sourceColumn: ReturnDate
+    partition Returns = m
+        mode: import
+        source =
+                let
+                    Kilde = Csv.Document(File.Contents("returns.csv")),
+                    Typed = Table.TransformColumnTypes(Kilde, {{"ReturnDate", type date}}),
+                    Added = Table.AddColumn(Typed, "Y", each Date.Year([ReturnDate]) + Date.From(#date(2024, 1, 1)))
+                in
+                    Added
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Returns", "ReturnDate"))
+    save_expected(p, {
+        "Column|Returns|ReturnDate": "Used",
+        "Column|Date|Date": "Likely unused",
+        "Column|Date|Weekday": "Likely unused",
+    }, "M is case-sensitive: type keywords and library identifiers must not create a dependency on a query named Date (found in a real project).")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1268,6 +1388,8 @@ def main():
         build_dax_unqualified_columns,
         build_report_measure_safety_net,
         build_report_column_safety_net,
+        build_pbir_entity_refs,
+        build_m_case_sensitive_refs,
     ]
     for builder in builders:
         builder(root)

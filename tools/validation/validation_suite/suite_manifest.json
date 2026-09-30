@@ -29,7 +29,9 @@
     "27_incomplete_sources",
     "28_dax_unqualified_columns",
     "29_report_measure_safety_net",
-    "30_report_column_safety_net"
+    "30_report_column_safety_net",
+    "31_pbir_entity_refs",
+    "32_m_case_sensitive_refs"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

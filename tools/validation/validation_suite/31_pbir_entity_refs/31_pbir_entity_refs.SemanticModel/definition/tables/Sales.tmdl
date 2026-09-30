@@ -1,0 +1,14 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Channel
+        sourceColumn: Channel
+    column OrderDate
+        sourceColumn: OrderDate
+    column Unused
+        sourceColumn: Unused
+    measure Revenue = SUM(Sales[Amount])
+    measure 'Filter Only' = COUNTROWS(Sales)
+    measure Idle = 1

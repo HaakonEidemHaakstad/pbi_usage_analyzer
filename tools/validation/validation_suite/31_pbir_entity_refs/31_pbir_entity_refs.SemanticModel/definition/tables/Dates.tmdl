@@ -1,0 +1,16 @@
+table Dates
+    column Year
+        sourceColumn: Year
+    column Month
+        sourceColumn: Month
+    column Day
+        sourceColumn: Day
+    column Other
+        sourceColumn: Other
+    hierarchy Calendar
+        level Year
+            column: Year
+        level Month
+            column: Month
+        level Day
+            column: Day

@@ -1,0 +1,12 @@
+table Date
+    column Date
+        sourceColumn: Date
+    column Weekday
+        sourceColumn: Weekday
+    partition Date = m
+        mode: import
+        source =
+                let
+                    Source = Csv.Document(File.Contents("dates.csv"))
+                in
+                    Source

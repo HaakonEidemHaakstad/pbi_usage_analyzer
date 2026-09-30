@@ -1,0 +1,8 @@
+{
+  "expected_status": {
+    "Column|Returns|ReturnDate": "Used",
+    "Column|Date|Date": "Likely unused",
+    "Column|Date|Weekday": "Likely unused"
+  },
+  "notes": "M is case-sensitive: type keywords and library identifiers must not create a dependency on a query named Date (found in a real project)."
+}

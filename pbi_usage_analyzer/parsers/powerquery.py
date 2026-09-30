@@ -161,14 +161,16 @@ def _find_query_refs(m_source: str, owner_table: str, model_tables: dict[str, st
 
     # Simple identifier references are much more ambiguous. Only accept if the full
     # identifier is a model query name, is not a local step, and is not immediately
-    # preceded by '[' or followed by '=' / '[' / '('.
+    # preceded by '[' or followed by '=' / '[' / '('. M identifiers are
+    # case-sensitive and may contain dots, so `type date` and `Date.From` are not
+    # the query `Date`; `#date` is an intrinsic.
     for key, display in model_tables.items():
         if key == norm(owner_table) or key in local_names:
             continue
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", display):
             continue
-        pattern = rf"(?<![\[\w]){re.escape(display)}(?!\s*[=\[(])\b"
-        if re.search(pattern, cleaned, flags=re.I):
+        pattern = rf"(?<![\[\w.#]){re.escape(display)}(?![\w.])(?!\s*[=\[(])"
+        if re.search(pattern, cleaned):
             refs.add(display)
     return refs
 

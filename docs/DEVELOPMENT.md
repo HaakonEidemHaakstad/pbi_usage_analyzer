@@ -140,6 +140,14 @@ regenerate with `make fixtures`, inspect the diff, then run `make check-fixtures
 and `make validate`. The clean regeneration target replaces the corpus; move any
 unrelated work out of that directory first.
 
+## Optional real-project check
+
+`tests/test_integration_adventureworks.py` compares every status with
+`tests/integration/adventureworks_expected.json` when `PBI_AW_PROJECT` names the
+folder containing `AdventureWorks Report.pbip`; otherwise it is skipped. The
+project is not committed. Update the expectations only after explaining each
+change against the project files.
+
 ## Performance check
 
 `make benchmark` generates a large synthetic model in a temporary folder

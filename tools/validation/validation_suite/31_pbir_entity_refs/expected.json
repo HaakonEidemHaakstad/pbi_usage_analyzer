@@ -1,0 +1,17 @@
+{
+  "expected_status": {
+    "Measure|Sales|Revenue": "Used",
+    "Column|Sales|Amount": "Used",
+    "Measure|Sales|Filter Only": "Used",
+    "Column|Sales|Region": "Used",
+    "Column|Sales|Channel": "Used",
+    "Column|Sales|OrderDate": "Used",
+    "Column|Dates|Year": "Used",
+    "Column|Dates|Month": "Used",
+    "Column|Dates|Day": "Used",
+    "Column|Dates|Other": "Likely unused",
+    "Column|Sales|Unused": "Likely unused",
+    "Measure|Sales|Idle": "Likely unused"
+  },
+  "notes": "Current PBIR visualContainer fields name the entity in SourceRef; hierarchy levels nest the hierarchy; auto-date variations reference the business column."
+}

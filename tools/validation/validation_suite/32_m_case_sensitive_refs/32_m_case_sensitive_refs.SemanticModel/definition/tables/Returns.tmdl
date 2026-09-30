@@ -1,0 +1,12 @@
+table Returns
+    column ReturnDate
+        sourceColumn: ReturnDate
+    partition Returns = m
+        mode: import
+        source =
+                let
+                    Kilde = Csv.Document(File.Contents("returns.csv")),
+                    Typed = Table.TransformColumnTypes(Kilde, {{"ReturnDate", type date}}),
+                    Added = Table.AddColumn(Typed, "Y", each Date.Year([ReturnDate]) + Date.From(#date(2024, 1, 1)))
+                in
+                    Added

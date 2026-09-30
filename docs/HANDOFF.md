@@ -67,7 +67,8 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Report safety net | Latest change: one tighter rule for columns and measures in readable PBIR files. Details below. |
+| Real project | Latest change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
+| Report safety net | Previous change: one tighter rule for columns and measures in readable PBIR files. Details below. |
 | Performance | Previous change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
 | Report measures | Previous change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
 | Unqualified DAX | Previous change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
@@ -75,7 +76,40 @@ then implemented. When asked to proceed, use the next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: tighter report safety net for columns
+## Latest change: first real-project validation (AdventureWorks)
+
+- Project: `~/Desktop/AW` (`AdventureWorks Report.pbip`, user's course material;
+  read-only, not in the repo; its M contains the author's local Windows paths).
+  9 tables, 72 columns, 24 measures, 1 page, 6 visuals; current PBIR
+  visualContainer format; auto-date disabled; no RLS/calculation groups/field
+  parameters/sort-by. Analyzed through the API only (the CLI writes reports next to
+  the project).
+- Ground truth: an independent subagent derived statuses from raw files without
+  seeing analyzer code or output. Main agent verified disagreements.
+- Bug 1 (critical): current PBIR fields use `"SourceRef": {"Entity": "T"}`;
+  `_table_from_expression` only handled `SourceRef.Source` aliases, so no visual
+  field resolved (0 of 15 used measures Used; only the tightened raw net kept them
+  at manual review). Also `Hierarchy` names are under key `"Hierarchy"` and
+  `HierarchyLevel` nests its hierarchy. Fixed in `parsers/pbir.py`; added
+  `PropertyVariationSource` -> business column (PBIR shape, no real sample yet).
+  Synthetic fixtures had only used the query-command alias form.
+- Bug 2: `_find_query_refs` matched simple identifiers with `re.I`, so
+  `{"ReturnDate", type date}` created a dependency on query `Date` (forbidden by
+  AGENTS.md). Now case-sensitive and not inside dotted/`#` identifiers.
+- Result: 79/96 exact; all 41 Used agree; no false `Likely unused`; 17 by-design
+  manual reviews (unused DAX owners; unused hierarchy levels). Expectations in
+  `tests/integration/adventureworks_expected.json`; run with
+  `PBI_AW_PROJECT=~/Desktop/AW make test`.
+- Scenarios 31 (`31_pbir_entity_refs`) and 32 (`32_m_case_sensitive_refs`);
+  tests `tests/test_pbir_entity_refs.py`, `tests/test_powerquery.py`. No evidence or
+  status changes in scenarios 01–30 or the large model.
+- Observed, not acted on: `Total Revenue (CC)` references nonexistent
+  `'Sales data'[Revenue]` (candidate health rule: DAX reference to a missing
+  object); `Total Customers` uses `'Sales Data'` (case differs; resolves correctly).
+  Design question: objects referenced only by Likely-unused owners are manual review;
+  a clearer sub-reason in reports could help users.
+
+## Previous change: tighter report safety net for columns
 
 - Old column rule (readable files): column-name substring anywhere in the file's
   values and keys, plus table-name substring or a unique column name. Observed
@@ -279,14 +313,13 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Not started; confirm with the user before beginning. Highest value: **validate on a
-real PBIP project** (user must provide one; record expected statuses for a sample,
-investigate every surprise, especially safety-net misses now that substrings no
-longer count). The user asked about a GUI on 2026-09-30: none exists; AGENTS.md
-keeps it a later priority. A thin desktop front end over `analyze_project()` is the
-intended path once real-project validation has stabilized results. Other
-candidates: show objects from failed TMDL files; TMDL inline-expression
-continuation.
+Not started; confirm with the user before beginning. Highest value: **more real
+projects**, especially with auto-date tables (verifies `PropertyVariationSource`),
+RLS, calculation groups, field parameters and report/page filters. Engineering
+candidates found on AdventureWorks: a health rule for DAX references to missing
+objects (`Total Revenue (CC)`); clearer reporting for "referenced only by unused
+objects". The user asked about a GUI: none exists; a thin desktop front end over
+`analyze_project()` is the intended path after more validation.
 
 ## Verification and environment
 
@@ -310,9 +343,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 164 unit/regression tests passed, 1 opt-in timing test skipped (2026-09-30,
-  after the safety-net change).
-- 232 synthetic checks passed across 30 scenarios, including JSON schema and
+- 169 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
+  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the real-project fixes).
+- 251 synthetic checks passed across 32 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

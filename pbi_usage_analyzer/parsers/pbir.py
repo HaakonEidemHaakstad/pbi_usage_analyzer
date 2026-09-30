@@ -47,9 +47,14 @@ def _table_from_expression(expr, mappings: dict[str, str]) -> str | None:
             return clean_name(entity)
     src = expr.get("SourceRef")
     if isinstance(src, dict):
+        # Query-command form: an alias declared in a From list.
         source = src.get("Source")
         if source:
             return mappings.get(str(source), clean_name(source))
+        # visualContainer form: the entity is named directly.
+        entity = src.get("Entity")
+        if entity:
+            return clean_name(entity)
     return None
 
 
@@ -58,8 +63,23 @@ def _find_refs(obj, mappings: dict[str, str], out: list[tuple[str, str, str]]) -
         for typ in ("Column", "Measure", "Hierarchy", "HierarchyLevel"):
             node = obj.get(typ)
             if isinstance(node, dict):
-                table = _table_from_expression(node.get("Expression"), mappings)
+                expr = node.get("Expression")
+                # A level's table is on its nested hierarchy; the hierarchy itself is
+                # found separately when recursion reaches it.
+                if typ == "HierarchyLevel" and isinstance(expr, dict) and isinstance(expr.get("Hierarchy"), dict):
+                    expr = expr["Hierarchy"].get("Expression")
+                variation = expr.get("PropertyVariationSource") if isinstance(expr, dict) else None
+                if isinstance(variation, dict):
+                    # Auto-date hierarchy over a business column: that column is used.
+                    table = _table_from_expression(variation.get("Expression"), mappings)
+                    column = variation.get("Property")
+                    if table and column:
+                        out.append((table, clean_name(column) or str(column), "Column"))
+                    continue
+                table = _table_from_expression(expr, mappings)
                 field = node.get("Property") or node.get("Name") or node.get("Level")
+                if typ == "Hierarchy" and not field and isinstance(node.get("Hierarchy"), str):
+                    field = node["Hierarchy"]
                 if table and field:
                     out.append((table, clean_name(field) or str(field), typ))
         for value in obj.values():
@@ -206,6 +226,10 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
                 continue
             idx = columns if typ == "Column" else measures if typ == "Measure" else hierarchies if typ == "Hierarchy" else None
             target = idx.get(norm_key(table, field)) if idx else None
+            if typ == "HierarchyLevel":
+                # Level names normally match their backing column; the enclosing
+                # hierarchy reference protects every level regardless.
+                target = columns.get(norm_key(table, field))
             if target:
                 result.evidence.append(Evidence(None, target, EvidenceType.DIRECT_REPORT_USE, f"{scope}-level report reference", str(path), "high"))
                 if target.object_type == ObjectType.COLUMN:

@@ -9,6 +9,7 @@ class PowerQueryTests(unittest.TestCase):
             "hovedbok 2024": "Hovedbok 2024",
             "firma": "Firma",
             "dates": "Dates",
+            "date": "Date",
         }
 
     def test_append_reference(self):
@@ -44,6 +45,27 @@ class PowerQueryTests(unittest.TestCase):
         '''
         refs = _find_query_refs(src, "Hovedbok", self.tables)
         self.assertNotIn("Firma", refs)
+
+    def test_type_keywords_and_library_names_are_not_queries(self):
+        # M is case-sensitive: `type date` and `Date.From` are not the query `Date`.
+        src = '''
+        let
+            Kilde = Csv.Document(File.Contents("x.csv")),
+            Typed = Table.TransformColumnTypes(Kilde, {{"ReturnDate", type date}}),
+            Added = Table.AddColumn(Typed, "Y", each Date.Year([ReturnDate]) + #date(2024, 1, 1))
+        in
+            Added
+        '''
+        self.assertEqual(_find_query_refs(src, "Returns Data", self.tables), set())
+
+    def test_exact_case_simple_reference_still_counts(self):
+        src = '''
+        let
+            Source = Table.NestedJoin(Firma, {"Id"}, Date, {"Id"}, "D", JoinKind.LeftOuter)
+        in
+            Source
+        '''
+        self.assertEqual(_find_query_refs(src, "Hovedbok", self.tables), {"Firma", "Date"})
 
 
 if __name__ == "__main__":

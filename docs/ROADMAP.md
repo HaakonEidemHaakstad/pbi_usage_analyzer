@@ -140,4 +140,8 @@ the report measure net extracts qualified names once per file: the generated
 Evidence order no longer depends on the hash seed.
 The report safety net uses one qualified/whole-name rule for columns and measures
 in readable files (scenario 30); substrings and JSON keys no longer protect columns.
-Next: validate on a real project; then GUI planning.
+First real-project check (AdventureWorks): current-format PBIR `SourceRef.Entity`
+fields and nested hierarchy levels are now resolved; M simple identifiers match
+case-sensitively (scenarios 31–32; optional integration test).
+Next: more real projects covering auto-date, RLS, calculation groups and filters;
+then GUI planning.
