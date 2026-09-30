@@ -72,3 +72,50 @@ class MLineageTests(unittest.TestCase):
         result = self.infer('Table.SelectColumns(Table.SelectColumns(Source, {"A", "B"}), {"A"})')['Source']
         self.assertTrue(result.accepts('B'))
         self.assertFalse(result.accepts('C'))
+
+    def test_rename_maps_output_back_to_source(self):
+        demand = self.infer('Table.SelectColumns(Table.RenameColumns(Source, {{"Old", "New"}}), {"New"})')['Source']
+        self.assertTrue(demand.accepts('Old'))
+        self.assertFalse(demand.accepts('Unrelated'))
+        self.assertFalse(demand.accepts('New'))
+
+    def test_rename_ignore_preserves_both_possible_sources(self):
+        demand = self.infer('Table.SelectColumns(Table.RenameColumns(Source, {"Old", "New"}, MissingField.Ignore), {"New"})')['Source']
+        self.assertTrue(demand.accepts('Old'))
+        self.assertTrue(demand.accepts('New'))
+        self.assertFalse(demand.accepts('Unrelated'))
+
+    def test_separate_rename_steps_compose(self):
+        demand = self.infer('let A = Table.RenameColumns(Source, {{"Old", "Middle"}}), B = Table.RenameColumns(A, {{"Middle", "New"}}) in Table.SelectColumns(B, {"New"})')['Source']
+        self.assertTrue(demand.accepts('Old'))
+        self.assertFalse(demand.accepts('Middle'))
+        self.assertFalse(demand.accepts('Unrelated'))
+
+    def test_type_transform_preserves_operational_columns(self):
+        demand = self.infer('Table.SelectColumns(Table.TransformColumnTypes(Source, {{"Amount", type number}, {"Key", Int64.Type}}, "en-US"), {"Amount"})')['Source']
+        self.assertTrue(demand.accepts('Amount'))
+        self.assertTrue(demand.accepts('Key'))
+        self.assertFalse(demand.accepts('Unrelated'))
+
+    def test_rename_exclusions_follow_output_names(self):
+        demand = self.infer('Table.RemoveColumns(Table.RenameColumns(Source, {"Old", "New"}, MissingField.Ignore), {"New"}, MissingField.Ignore)')['Source']
+        self.assertFalse(demand.accepts('Old'))
+        self.assertTrue(demand.accepts('Other'))
+
+    def test_type_single_pair_and_nullable_scalar(self):
+        demand = self.infer('Table.SelectColumns(Table.TransformColumnTypes(Source, {"A", type nullable number}), {})')['Source']
+        self.assertTrue(demand.accepts('A'))
+        self.assertFalse(demand.accepts('B'))
+
+    def test_rename_and_type_unsupported_forms_fall_back(self):
+        for expression in (
+            'Table.RenameColumns(Source, {{"A", "B"}, {"B", "C"}})',
+            'Table.RenameColumns(Source, {{"A", "X"}, {"B", "X"}})',
+            'Table.RenameColumns(Source, DynamicNames)',
+            'Table.TransformColumnTypes(Source, {{"A", CustomType}})',
+            'Table.TransformColumnTypes(Source, {{"A", type table}})',
+            'Table.TransformColumnTypes(Source, {{"A", type text}}, [Culture="en-US"])',
+            'let Int64.Type = Other in Table.TransformColumnTypes(Source, {{"A", Int64.Type}})',
+        ):
+            with self.subTest(expression=expression):
+                self.assertIsNone(self.infer(expression))

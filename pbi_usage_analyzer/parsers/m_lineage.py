@@ -114,6 +114,52 @@ class _Parser:
     def at(self, kind: str) -> bool:
         return self.tokens[self.index][0] == kind
 
+    def transformation_pairs(self, rename: bool):
+        """Read literal rename/type pairs; reject dynamic expressions."""
+        self.take('{')
+        single = self.at('string')
+        pairs = []
+        type_refs = set()
+        while not self.at('}'):
+            if not single:
+                self.take('{')
+            column = norm(self.take('string'))
+            self.take(',')
+            if rename:
+                value = norm(self.take('string'))
+            else:
+                value = self.take('identifier')
+                if value == 'type':
+                    value = self.take('identifier')
+                    if value == 'nullable':
+                        value = self.take('identifier')
+                    if value not in {'any', 'number', 'text', 'date', 'time', 'datetime',
+                                     'datetimezone', 'duration', 'logical', 'binary'}:
+                        raise _Unsupported()
+                elif value in {'Int64.Type', 'Int32.Type', 'Int16.Type', 'Int8.Type',
+                               'Double.Type', 'Single.Type', 'Decimal.Type',
+                               'Currency.Type', 'Percentage.Type'}:
+                    type_refs.add(value)
+                else:
+                    raise _Unsupported()
+            pairs.append((column, value))
+            if single:
+                break
+            self.take('}')
+            if not self.at(','):
+                break
+            self.take(',')
+        self.take('}')
+        old_names = [old for old, _ in pairs]
+        if len(set(old_names)) != len(old_names):
+            raise _Unsupported()
+        if rename:
+            new_names = [new for _, new in pairs]
+            # Collisions and ordered rename chains require a known source schema.
+            if len(set(new_names)) != len(new_names) or set(old_names) & set(new_names):
+                raise _Unsupported()
+        return pairs, type_refs
+
     def expression(self, depth: int = 0):
         if depth > 80:
             raise _Unsupported()
@@ -152,10 +198,26 @@ class _Parser:
             self.take('}')
             self.take(')')
             return ('combine', inputs)
-        if name not in {'Table.SelectColumns', 'Table.RemoveColumns'}:
+        if name not in {'Table.SelectColumns', 'Table.RemoveColumns',
+                        'Table.RenameColumns', 'Table.TransformColumnTypes'}:
             raise _Unsupported()
         upstream = self.expression(depth + 1)
         self.take(',')
+        if name in {'Table.RenameColumns', 'Table.TransformColumnTypes'}:
+            rename = name == 'Table.RenameColumns'
+            pairs, type_refs = self.transformation_pairs(rename)
+            ignore_missing = False
+            if self.at(','):
+                self.take(',')
+                if rename:
+                    if self.take('identifier') != 'MissingField.Ignore':
+                        raise _Unsupported()
+                    ignore_missing = True
+                else:
+                    self.take('string')  # Literal culture changes values, not lineage.
+            self.take(')')
+            return ('rename', upstream, pairs, ignore_missing) if rename else (
+                'types', upstream, frozenset(column for column, _ in pairs), type_refs)
         self.take('{')
         columns = set()
         if not self.at('}'):
@@ -192,10 +254,11 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 raise _Unsupported()
             kind = node[0]
             intrinsic = {'combine': 'Table.Combine', 'select': 'Table.SelectColumns',
-                         'remove': 'Table.RemoveColumns'}.get(kind)
+                         'remove': 'Table.RemoveColumns', 'rename': 'Table.RenameColumns',
+                         'types': 'Table.TransformColumnTypes'}.get(kind)
             if intrinsic and (intrinsic in scope or norm(intrinsic) in model_tables):
                 raise _Unsupported()
-            if kind in {'select', 'remove'} and node[3] and (
+            if kind in {'select', 'remove', 'rename'} and node[3] and (
                     'MissingField.Ignore' in scope or norm('MissingField.Ignore') in model_tables):
                 raise _Unsupported()
             if kind == 'let':
@@ -227,6 +290,26 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 visit(node[1], ColumnDemand(selected - demand.excluded, required=demand.required | (frozenset() if node[3] else columns)), scope, depth + 1)
             elif kind == 'remove':
                 visit(node[1], ColumnDemand(demand.included, demand.excluded | node[2], demand.required | (frozenset() if node[3] else node[2])), scope, depth + 1)
+            elif kind == 'rename':
+                inverse = {new: old for old, new in node[2]}
+                old_names = frozenset(inverse.values())
+
+                def back(names):
+                    mapped = frozenset(inverse.get(name, name) for name in names)
+                    # With Ignore, the old name may be absent and the new name
+                    # may already exist. Both possible origins remain protected.
+                    return mapped | names if node[3] else mapped
+
+                included = None if demand.included is None else back(demand.included)
+                excluded = frozenset(name for name in demand.excluded if name not in old_names)
+                excluded = frozenset(inverse.get(name, name) for name in excluded)
+                required = back(demand.required) | (frozenset() if node[3] else old_names)
+                visit(node[1], ColumnDemand(included, excluded, required), scope, depth + 1)
+            elif kind == 'types':
+                if any(name in scope or norm(name) in model_tables for name in node[3]):
+                    raise _Unsupported()
+                visit(node[1], ColumnDemand(demand.included, demand.excluded,
+                                           demand.required | node[2]), scope, depth + 1)
 
         visit(root, ColumnDemand(), {})
         return result

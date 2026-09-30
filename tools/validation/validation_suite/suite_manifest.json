@@ -10,7 +10,8 @@
     "08_autodate_scope_guard",
     "09_raw_report_safety_net",
     "10_m_column_lineage",
-    "11_m_lineage_fallback"
+    "11_m_lineage_fallback",
+    "12_m_rename_types"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

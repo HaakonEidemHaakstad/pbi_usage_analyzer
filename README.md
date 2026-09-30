@@ -139,7 +139,8 @@ V2 distinguishes query-level lineage from column-level lineage. A query-level de
 ## Column-level Power Query lineage
 
 The analyzer traces source-column requirements through complete expressions using
-`Table.SelectColumns`, `Table.RemoveColumns`, and `Table.Combine`, including named
+`Table.SelectColumns`, `Table.RemoveColumns`, `Table.Combine`,
+`Table.RenameColumns`, and `Table.TransformColumnTypes`, including named
 steps and nested calls. Column lists must be literal lists. Select/remove support
 an optional `MissingField.Ignore` argument. Requirements from multiple M
 partitions are combined.
@@ -155,10 +156,17 @@ query-level protection. Internal auto-date queries retain their separate bounded
 scope. This is static analysis, not execution of M or a complete schema inference
 engine.
 
+Renames support literal pairs or lists of independent pairs, optionally with
+`MissingField.Ignore`. Separate rename steps can be chained. Type changes support
+literal column/type pairs, standard scalar types, and an optional culture string.
+Conversion columns remain protected even if a later projection removes them.
+Dynamic mappings, overlapping rename pairs, and culture records retain fallback
+behavior.
+
 ## Next planned improvement
 
-Extend lineage to renaming and type transformations, then joins, filters, and
-computed columns while preserving their operational dependencies. General M
+Extend lineage to joins, filters, and computed columns while preserving their
+operational dependencies. General M
 expressions, dynamic column lists, and connector-specific schemas remain outside
 the current bounded implementation.
 

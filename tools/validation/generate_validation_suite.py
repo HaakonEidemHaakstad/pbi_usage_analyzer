@@ -471,6 +471,43 @@ table Output
                   "Unsupported expressions must not turn a partial projection into complete lineage.")
 
 
+def build_m_rename_types(root: Path):
+    name = "12_m_rename_types"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Archive.tmdl", """
+table Archive
+    column 'Amount display'
+        sourceColumn: RawAmount
+        dataType: double
+    column ConversionOnly
+        sourceColumn: ConversionOnly
+        dataType: int64
+    column Unrelated
+        sourceColumn: Unrelated
+        dataType: string
+""")
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    partition Output = m
+        source =
+            let
+                Renamed = Table.RenameColumns(Archive, {{"RawAmount", "Amount"}}),
+                Typed = Table.TransformColumnTypes(Renamed, {{"Amount", type number}, {"ConversionOnly", Int64.Type}}, "en-US"),
+                Selected = Table.SelectColumns(Typed, {"Amount"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Amount"))
+    save_expected(p, {"Column|Archive|Amount display": "Needs manual review",
+                      "Column|Archive|ConversionOnly": "Needs manual review",
+                      "Column|Archive|Unrelated": "Likely unused",
+                      "Column|Output|Amount": "Used"},
+                  "Rename maps output to original sourceColumn; type conversion retains operational inputs even after projection.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -494,6 +531,7 @@ def main():
         build_raw_safety_net,
         build_m_column_lineage,
         build_m_lineage_fallback,
+        build_m_rename_types,
     ]
     for builder in builders:
         builder(root)

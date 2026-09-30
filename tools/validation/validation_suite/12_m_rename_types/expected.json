@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Column|Archive|Amount display": "Needs manual review",
+    "Column|Archive|ConversionOnly": "Needs manual review",
+    "Column|Archive|Unrelated": "Likely unused",
+    "Column|Output|Amount": "Used"
+  },
+  "notes": "Rename maps output to original sourceColumn; type conversion retains operational inputs even after projection."
+}

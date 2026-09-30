@@ -34,7 +34,7 @@ Edges/evidence currently include:
 - RLS_DEPENDENCY
 - CALCULATION_GROUP_DEPENDENCY
 - POWERQUERY_QUERY_DEPENDENCY
-- POWERQUERY_COLUMN_DEPENDENCY (bounded auto-date projections; fuller M lineage planned)
+- POWERQUERY_COLUMN_DEPENDENCY (bounded M lineage and auto-date projections)
 - FALLBACK_MATCH
 - INTERNAL_OBJECT
 
@@ -153,3 +153,21 @@ Operation semantics follow Microsoft's documentation:
 [SelectColumns](https://learn.microsoft.com/en-us/powerquery-m/table-selectcolumns),
 [RemoveColumns](https://learn.microsoft.com/en-us/powerquery-m/table-removecolumns),
 and [Combine](https://learn.microsoft.com/en-us/powerquery-m/table-combine).
+
+### Rename and type transformations
+
+Literal `Table.RenameColumns` pairs map downstream column demands and schema
+requirements back to their original source names. Independent pairs in one call
+and chains of separate calls are supported. Overlapping/duplicate pairs fall
+back because their collision behavior needs a known schema. With
+`MissingField.Ignore`, both the old name and an already-existing new name may be
+origins, so both remain protected when demanded.
+
+`Table.TransformColumnTypes` accepts literal pairs using scalar `type` values or
+recognized numeric `.Type` constants, with an optional literal culture string.
+All conversion inputs remain schema requirements even after later projections.
+Dynamic types, culture records, and shadowed library symbols return unknown
+lineage. This does not execute conversions or validate source values.
+
+References: [RenameColumns](https://learn.microsoft.com/en-us/powerquery-m/table-renamecolumns)
+and [TransformColumnTypes](https://learn.microsoft.com/en-us/powerquery-m/table-transformcolumntypes).

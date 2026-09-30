@@ -1,0 +1,12 @@
+table Output
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    partition Output = m
+        source =
+            let
+                Renamed = Table.RenameColumns(Archive, {{"RawAmount", "Amount"}}),
+                Typed = Table.TransformColumnTypes(Renamed, {{"Amount", type number}, {"ConversionOnly", Int64.Type}}, "en-US"),
+                Selected = Table.SelectColumns(Typed, {"Amount"})
+            in
+                Selected

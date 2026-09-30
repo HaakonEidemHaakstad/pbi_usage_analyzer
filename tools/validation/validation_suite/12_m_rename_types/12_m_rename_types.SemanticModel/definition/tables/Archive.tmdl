@@ -1,0 +1,10 @@
+table Archive
+    column 'Amount display'
+        sourceColumn: RawAmount
+        dataType: double
+    column ConversionOnly
+        sourceColumn: ConversionOnly
+        dataType: int64
+    column Unrelated
+        sourceColumn: Unrelated
+        dataType: string
