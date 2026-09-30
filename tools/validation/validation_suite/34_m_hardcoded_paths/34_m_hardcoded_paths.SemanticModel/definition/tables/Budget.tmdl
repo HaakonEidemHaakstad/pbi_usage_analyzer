@@ -1,0 +1,10 @@
+table Budget
+    column Amount
+        sourceColumn: Amount
+    partition Budget = m
+        mode: import
+        source =
+                let
+                    Source = Csv.Document(File.Contents(DataFolder & "\budget.csv"))
+                in
+                    Source

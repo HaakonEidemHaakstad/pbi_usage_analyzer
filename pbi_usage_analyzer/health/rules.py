@@ -1,7 +1,9 @@
 from collections.abc import Iterable
+import re
 
 from ..model import ModelObject, ObjectType
 from ..parsers.dax import DaxIndex, unresolved_references
+from ..parsers.m_queries import MQuery, MQueryKind, m_string_literals
 from ..util import norm_key
 from ..util import is_internal_table
 from ..parsers.relationships import Relationship
@@ -126,5 +128,42 @@ def unresolved_dax_references(objects: Iterable[ModelObject]) -> list[HealthFind
                            f"{kind} if it is no longer needed. If the referenced table exists but was not "
                            "parsed (see diagnostics), resolve that first and re-run the analysis.",
             source_file=obj.source_file, line=obj.source_line,
+        ))
+    return findings
+
+
+FILE_PATH = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\[^\\/\s]+[\\/])")
+USER_PROFILE = re.compile(r"^[A-Za-z]:[\\/]Users[\\/][^\\/]+|OneDrive", re.I)
+
+
+def hardcoded_m_paths(queries: Iterable[MQuery]) -> list[HealthFinding]:
+    findings = []
+    for query in queries:
+        # A parameter is the recommended home for a path.
+        if query.kind == MQueryKind.PARAMETER:
+            continue
+        paths: list[tuple[str, int]] = []
+        for value, line in m_string_literals(query.source):
+            if FILE_PATH.match(value) and value not in (p for p, _ in paths):
+                paths.append((value, query.file_line(line)))
+        if not paths:
+            continue
+        evidence = tuple(
+            f"line {line}: {value}" + (" (user profile or OneDrive folder)" if USER_PROFILE.search(value) else "")
+            for value, line in paths)
+        findings.append(HealthFinding(
+            rule_id="POWERQUERY_HARDCODED_PATH", category="power_query",
+            severity=HealthSeverity.WARNING, confidence="high", scope=query.name,
+            title="Move hard-coded file paths into parameters",
+            explanation="This query reads from a literal local or network path. Refresh fails on "
+                        "other machines and in the Power BI service unless the same path exists "
+                        "there (the service needs a gateway for local and network files). Paths "
+                        "inside a personal user or OneDrive folder are the most fragile.",
+            evidence=evidence,
+            recommendation="Create a text parameter for the folder (Manage Parameters) and build paths "
+                           "from it, for example File.Contents(DataFolder & \"\\sales.csv\"). For shared "
+                           "models, prefer a shared location such as SharePoint or a database and plan "
+                           "the gateway. A single-user file may accept the path, but record the decision.",
+            source_file=query.source_file, line=paths[0][1],
         ))
     return findings

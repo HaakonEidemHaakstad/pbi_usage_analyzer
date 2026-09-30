@@ -32,7 +32,8 @@
     "30_report_column_safety_net",
     "31_pbir_entity_refs",
     "32_m_case_sensitive_refs",
-    "33_dax_unresolved_references"
+    "33_dax_unresolved_references",
+    "34_m_hardcoded_paths"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

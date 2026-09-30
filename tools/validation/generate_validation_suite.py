@@ -1388,6 +1388,65 @@ table Sales
     write_json(expected_path, expected)
 
 
+def build_m_hardcoded_paths(root: Path):
+    name = "34_m_hardcoded_paths"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    // Old location: C:\\Archive\\sales.csv
+                    Source = Csv.Document(File.Contents("C:\\Users\\ann\\OneDrive\\Data\\sales.csv")),
+                    Note = "See https://example.com/docs",
+                    Types = Table.TransformColumnTypes(Source, {{"Amount", type number}})
+                in
+                    Types
+""")
+    write(model / "definition" / "tables" / "Budget.tmdl", """
+table Budget
+    column Amount
+        sourceColumn: Amount
+    partition Budget = m
+        mode: import
+        source =
+                let
+                    Source = Csv.Document(File.Contents(DataFolder & "\\budget.csv"))
+                in
+                    Source
+""")
+    # CRLF line endings and tab indentation, as Power BI Desktop writes them.
+    expressions = (
+        'expression DataFolder = "D:\\Data" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]\n'
+        '\tlineageTag: 11111111-1111-1111-1111-111111111111\n'
+        '\n'
+        "expression 'Sales Archive' =\n"
+        '\t\tlet\n'
+        '\t\t    Files = Folder.Files("\\\\fileserver\\finance\\sales"),\n'
+        '\t\t    #"C:\\not a path" = Files\n'
+        '\t\tin\n'
+        '\t\t    #"C:\\not a path"\n'
+        '\tlineageTag: 22222222-2222-2222-2222-222222222222\n'
+        '\n'
+        '\tannotation PBI_ResultType = Table\n'
+    ).replace("\n", "\r\n")
+    (model / "definition" / "expressions.tmdl").write_bytes(expressions.encode("utf-8"))
+    save_expected(p, {
+        "Column|Sales|Amount": "Likely unused",
+        "Column|Budget|Amount": "Likely unused",
+    }, "Literal drive and UNC paths in M are reported per query; parameters, comments, quoted identifiers, URLs and relative fragments are not.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "POWERQUERY_HARDCODED_PATH", "scope": "Sales"},
+        {"rule_id": "POWERQUERY_HARDCODED_PATH", "scope": "Sales Archive"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1433,6 +1492,7 @@ def main():
         build_pbir_entity_refs,
         build_m_case_sensitive_refs,
         build_dax_unresolved_references,
+        build_m_hardcoded_paths,
     ]
     for builder in builders:
         builder(root)

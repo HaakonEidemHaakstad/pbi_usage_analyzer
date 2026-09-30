@@ -146,6 +146,7 @@ case-sensitively (scenarios 31–32; optional integration test).
 A multi-source bad-practice case study (MariaDB, Excel, CSV, JSON) has a source
 generator and a build guide with an answer key (docs/CASE_STUDY_ADVENTUREWORKS.md).
 `DAX_REFERENCE_UNRESOLVED` reports references to missing columns/measures.
+`POWERQUERY_HARDCODED_PATH` reports literal drive/UNC paths in partitions and shared queries.
 Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
 "not yet" items (annual appends, staging loaded, text keys, hard-coded paths,
 duplicate measures, folder combines) into health rules; then GUI planning.

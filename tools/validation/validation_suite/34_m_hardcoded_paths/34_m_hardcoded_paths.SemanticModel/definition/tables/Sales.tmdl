@@ -1,0 +1,13 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    // Old location: C:\Archive\sales.csv
+                    Source = Csv.Document(File.Contents("C:\Users\ann\OneDrive\Data\sales.csv")),
+                    Note = "See https://example.com/docs",
+                    Types = Table.TransformColumnTypes(Source, {{"Amount", type number}})
+                in
+                    Types

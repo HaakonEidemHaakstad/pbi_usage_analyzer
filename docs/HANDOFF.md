@@ -67,7 +67,8 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| DAX health rule | Latest change: `DAX_REFERENCE_UNRESOLVED`. Details below. |
+| M path rule | Latest change: `parsers/m_queries.py` and `POWERQUERY_HARDCODED_PATH`. Details below. |
+| DAX health rule | Previous change: `DAX_REFERENCE_UNRESOLVED`. Details below. |
 | Case study | Previous change: multi-source bad-practice package generator and build guide. Details below. |
 | Real project | Previous change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
 | Report safety net | Previous change: one tighter rule for columns and measures in readable PBIR files. Details below. |
@@ -78,7 +79,24 @@ then implemented. When asked to proceed, use the next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: unresolved DAX reference rule
+## Latest change: hard-coded path rule and shared-query collection
+
+- `parsers/m_queries.py`: `collect_m_queries(model_folder)` returns `MQuery`
+  records for table partitions and `expressions.tmdl` shared queries (kind
+  `partition`/`expression`/`parameter`, per-line file numbers; CRLF and fences
+  handled). Stored as `AnalysisContext.m_queries`; passed to `evaluate_health`.
+  Shared expressions were previously not read at all; they are still not lineage
+  or graph nodes.
+- `POWERQUERY_HARDCODED_PATH` (warning, `power_query`): per query, drive (`C:\`,
+  `C:/`) or UNC path literals from `m_string_literals` (skips comments and
+  `#"quoted identifiers"`); parameters skipped; user-profile/OneDrive flagged in
+  evidence; line = first path's file line.
+- AdventureWorks: 11 findings (7 partitions + 4 shared queries; `Measure Table`
+  and `Sales data` correctly none); lines verified against the files. Integration
+  expectations store rule IDs and query names only (paths contain the author's
+  username). Scenario 34; `tests/test_m_hardcoded_paths.py`.
+
+## Previous change: unresolved DAX reference rule
 
 - `DAX_REFERENCE_UNRESOLVED` (warning, category `dax`) in `health/rules.py`, via
   `parsers.dax.unresolved_references(expression, index)`. Checks qualified
@@ -355,9 +373,8 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 Waiting on the user: build the case study in Power BI Desktop (Windows PC) and
 return the PBIP. Then score it (independent ground truth vs analyzer; record
 expectations like `tests/integration/adventureworks_expected.json`). Engineering
-candidates meanwhile, from the answer key's "Not yet" rows. Next: hard-coded paths
-in M, which needs parsing of shared queries in `expressions.tmdl` (currently not
-read at all). Then loaded staging/per-year queries, hard-coded annual appends,
+candidates meanwhile, from the answer key's "Not yet" rows. Next: loaded staging/per-year
+queries (shared expressions are now collected, see `m_queries`), hard-coded annual appends,
 text-key relationships, duplicate measures, `Folder.Files` without a filter. GUI: none
 exists; thin desktop front end over `analyze_project()` after more validation.
 
@@ -383,9 +400,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 177 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
-  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the DAX reference rule).
-- 261 synthetic checks passed across 33 scenarios, including JSON schema and
+- 180 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
+  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the M path rule).
+- 266 synthetic checks passed across 34 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

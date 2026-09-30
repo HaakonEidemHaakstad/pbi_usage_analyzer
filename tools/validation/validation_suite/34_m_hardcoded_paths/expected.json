@@ -1,0 +1,17 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Likely unused",
+    "Column|Budget|Amount": "Likely unused"
+  },
+  "notes": "Literal drive and UNC paths in M are reported per query; parameters, comments, quoted identifiers, URLs and relative fragments are not.",
+  "expected_health": [
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales Archive"
+    }
+  ]
+}

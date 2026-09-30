@@ -124,6 +124,61 @@
       "rule_id": "DAX_REFERENCE_UNRESOLVED",
       "scope": "Measure Table[Total Revenue (CC)]",
       "note": "References 'Sales data'[Revenue], which does not exist"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Customer Lookup",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Date",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Product Categories Lookup",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Product Lookup",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Product Subcategories Lookup",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Returns Data",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Territory Lookup",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Largest Asset Management Firms",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales Data 2022",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales Data 2021",
+      "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales Data 2020",
+      "note": "CSV path in the author's OneDrive folder"
     }
   ]
 }

@@ -359,6 +359,13 @@ Reference: [TMDL descriptions](https://learn.microsoft.com/en-us/analysis-servic
 qualified-table rules as dependency extraction. Columns now record `source_line`
 like measures, so findings and JSON exports locate calculated columns.
 
+`parsers/m_queries.py` collects every M source as an `MQuery` (name, kind:
+partition / expression / parameter, source, file, per-line file numbers) from
+table partitions and `expressions.tmdl`, stored on the analysis context as
+`m_queries`. `m_string_literals` scans M text literals outside comments and quoted
+identifiers. `POWERQUERY_HARDCODED_PATH` consumes these; dependency extraction
+still uses its own partition reader, and shared expressions are not graph nodes.
+
 ### Health finding filters
 
 The health engine has one explicit registry of stable IDs, evaluators and input

@@ -8,6 +8,7 @@ from ..model import DependencyGraph, Evidence, EvidenceType, ModelObject, Object
 from ..parsers.dax import DaxIndex, dax_dependencies
 from ..parsers.dax_lexer import mask_dax
 from ..parsers.special_dax import special_dax_evidence
+from ..parsers.m_queries import MQuery, collect_m_queries
 from ..parsers.pbir import ReportParseResult, parse_report
 from ..parsers.powerquery import PowerQueryResult, parse_power_query_dependencies
 from ..parsers.relationships import Relationship, parse_relationship_metadata, relationship_evidence
@@ -19,6 +20,7 @@ class AnalysisContext(DiagnosticCollection):
     def __init__(self) -> None:
         self.graph = DependencyGraph()
         self.relationships: list[Relationship] = []
+        self.m_queries: list[MQuery] = []
         self.tmdl: TmdlModel | None = None
         self.report: ReportParseResult | None = None
         self.powerquery: PowerQueryResult | None = None
@@ -118,6 +120,7 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
     for ev in report.evidence:
         ctx.graph.add_evidence(ev)
 
+    ctx.m_queries = collect_m_queries(model_folder)
     pq = parse_power_query_dependencies(model_folder, table_names)
     ctx.powerquery = pq
     ctx.diagnostics.extend(pq.diagnostics)

@@ -255,6 +255,12 @@ unqualified names may be virtual columns and are skipped. A quoted table missing
 from the parsed model gives medium confidence, since its file may have failed to
 parse.
 
+`POWERQUERY_HARDCODED_PATH` warns when a Power Query reads from a literal drive
+(`C:\...`) or network (`\\server\share`) path, listing each path and its line
+and calling out user-profile or OneDrive folders. Table partitions and shared
+queries in `expressions.tmdl` are checked; parameter queries, comments and
+`#"quoted identifiers"` are not. URLs and database server names are not checked.
+
 ## Filtering model-health findings
 
 ```bash

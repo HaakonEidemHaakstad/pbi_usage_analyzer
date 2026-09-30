@@ -1,0 +1,12 @@
+expression DataFolder = "D:\Data" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 11111111-1111-1111-1111-111111111111
+
+expression 'Sales Archive' =
+		let
+		    Files = Folder.Files("\\fileserver\finance\sales"),
+		    #"C:\not a path" = Files
+		in
+		    #"C:\not a path"
+	lineageTag: 22222222-2222-2222-2222-222222222222
+
+	annotation PBI_ResultType = Table

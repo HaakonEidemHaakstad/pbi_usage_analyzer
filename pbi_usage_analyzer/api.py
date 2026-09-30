@@ -79,7 +79,7 @@ def analyze_project(path: str | Path, *, health_rule_ids=None, health_severities
         measures=counts(ObjectType.MEASURE),
         query_dependencies=len(context.powerquery.dependencies) if context.powerquery else 0,
     )
-    all_health = evaluate_health(context.relationships, context.graph.objects.values())
+    all_health = evaluate_health(context.relationships, context.graph.objects.values(), context.m_queries)
     selected_health = filter_health_findings(
         all_health, rule_ids=health_rule_ids, severities=health_severities)
     scope = HealthFilterScope(
