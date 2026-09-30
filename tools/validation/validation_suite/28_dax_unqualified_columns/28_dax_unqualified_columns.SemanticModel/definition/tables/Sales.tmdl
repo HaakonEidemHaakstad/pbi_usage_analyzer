@@ -1,0 +1,20 @@
+table Sales
+    column Quantity
+        sourceColumn: Quantity
+    column Price
+        sourceColumn: Price
+    column Amount
+        sourceColumn: Amount
+    column Cost
+        sourceColumn: Cost
+    column Region
+        sourceColumn: Region
+    column Unused
+        sourceColumn: Unused
+    column 'Line Total' = [Quantity] * [Price]
+    measure Revenue = SUMX(Sales, [Amount])
+    measure 'Cost Total' = SUM(Sales[Cost])
+    measure Summary =
+            VAR threshold = 0
+            RETURN
+                [Cost Total]

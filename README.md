@@ -403,9 +403,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Resolve unqualified column references in DAX (for example a calculated column
-`= [Quantity] * [Price]` or `SUMX(Sales, [Amount])`). Today only unqualified
-measures resolve, so such columns can be missed and reported `Likely unused`.
+Extend the raw report safety net to measures in readable report files. Measures
+referenced through report structures the structured parser does not recognize
+can currently be reported `Likely unused`.
 
 ## Development
 

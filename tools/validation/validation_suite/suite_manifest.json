@@ -26,7 +26,8 @@
     "24_special_dax_scope",
     "25_dax_lexical_scope",
     "26_tmdl_expression_boundaries",
-    "27_incomplete_sources"
+    "27_incomplete_sources",
+    "28_dax_unqualified_columns"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

@@ -1,0 +1,16 @@
+{
+  "expected_status": {
+    "Column|Sales|Line Total": "Used",
+    "Column|Sales|Quantity": "Used",
+    "Column|Sales|Price": "Used",
+    "Column|Sales|Region": "Used",
+    "Measure|Sales|Summary": "Used",
+    "Measure|Sales|Cost Total": "Used",
+    "Column|Sales|Cost": "Used",
+    "Measure|Sales|Revenue": "Used",
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Budget|Amount": "Likely unused",
+    "Column|Sales|Unused": "Likely unused"
+  },
+  "notes": "Unqualified columns bind to a certain row context (calculated column, RLS table); iterator row context is manual review, narrowed by the table argument. RETURN before [Measure] is not a table name."
+}

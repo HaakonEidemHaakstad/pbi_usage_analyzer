@@ -1082,6 +1082,59 @@ table Sales
     }, "Unreadable report JSON is raw-scanned for manual-review evidence; BOMs are tolerated; invalid UTF-8 TMDL is decoded with replacement and only objects with damaged names are downgraded.")
 
 
+def build_dax_unqualified_columns(root: Path):
+    name = "28_dax_unqualified_columns"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Quantity
+        sourceColumn: Quantity
+    column Price
+        sourceColumn: Price
+    column Amount
+        sourceColumn: Amount
+    column Cost
+        sourceColumn: Cost
+    column Region
+        sourceColumn: Region
+    column Unused
+        sourceColumn: Unused
+    column 'Line Total' = [Quantity] * [Price]
+    measure Revenue = SUMX(Sales, [Amount])
+    measure 'Cost Total' = SUM(Sales[Cost])
+    measure Summary =
+            VAR threshold = 0
+            RETURN
+                [Cost Total]
+""")
+    write(model / "definition" / "tables" / "Budget.tmdl", """
+table Budget
+    column Amount
+        sourceColumn: Amount
+""")
+    write(model / "definition" / "roles" / "North.tmdl", """
+role North
+    modelPermission: read
+    tablePermission Sales = [Region] = "North"
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Sales", "Line Total"))
+    add_visual(report, "Page1", "Visual2", visual_measure("Sales", "Revenue"))
+    add_visual(report, "Page1", "Visual3", visual_measure("Sales", "Summary"))
+    save_expected(p, {
+        "Column|Sales|Line Total": "Used",
+        "Column|Sales|Quantity": "Used",
+        "Column|Sales|Price": "Used",
+        "Column|Sales|Region": "Used",
+        "Measure|Sales|Summary": "Used",
+        "Measure|Sales|Cost Total": "Used",
+        "Column|Sales|Cost": "Used",
+        "Measure|Sales|Revenue": "Used",
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Budget|Amount": "Likely unused",
+        "Column|Sales|Unused": "Likely unused",
+    }, "Unqualified columns bind to a certain row context (calculated column, RLS table); iterator row context is manual review, narrowed by the table argument. RETURN before [Measure] is not a table name.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1121,6 +1174,7 @@ def main():
         build_dax_lexical_scope,
         build_tmdl_expression_boundaries,
         build_incomplete_sources,
+        build_dax_unqualified_columns,
     ]
     for builder in builders:
         builder(root)

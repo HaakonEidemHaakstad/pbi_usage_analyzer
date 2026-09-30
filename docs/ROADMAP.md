@@ -129,4 +129,7 @@ DAX-masked text (scenario 26); colons in DAX strings/comments no longer truncate
 Damaged sources add scoped manual-review evidence (scenario 27): unreadable report
 JSON is raw-scanned (columns and measures), failed TMDL table files are scanned for
 DAX references, and BOM/invalid UTF-8 no longer abort or hide files.
-Next: unqualified column references in DAX (calculated columns, row context).
+Unqualified DAX columns resolve in certain row contexts (calculated columns, RLS);
+other unqualified columns are manual review (scenario 28). Keywords/variables before
+`[` no longer swallow measure references (`RETURN [Measure]`).
+Next: measure-aware raw report safety net for readable files.

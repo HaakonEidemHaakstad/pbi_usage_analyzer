@@ -32,6 +32,8 @@ class SpecialExpression:
     kind: EvidenceType
     expression: str
     line: int
+    # Table whose row context is certain (an RLS table permission's table).
+    row_table: str | None = None
 
 
 def extract_special_expressions(text: str) -> list[SpecialExpression]:
@@ -87,7 +89,10 @@ def extract_special_expressions(text: str) -> list[SpecialExpression]:
                                     break
                                 body.append(line)
                         expression = mask_dax_literals('\n'.join(body))
-                        if kind is not None:
+                        if kind == EvidenceType.RLS_DEPENDENCY:
+                            table = split_object_definition(stripped.split(None, 1)[1])[0]
+                            found.append(SpecialExpression(kind, expression, i + 1, table))
+                        elif kind is not None:
                             found.append(SpecialExpression(kind, expression, i + 1))
                         else:
                             for argument in nameof_arguments(expression):
@@ -104,7 +109,11 @@ def special_dax_evidence(path: Path, columns, measures) -> list[Evidence]:
     owner = ObjectRef(ObjectType.TABLE, f'Special:{path.name}')
     evidence = []
     for item in extract_special_expressions(read_source_text(path)[0]):
-        for edge in dax_dependencies(owner, item.expression, columns, measures):
+        for edge in dax_dependencies(owner, item.expression, columns, measures, row_table=item.row_table):
+            # Only proven references become special roots; unresolved row-context
+            # guesses must not be promoted to Used.
+            if edge.evidence_type != EvidenceType.DAX_DEPENDENCY:
+                continue
             evidence.append(Evidence(owner, edge.target, item.kind,
                                     f'Referenced by {item.kind.value} in {path.name}:{item.line}',
                                     str(path), 'medium'))

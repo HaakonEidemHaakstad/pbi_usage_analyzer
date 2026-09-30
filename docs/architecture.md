@@ -445,6 +445,20 @@ The [format coverage matrix](FORMAT_COVERAGE.md) distinguishes implementation
 subsets, heuristics, tested examples and unsupported forms. Architecture goals
 elsewhere in this document are not a claim of complete Power BI format support.
 
+### Unqualified DAX references
+
+`dax_dependencies(..., row_table=...)` resolves unqualified `[Name]` in order:
+measure in the owner's table, unique measure model-wide, then a column of
+`row_table` when the row context is certain (the table of a calculated column; the
+table of an RLS `tablePermission`). These produce `DAX_DEPENDENCY` (RLS:
+`RLS_DEPENDENCY`). Otherwise a same-named non-internal column yields
+`DAX_UNQUALIFIED_COLUMN_REFERENCE` (manual review, never propagated), narrowed to
+tables the masked expression names; this covers iterator arguments without binding
+row context. Special-DAX converts only `DAX_DEPENDENCY` edges into special roots.
+Unquoted DAX table names cannot contain spaces, so a qualified match's table is the
+longest trailing word sequence that is a known table: `RETURN [Margin]` and
+`NOT Sales[Flag]` resolve correctly. Scenario 28 covers this.
+
 ### DAX lexical masking
 
 `parsers/dax_lexer.py` blanks DAX strings (with doubled-quote escapes) and `//`,

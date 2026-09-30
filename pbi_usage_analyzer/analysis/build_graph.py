@@ -69,7 +69,8 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                     "references after it were kept as dependency evidence.",
                     source_file=obj.source_file, object_ref=ref,
                 ))
-            for ev in dax_dependencies(ref, obj.expression, columns, measures):
+            row_table = ref.table if ref.object_type == ObjectType.COLUMN else None
+            for ev in dax_dependencies(ref, obj.expression, columns, measures, row_table=row_table):
                 ctx.graph.add_evidence(ev)
 
     # Evidence hidden by unparseable or undecodable TMDL stays reviewable.

@@ -67,11 +67,40 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Damaged sources | Latest change: scoped evidence recovery for unreadable/undecodable files. Details below. |
+| Unqualified DAX | Latest change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
+| Damaged sources | Previous change: scoped evidence recovery for unreadable/undecodable files. Details below. |
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: damaged source files
+## Latest change: unqualified DAX references
+
+- Bug found and fixed: `QUALIFIED_DAX_REF` allows spaces/hyphens in unquoted table
+  names and `\s*` spans newlines, so `VAR … RETURN [Margin]`, `Total - [Discount]`,
+  `NOT [Margin]` were read as qualified references to tables `RETURN`/`Total -`/`NOT`
+  and dropped; `FILTER(Sales, NOT Sales[Flag])` lost `Sales[Flag]`.
+  `_qualified_table` now takes the longest trailing word sequence that names a known
+  table; if none, the bracket is resolved as unqualified. Quoted `'Old'[X]` stays
+  qualified (stale refs are not reinterpreted).
+- `dax_dependencies(..., row_table=None)`: unqualified names resolve to measures
+  first (unchanged), then to a `row_table` column (calculated columns pass their own
+  table; special-DAX passes the RLS `tablePermission` table) as `DAX_DEPENDENCY`.
+  Otherwise same-named non-internal columns get new
+  `EvidenceType.DAX_UNQUALIFIED_COLUMN_REFERENCE` (classifier `MANUAL_REVIEW`, not
+  propagated), narrowed to tables named in the masked expression.
+- Special-DAX converts only `DAX_DEPENDENCY` edges into RLS/calculation-group/field
+  parameter evidence, so heuristic matches never become Used roots.
+- Tests: `tests/test_dax_unqualified.py` (failed against the old code), scenario
+  `28_dax_unqualified_columns`.
+- Comparison: no changes in 01–27. Scenario 28: `Sales[Region]` (RLS),
+  `Sales[Quantity]`/`Sales[Price]` (calculated column) and `Sales[Cost Total]`/
+  `Sales[Cost]` (`RETURN` fix) became Used; `Sales[Amount]` (`SUMX(Sales, [Amount])`)
+  Likely unused -> Needs manual review. `Budget[Amount]` stays Likely unused.
+- Known limits: a same-named measure suppresses column evidence in measures (DAX
+  precedence is not modeled); calculation items with unqualified columns give no
+  evidence; `dax_dependencies` scans the column/measure indexes per call
+  (O(objects x expressions)); precompute indexes if large models are slow.
+
+## Previous change: damaged source files
 
 Problems found (2026-09-30):
 - Invalid UTF-8 in any TMDL file crashed analysis: `TMDL_PARSE_FAILED` caught it in
@@ -176,17 +205,15 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Not started; confirm with the user before beginning. Candidate: **unqualified
-column references in DAX**. `dax.py` resolves unqualified `[Name]` only to measures.
-A calculated column `= [Quantity] * [Price]` or row-context `SUMX(Sales, [Amount])`
-produces no column evidence, so those columns can be `Likely unused` (false-positive
-risk). Conservative approach: in a calculated column, resolve unqualified names to
-same-table columns when no measure matches; in measures, unqualified column names
-inside iterator/row context are not reliably scoped, so consider manual-review
-evidence (same table as a table argument, or unique model-wide column) rather than
-`Used`. Add regressions and a scenario; compare classifications across 01–27.
-Other candidates: whether TMDL permits inline expressions continued on following
-lines; making failed-TMDL objects visible in results.
+Not started; confirm with the user before beginning. Candidate: **measure-aware
+raw report safety net for readable PBIR files**. The structured parser recognizes
+selected node shapes; the raw net for readable files covers columns only, so a
+measure referenced through an unrecognized structure can be `Likely unused`. Design
+care: measure names are often generic words (`Total`, `Sales`), so require table
+plus measure token co-occurrence or a unique, sufficiently specific name, and keep
+it manual-review evidence. Compare classifications across 01–28 and explain changes.
+Other candidates: precomputed DAX indexes for large models; showing objects from
+failed TMDL files; TMDL inline-expression continuation; real-project benchmark.
 
 ## Verification and environment
 
@@ -210,11 +237,12 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 142 unit/regression tests passed (2026-09-30, after damaged-source handling).
-- 195 synthetic checks passed across 27 scenarios, including JSON schema and
+- 152 unit/regression tests passed (2026-09-30, after unqualified DAX resolution).
+- 208 synthetic checks passed across 28 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
-- Runtime-only smoke test passed on 2026-09-30 after damaged-source handling.
+- Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;
+  hosted CI reruns it on every push.
 - Hosted GitHub Actions run passed on `75d5132` (2026-09-30).
 - `make check` reports missing Docker. Docker is optional; do not install host
   packages or require it for ordinary tests. No real PBIP accuracy benchmark or
@@ -244,7 +272,7 @@ The [coverage matrix](FORMAT_COVERAGE.md) is the detailed reference. Key limits:
 - Damaged sources add only scoped manual-review evidence. Objects defined in a
   failed TMDL table file are absent from results; references containing undecodable
   bytes cannot be resolved. Treat results with diagnostics as incomplete.
-- Unqualified DAX column references are not resolved (next task).
+- Unqualified DAX columns outside a certain row context are manual review only.
 - M fallback is heuristic; precise lineage covers a bounded subset. Do not claim
   every unsupported expression necessarily produces protective evidence.
 - Health confidence reflects detection, not proof of defects. Rules do not change
