@@ -36,7 +36,7 @@ class MLineageTests(unittest.TestCase):
         self.assertTrue(all(d.accepts('Key') and not d.accepts('Other') for d in result.values()))
 
     def test_unknown_and_unsupported_shapes_fail_closed(self):
-        for source in ('Unknown', 'Table.SelectColumns(Unknown, {"A"})', 'Table.AddColumn(Source, "A", each 1)', 'Table.Combine({Source}, {"A"})', 'Table.RemoveColumns(Source, {"A"}, MissingField.UseNull)', 'Source trailing', '"Source"'):
+        for source in ('Unknown', 'Table.SelectColumns(Unknown, {"A"})', 'Table.AddColumn(Source, "A", each CustomFunction(_))', 'Table.Combine({Source}, {"A"})', 'Table.RemoveColumns(Source, {"A"}, MissingField.UseNull)', 'Source trailing', '"Source"'):
             with self.subTest(source=source):
                 self.assertIsNone(self.infer(source))
 
@@ -119,3 +119,40 @@ class MLineageTests(unittest.TestCase):
         ):
             with self.subTest(expression=expression):
                 self.assertIsNone(self.infer(expression))
+
+    def test_filter_protects_predicate_columns_after_projection(self):
+        demand = self.infer('Table.SelectColumns(Table.SelectRows(Source, each [Active] = true and [Amount] > 0), {"Key"})')['Source']
+        self.assertTrue(all(demand.accepts(c) for c in ('Active', 'Amount', 'Key')))
+        self.assertFalse(demand.accepts('Unrelated'))
+
+    def test_computed_column_maps_to_input_reads(self):
+        demand = self.infer('Table.SelectColumns(Table.AddColumn(Source, "Total", each [Price] * [Quantity], type number), {"Total"})')['Source']
+        self.assertTrue(demand.accepts('Price'))
+        self.assertTrue(demand.accepts('Quantity'))
+        self.assertFalse(demand.accepts('Total'))
+        self.assertFalse(demand.accepts('Unrelated'))
+
+    def test_chained_computed_columns_and_conditionals(self):
+        demand = self.infer('let A = Table.AddColumn(Source, "Gross", each [Net] + [Tax]), B = Table.AddColumn(A, "Final", each if [Active] then [Gross] else 0) in Table.SelectColumns(B, {"Final"})')['Source']
+        self.assertTrue(all(demand.accepts(c) for c in ('Net', 'Tax', 'Active')))
+        self.assertFalse(demand.accepts('Gross'))
+        self.assertFalse(demand.accepts('Final'))
+
+    def test_row_strings_comments_and_quoted_fields(self):
+        demand = self.infer('Table.SelectColumns(Table.SelectRows(Source, each [#"Års data"] <> "[Fake]" /* [AlsoFake] */), {})')['Source']
+        self.assertTrue(demand.accepts('Års data'))
+        self.assertFalse(demand.accepts('Fake'))
+        self.assertFalse(demand.accepts('AlsoFake'))
+
+    def test_unsupported_row_expressions_remain_unknown(self):
+        for row in ('CustomFunction([A])', 'Record.Field(_, "A")', '[A][B]',
+                    '[A]?', 'OtherQuery', '(x) => x[A]', '_',
+                    'let X = [A] in X', '[A] +', '[A] [B]', '#"true"',
+                    '[A] "and" [B]'):
+            with self.subTest(row=row):
+                self.assertIsNone(self.infer(f'Table.SelectRows(Source, each {row})'))
+
+    def test_quoted_keywords_and_invalid_numbers_fail_closed(self):
+        self.assertIsNone(self.infer('Table.SelectRows(Source, #"each" [A])'))
+        self.assertIsNone(self.infer('Table.SelectRows(Source, each [A] > ²)'))
+        self.assertIsNone(self.infer('Table.AddColumn(Source, "A", each 1, type #"number")'))

@@ -1,0 +1,9 @@
+table Archive
+    column Price
+        sourceColumn: Price
+    column Quantity
+        sourceColumn: Quantity
+    column Active
+        sourceColumn: Active
+    column Unrelated
+        sourceColumn: Unrelated

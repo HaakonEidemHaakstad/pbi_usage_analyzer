@@ -83,8 +83,15 @@ def _tokens(source: str) -> list[tuple[str, str]]:
                     i += 1
             else:
                 raise _Unsupported()
-            tokens.append((kind, value))
-        elif source[i] in '(){},=':
+            tokens.append(('quoted_identifier' if kind == 'identifier' else kind, value))
+        elif source[i].isdecimal():
+            match = re.match(r'\d+(?:\.\d+)?(?:[eE][+-]?\d+)?', source[i:])
+            tokens.append(('number', match.group()))
+            i += len(match.group())
+        elif source[i:i + 2] in {'<=', '>=', '<>'}:
+            tokens.append((source[i:i + 2], source[i:i + 2]))
+            i += 2
+        elif source[i] in '(){},=[]+-*/<>&':
             tokens.append((source[i], source[i]))
             i += 1
         else:
@@ -106,13 +113,58 @@ class _Parser:
 
     def take(self, kind: str) -> str:
         actual, value = self.tokens[self.index]
-        if actual != kind:
+        if actual != kind and not (kind == 'identifier' and actual == 'quoted_identifier'):
             raise _Unsupported()
         self.index += 1
         return value
 
     def at(self, kind: str) -> bool:
         return self.tokens[self.index][0] == kind
+
+    def keyword(self, value: str) -> None:
+        if self.tokens[self.index] != ('identifier', value):
+            raise _Unsupported()
+        self.index += 1
+
+    def row_expression(self, depth=0) -> frozenset[str]:
+        """Collect reads from a closed scalar expression, never arbitrary M."""
+        if depth > 80:
+            raise _Unsupported()
+        reads = self.row_atom(depth + 1)
+        while self.tokens[self.index][0] not in {'string', 'quoted_identifier'} and self.tokens[self.index][1] in {
+                '+', '-', '*', '/', '&', '=', '<>', '<', '>', '<=', '>=', 'and', 'or'}:
+            self.index += 1
+            reads |= self.row_atom(depth + 1)
+        return reads
+
+    def row_atom(self, depth) -> frozenset[str]:
+        if depth > 80:
+            raise _Unsupported()
+        kind, value = self.tokens[self.index]
+        if kind not in {'string', 'quoted_identifier'} and value in {'+', '-', 'not'}:
+            self.index += 1
+            return self.row_atom(depth + 1)
+        if kind == '(':
+            self.take('(')
+            reads = self.row_expression(depth + 1)
+            self.take(')')
+            return reads
+        if kind == '[':
+            self.take('[')
+            field = norm(self.take('identifier'))
+            self.take(']')
+            return frozenset({field})
+        if kind == 'identifier' and value == 'if':
+            self.index += 1
+            reads = self.row_expression(depth + 1)
+            self.keyword('then')
+            reads |= self.row_expression(depth + 1)
+            self.keyword('else')
+            return reads | self.row_expression(depth + 1)
+        if kind in {'number', 'string'} or (kind == 'identifier' and value in {'true', 'false', 'null'}):
+            self.index += 1
+            return frozenset()
+        raise _Unsupported()
 
     def transformation_pairs(self, rename: bool):
         """Read literal rename/type pairs; reject dynamic expressions."""
@@ -199,10 +251,33 @@ class _Parser:
             self.take(')')
             return ('combine', inputs)
         if name not in {'Table.SelectColumns', 'Table.RemoveColumns',
-                        'Table.RenameColumns', 'Table.TransformColumnTypes'}:
+                        'Table.RenameColumns', 'Table.TransformColumnTypes',
+                        'Table.SelectRows', 'Table.AddColumn'}:
             raise _Unsupported()
         upstream = self.expression(depth + 1)
         self.take(',')
+        if name in {'Table.SelectRows', 'Table.AddColumn'}:
+            added = None
+            if name == 'Table.AddColumn':
+                added = norm(self.take('string'))
+                self.take(',')
+            self.keyword('each')
+            reads = self.row_expression()
+            if added is not None and self.at(','):
+                self.take(',')
+                self.keyword('type')
+                if not self.at('identifier'):
+                    raise _Unsupported()
+                column_type = self.take('identifier')
+                if column_type == 'nullable':
+                    if not self.at('identifier'):
+                        raise _Unsupported()
+                    column_type = self.take('identifier')
+                if column_type not in {'any', 'number', 'text', 'date', 'time',
+                                       'datetime', 'datetimezone', 'duration', 'logical', 'binary'}:
+                    raise _Unsupported()
+            self.take(')')
+            return ('filter', upstream, reads) if added is None else ('add', upstream, added, reads)
         if name in {'Table.RenameColumns', 'Table.TransformColumnTypes'}:
             rename = name == 'Table.RenameColumns'
             pairs, type_refs = self.transformation_pairs(rename)
@@ -255,7 +330,8 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
             kind = node[0]
             intrinsic = {'combine': 'Table.Combine', 'select': 'Table.SelectColumns',
                          'remove': 'Table.RemoveColumns', 'rename': 'Table.RenameColumns',
-                         'types': 'Table.TransformColumnTypes'}.get(kind)
+                         'types': 'Table.TransformColumnTypes', 'filter': 'Table.SelectRows',
+                         'add': 'Table.AddColumn'}.get(kind)
             if intrinsic and (intrinsic in scope or norm(intrinsic) in model_tables):
                 raise _Unsupported()
             if kind in {'select', 'remove', 'rename'} and node[3] and (
@@ -310,6 +386,16 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                     raise _Unsupported()
                 visit(node[1], ColumnDemand(demand.included, demand.excluded,
                                            demand.required | node[2]), scope, depth + 1)
+            elif kind == 'filter':
+                # Row membership depends on predicate columns regardless of output.
+                visit(node[1], ColumnDemand(demand.included, demand.excluded,
+                                           demand.required | node[2]), scope, depth + 1)
+            elif kind == 'add':
+                added = frozenset({node[2]})
+                included = None if demand.included is None else demand.included - added
+                # Keep generator reads conservatively even if the output is dropped.
+                visit(node[1], ColumnDemand(included, demand.excluded | added,
+                                           (demand.required - added) | node[3]), scope, depth + 1)
 
         visit(root, ColumnDemand(), {})
         return result

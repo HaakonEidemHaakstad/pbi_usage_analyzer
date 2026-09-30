@@ -11,7 +11,8 @@
     "09_raw_report_safety_net",
     "10_m_column_lineage",
     "11_m_lineage_fallback",
-    "12_m_rename_types"
+    "12_m_rename_types",
+    "13_m_rows_and_computed"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

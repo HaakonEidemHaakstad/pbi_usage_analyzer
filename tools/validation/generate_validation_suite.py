@@ -508,6 +508,42 @@ table Output
                   "Rename maps output to original sourceColumn; type conversion retains operational inputs even after projection.")
 
 
+def build_m_rows_and_computed(root: Path):
+    name = "13_m_rows_and_computed"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Archive.tmdl", """
+table Archive
+    column Price
+        sourceColumn: Price
+    column Quantity
+        sourceColumn: Quantity
+    column Active
+        sourceColumn: Active
+    column Unrelated
+        sourceColumn: Unrelated
+""")
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Total
+        sourceColumn: Total
+    partition Output = m
+        source =
+            let
+                Filtered = Table.SelectRows(Archive, each [Active] = true),
+                Calculated = Table.AddColumn(Filtered, "Total", each [Price] * [Quantity], type number),
+                Selected = Table.SelectColumns(Calculated, {"Total"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Total"))
+    save_expected(p, {"Column|Archive|Price": "Needs manual review",
+                      "Column|Archive|Quantity": "Needs manual review",
+                      "Column|Archive|Active": "Needs manual review",
+                      "Column|Archive|Unrelated": "Likely unused",
+                      "Column|Output|Total": "Used"},
+                  "Filter inputs and computed-column inputs survive projection; unrelated columns are not protected.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -532,6 +568,7 @@ def main():
         build_m_column_lineage,
         build_m_lineage_fallback,
         build_m_rename_types,
+        build_m_rows_and_computed,
     ]
     for builder in builders:
         builder(root)

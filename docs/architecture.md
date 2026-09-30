@@ -171,3 +171,25 @@ lineage. This does not execute conversions or validate source values.
 
 References: [RenameColumns](https://learn.microsoft.com/en-us/powerquery-m/table-renamecolumns)
 and [TransformColumnTypes](https://learn.microsoft.com/en-us/powerquery-m/table-transformcolumntypes).
+
+### Row filters and computed columns
+
+`Table.SelectRows` and `Table.AddColumn` accept a bounded scalar `each` grammar:
+direct `[Column]` or `[#"Column name"]` reads, numeric/text/logical/null literals,
+unary operators, arithmetic, comparisons, logical operators, parentheses, and
+conditionals. All conditional branches contribute dependencies. Parsing collects
+reads without executing M or inferring runtime values.
+
+Filter inputs remain required independently of the projected output. Added
+column names are removed from upstream demands and replaced by generator reads.
+Generator reads remain conservatively required even if the added column is
+later discarded. This composes with separate add, rename, and projection steps.
+Optional added-column types are limited to scalar `type` literals.
+
+Function calls, external bindings, explicit lambda parameters, dynamic/optional
+field access, and nested record reads remain unsupported. Unknown expressions
+preserve query-level fallback. Quoted identifiers are distinct from scalar
+keywords, so a query named `true` is not mistaken for the logical literal.
+
+References: [SelectRows](https://learn.microsoft.com/en-us/powerquery-m/table-selectrows)
+and [AddColumn](https://learn.microsoft.com/en-us/powerquery-m/table-addcolumn).

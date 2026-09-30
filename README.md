@@ -140,7 +140,8 @@ V2 distinguishes query-level lineage from column-level lineage. A query-level de
 
 The analyzer traces source-column requirements through complete expressions using
 `Table.SelectColumns`, `Table.RemoveColumns`, `Table.Combine`,
-`Table.RenameColumns`, and `Table.TransformColumnTypes`, including named
+`Table.RenameColumns`, `Table.TransformColumnTypes`, `Table.SelectRows`, and
+`Table.AddColumn`, including named
 steps and nested calls. Column lists must be literal lists. Select/remove support
 an optional `MissingField.Ignore` argument. Requirements from multiple M
 partitions are combined.
@@ -163,10 +164,18 @@ Conversion columns remain protected even if a later projection removes them.
 Dynamic mappings, overlapping rename pairs, and culture records retain fallback
 behavior.
 
+Row filters and computed columns support bounded `each` expressions with direct
+field reads, scalar literals, arithmetic, comparisons, logical operators,
+parentheses, and `if`/`then`/`else`. Predicate columns remain required after output
+projection. Computed outputs map back to their input fields; generator reads are
+retained conservatively even when the output is dropped. Function calls, dynamic
+field access, nested record access, and external bindings retain fallback behavior.
+
 ## Next planned improvement
 
-Extend lineage to joins, filters, and computed columns while preserving their
-operational dependencies. General M
+Extend lineage to joins and expanded nested tables, preserving join keys and
+resolving output-column ownership. Broaden row-expression support incrementally
+with explicit function semantics. General M
 expressions, dynamic column lists, and connector-specific schemas remain outside
 the current bounded implementation.
 

@@ -1,0 +1,11 @@
+table Output
+    column Total
+        sourceColumn: Total
+    partition Output = m
+        source =
+            let
+                Filtered = Table.SelectRows(Archive, each [Active] = true),
+                Calculated = Table.AddColumn(Filtered, "Total", each [Price] * [Quantity], type number),
+                Selected = Table.SelectColumns(Calculated, {"Total"})
+            in
+                Selected
