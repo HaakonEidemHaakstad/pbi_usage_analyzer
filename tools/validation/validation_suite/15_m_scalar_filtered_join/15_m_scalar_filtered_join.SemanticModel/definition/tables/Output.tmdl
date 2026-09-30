@@ -1,0 +1,15 @@
+table Output
+    column Rounded
+        sourceColumn: Rounded
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details"),
+                Filtered = Table.SelectRows(Joined, each Text.StartsWith(Text.Upper(Text.Trim([Region])), "N")),
+                Expanded = Table.ExpandTableColumn(Filtered, "Details", {"Name"}, {"CustomerName"}),
+                Calculated = Table.AddColumn(Expanded, "Rounded", each Number.Round(Number.Abs([Amount]), 2)),
+                Selected = Table.SelectColumns(Calculated, {"Rounded", "CustomerName"})
+            in
+                Selected

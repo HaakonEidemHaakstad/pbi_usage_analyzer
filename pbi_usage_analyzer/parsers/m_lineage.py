@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import re
 
 from ..util import norm
+from .m_scalar_functions import SCALAR_ARITIES
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,7 @@ class _Parser:
     def __init__(self, source: str):
         self.tokens = _tokens(source)
         self.index = 0
+        self.row_calls = set()
 
     def take(self, kind: str) -> str:
         actual, value = self.tokens[self.index]
@@ -176,6 +178,23 @@ class _Parser:
             reads |= self.row_expression(depth + 1)
             self.keyword('else')
             return reads | self.row_expression(depth + 1)
+        if kind == 'identifier' and value in SCALAR_ARITIES:
+            self.index += 1
+            self.take('(')
+            reads = frozenset()
+            count = 0
+            if not self.at(')'):
+                while True:
+                    reads |= self.row_expression(depth + 1)
+                    count += 1
+                    if not self.at(','):
+                        break
+                    self.take(',')
+            self.take(')')
+            if count not in SCALAR_ARITIES[value]:
+                raise _Unsupported()
+            self.row_calls.add(value)
+            return reads
         if kind in {'number', 'string'} or (kind == 'identifier' and value in {'true', 'false', 'null'}):
             self.index += 1
             return frozenset()
@@ -315,7 +334,9 @@ class _Parser:
                 added = norm(self.take('string'))
                 self.take(',')
             self.keyword('each')
+            self.row_calls = set()
             reads = self.row_expression()
+            calls = frozenset(self.row_calls)
             if added is not None and self.at(','):
                 self.take(',')
                 self.keyword('type')
@@ -330,7 +351,7 @@ class _Parser:
                                        'datetime', 'datetimezone', 'duration', 'logical', 'binary'}:
                     raise _Unsupported()
             self.take(')')
-            return ('filter', upstream, reads) if added is None else ('add', upstream, added, reads)
+            return ('filter', upstream, reads, calls) if added is None else ('add', upstream, added, reads, calls)
         if name in {'Table.RenameColumns', 'Table.TransformColumnTypes'}:
             rename = name == 'Table.RenameColumns'
             pairs, type_refs = self.transformation_pairs(rename)
@@ -375,8 +396,12 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
         active = set()
         remaining_visits = 10000
 
+        def check_row_calls(calls, scope):
+            if any(name in scope or norm(name) in model_tables for name in calls):
+                raise _Unsupported()
+
         def resolve_nested(node, scope, depth=0):
-            """Resolve only aliases/let wrappers; other intervening operations fall back."""
+            """Resolve aliases, let wrappers and row filters without losing reads."""
             nonlocal remaining_visits
             remaining_visits -= 1
             if depth > 80 or remaining_visits < 0:
@@ -389,13 +414,19 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 for name, expression in node[1].items():
                     nested[name] = (expression, nested)
                 return resolve_nested(node[2], nested, depth + 1)
+            if node[0] == 'filter':
+                if 'Table.SelectRows' in scope or norm('Table.SelectRows') in model_tables:
+                    raise _Unsupported()
+                check_row_calls(node[3], scope)
+                joined, join_scope, reads = resolve_nested(node[1], scope, depth + 1)
+                return joined, join_scope, reads | node[2]
             if node[0] != 'nestedjoin':
                 raise _Unsupported()
             if 'Table.NestedJoin' in scope or norm('Table.NestedJoin') in model_tables:
                 raise _Unsupported()
             if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
                 raise _Unsupported()
-            return node, scope
+            return node, scope, frozenset()
 
         def visit(node, demand, scope, depth=0):
             nonlocal remaining_visits
@@ -463,10 +494,12 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 visit(node[1], ColumnDemand(demand.included, demand.excluded,
                                            demand.required | node[2]), scope, depth + 1)
             elif kind == 'filter':
+                check_row_calls(node[3], scope)
                 # Row membership depends on predicate columns regardless of output.
                 visit(node[1], ColumnDemand(demand.included, demand.excluded,
                                            demand.required | node[2]), scope, depth + 1)
             elif kind == 'add':
+                check_row_calls(node[4], scope)
                 added = frozenset({node[2]})
                 included = None if demand.included is None else demand.included - added
                 # Keep generator reads conservatively even if the output is dropped.
@@ -488,17 +521,20 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
                 visit(node[2], ColumnDemand(right_demand.included, right_demand.excluded,
                                            right_demand.required | node[4]), scope, depth + 1)
             elif kind == 'expand':
-                joined, join_scope = resolve_nested(node[1], scope)
+                joined, join_scope, filter_reads = resolve_nested(node[1], scope)
                 if node[2] != joined[5]:
                     raise _Unsupported()
                 generated = frozenset(node[4]) | {node[2]}
                 left_demand = ColumnDemand(
                     None if demand.included is None else demand.included - generated,
-                    demand.excluded | generated, (demand.required - generated) | joined[3])
+                    demand.excluded | generated, (demand.required - generated) | joined[3]
+                    | (filter_reads - {node[2]}))
                 # Every expanded name remains a schema requirement, even when
                 # a later projection drops its output alias. Expansion also
                 # depends on matching rows, so both join keys always survive.
                 right_demand = ColumnDemand(frozenset(node[3]), required=joined[4] | frozenset(node[3]))
+                if node[2] in filter_reads:
+                    right_demand = ColumnDemand(required=joined[4] | frozenset(node[3]))
                 visit(joined[1], left_demand, join_scope, depth + 1)
                 visit(joined[2], right_demand, join_scope, depth + 1)
 

@@ -13,7 +13,8 @@
     "11_m_lineage_fallback",
     "12_m_rename_types",
     "13_m_rows_and_computed",
-    "14_m_join_expansion"
+    "14_m_join_expansion",
+    "15_m_scalar_filtered_join"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

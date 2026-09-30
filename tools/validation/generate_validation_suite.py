@@ -581,6 +581,46 @@ table Output
                   "Nested join keys survive projection and expanded aliases resolve to the right source only.")
 
 
+def build_m_scalar_filtered_join(root: Path):
+    name = "15_m_scalar_filtered_join"
+    p, report, model = project(root, name)
+    for table, columns in (("Orders", ("CustomerKey", "Region", "Amount", "UnusedOrder")),
+                           ("Customers", ("Key", "Name", "UnusedCustomer"))):
+        text = f"table {table}\n"
+        for column in columns:
+            text += f"    column {column}\n        sourceColumn: {column}\n"
+        write(model / "definition" / "tables" / f"{table}.tmdl", text)
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Rounded
+        sourceColumn: Rounded
+    column CustomerName
+        sourceColumn: CustomerName
+    partition Output = m
+        source =
+            let
+                Joined = Table.NestedJoin(Orders, {"CustomerKey"}, Customers, {"Key"}, "Details"),
+                Filtered = Table.SelectRows(Joined, each Text.StartsWith(Text.Upper(Text.Trim([Region])), "N")),
+                Expanded = Table.ExpandTableColumn(Filtered, "Details", {"Name"}, {"CustomerName"}),
+                Calculated = Table.AddColumn(Expanded, "Rounded", each Number.Round(Number.Abs([Amount]), 2)),
+                Selected = Table.SelectColumns(Calculated, {"Rounded", "CustomerName"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Output", "Rounded"))
+    add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
+    save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
+                      "Column|Orders|Region": "Needs manual review",
+                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|UnusedOrder": "Likely unused",
+                      "Column|Customers|Key": "Needs manual review",
+                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|UnusedCustomer": "Likely unused",
+                      "Column|Output|Rounded": "Used",
+                      "Column|Output|CustomerName": "Used"},
+                  "Scalar function arguments and pre-expansion filter reads remain protected alongside both join keys.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -607,6 +647,7 @@ def main():
         build_m_rename_types,
         build_m_rows_and_computed,
         build_m_join_expansion,
+        build_m_scalar_filtered_join,
     ]
     for builder in builders:
         builder(root)

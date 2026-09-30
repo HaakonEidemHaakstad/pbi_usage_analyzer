@@ -193,7 +193,7 @@ class MLineageTests(unittest.TestCase):
             'Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Wrong", {"Name"})',
             'Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Details", {"Name"}, {"X", "Y"})',
             'let JoinKind.Inner = Other in Table.Join(Source, "A", Other, "B", JoinKind.Inner)',
-            'Table.ExpandTableColumn(Table.SelectRows(Table.NestedJoin(Source, "A", Other, "B", "Details"), each [A] > 0), "Details", {"Name"})',
+            'Table.ExpandTableColumn(Table.AddColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "X", each 1), "Details", {"Name"})',
             'let A = B, B = A in Table.ExpandTableColumn(A, "Details", {"Name"})',
             'let Table.NestedJoin = Other in Table.ExpandTableColumn(Table.NestedJoin(Source, "A", Other, "B", "Details"), "Details", {"Name"})',
         ):
@@ -206,3 +206,41 @@ class MLineageTests(unittest.TestCase):
         self.assertTrue(all(result['Other'].accepts(c) for c in ('C', 'D', 'Name')))
         self.assertFalse(result['Source'].accepts('Name'))
         self.assertFalse(result['Other'].accepts('Unrelated'))
+
+    def test_nested_scalar_functions_preserve_every_argument_read(self):
+        demand = self.infer('Table.SelectColumns(Table.SelectRows(Source, each Text.Contains(Text.Lower(Text.Trim([Name])), Text.Lower([Search]))), {"Key"})')['Source']
+        self.assertTrue(all(demand.accepts(c) for c in ('Name', 'Search', 'Key')))
+        self.assertFalse(demand.accepts('Unused'))
+
+    def test_numeric_and_date_calls_in_computed_expression(self):
+        demand = self.infer('Table.SelectColumns(Table.AddColumn(Source, "Result", each Number.Round(Number.Abs([Amount]), [Digits]) + Date.Year([Date])), {"Result"})')['Source']
+        self.assertTrue(all(demand.accepts(c) for c in ('Amount', 'Digits', 'Date')))
+        self.assertFalse(demand.accepts('Result'))
+        self.assertFalse(demand.accepts('Unused'))
+
+    def test_scalar_functions_reject_unknown_arity_callbacks_and_shadowing(self):
+        for source in (
+            'Table.SelectRows(Source, each Text.Contains([Name]))',
+            'Table.SelectRows(Source, each Text.Contains([Name], "A", Comparer.Ordinal))',
+            'Table.AddColumn(Source, "X", each UnknownFunction([A]))',
+            'let Text.Contains = Other in Table.SelectRows(Source, each Text.Contains([Name], "A"))',
+            'let Number.Abs = Other in Table.AddColumn(Source, "X", each Number.Abs([A]))',
+        ):
+            with self.subTest(source=source):
+                self.assertIsNone(self.infer(source))
+
+    def test_filter_between_join_and_expansion_preserves_predicate(self):
+        result = self.infer('let J = Table.NestedJoin(Source, "A", Other, "B", "Details"), F = Table.SelectRows(J, each Text.StartsWith([Region], "N")), E = Table.ExpandTableColumn(F, "Details", {"Name"}, {"Customer"}) in Table.SelectColumns(E, {"Customer"})')
+        self.assertTrue(result['Source'].accepts('A'))
+        self.assertTrue(result['Source'].accepts('Region'))
+        self.assertFalse(result['Source'].accepts('Customer'))
+        self.assertTrue(result['Other'].accepts('B'))
+        self.assertTrue(result['Other'].accepts('Name'))
+        self.assertFalse(result['Other'].accepts('Region'))
+
+    def test_filter_reading_nested_value_retains_right_contents(self):
+        result = self.infer('Table.ExpandTableColumn(Table.SelectRows(Table.NestedJoin(Source, "A", Other, "B", "Details"), each [Details] <> null), "Details", {"Name"})')
+        self.assertTrue(result['Other'].accepts('AnyColumn'))
+
+    def test_filtered_expansion_rejects_shadowed_predicate_function(self):
+        self.assertIsNone(self.infer('let Text.Contains = Other, J = Table.NestedJoin(Source, "A", Other, "B", "Details"), F = Table.SelectRows(J, each Text.Contains([Region], "N")) in Table.ExpandTableColumn(F, "Details", {"Name"})'))

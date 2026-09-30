@@ -1,0 +1,9 @@
+table Orders
+    column CustomerKey
+        sourceColumn: CustomerKey
+    column Region
+        sourceColumn: Region
+    column Amount
+        sourceColumn: Amount
+    column UnusedOrder
+        sourceColumn: UnusedOrder

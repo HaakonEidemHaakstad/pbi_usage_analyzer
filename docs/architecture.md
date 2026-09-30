@@ -186,7 +186,7 @@ Generator reads remain conservatively required even if the added column is
 later discarded. This composes with separate add, rename, and projection steps.
 Optional added-column types are limited to scalar `type` literals.
 
-Function calls, external bindings, explicit lambda parameters, dynamic/optional
+Unknown function calls, external bindings, explicit lambda parameters, dynamic/optional
 field access, and nested record reads remain unsupported. Unknown expressions
 preserve query-level fallback. Quoted identifiers are distinct from scalar
 keywords, so a query named `true` is not mistaken for the logical literal.
@@ -210,7 +210,7 @@ local aliases or `let` wrappers. Literal inner names and optional output aliases
 map to the right input; left output demands exclude those generated aliases.
 All expanded inner names remain schema requirements after projection.
 
-Unknown nested provenance, intervening transformations, dynamic/mismatched keys,
+Unknown nested provenance, unsupported intervening transformations, dynamic/mismatched keys,
 custom comparers, join algorithms, unsupported kinds, duplicate output aliases,
 and shadowed built-ins fall back. Alias resolution shares depth/work limits with
 the lineage traversal. No join is executed and no cardinality is inferred.
@@ -218,3 +218,23 @@ the lineage traversal. No join is executed and no cardinality is inferred.
 References: [Join](https://learn.microsoft.com/en-us/powerquery-m/table-join),
 [NestedJoin](https://learn.microsoft.com/en-us/powerquery-m/table-nestedjoin),
 and [ExpandTableColumn](https://learn.microsoft.com/en-us/powerquery-m/table-expandtablecolumn).
+
+### Scalar function semantics and filtered expansion
+
+`m_scalar_functions.py` is an immutable allowlist of scalar built-ins and accepted
+argument counts. Calls may nest within row expressions; all argument reads are
+unioned. Every row-expression node records the called symbols, which are checked
+against its lexical scope and model query names before lineage is accepted.
+Unknown or shadowed calls fall back rather than assuming argument-only behavior.
+Runtime values and types are not evaluated.
+
+Supported row filters may intervene between a nested join and expansion.
+Resolution accumulates predicate reads with their original lexical scope checks.
+Left-side predicate reads remain required even after projection. Reading the
+nested value protects all right-side contents conservatively. Aliases, filters,
+and let wrappers share the bounded resolution traversal; other transformations
+still return unknown provenance.
+
+References: [Text.Contains](https://learn.microsoft.com/en-us/powerquery-m/text-contains),
+[Number.Round](https://learn.microsoft.com/en-us/powerquery-m/number-round),
+and [Date.Year](https://learn.microsoft.com/en-us/powerquery-m/date-year).

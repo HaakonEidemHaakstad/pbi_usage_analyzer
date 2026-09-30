@@ -169,25 +169,35 @@ Row filters and computed columns support bounded `each` expressions with direct
 field reads, scalar literals, arithmetic, comparisons, logical operators,
 parentheses, and `if`/`then`/`else`. Predicate columns remain required after output
 projection. Computed outputs map back to their input fields; generator reads are
-retained conservatively even when the output is dropped. Function calls, dynamic
+retained conservatively even when the output is dropped. Unknown function calls, dynamic
 field access, nested record access, and external bindings retain fallback behavior.
 
 Joins support literal single/composite keys and default, inner, left outer,
 right outer, or full outer kinds. Both input keys remain protected. Flat joins
 conservatively apply output-name demands to both inputs. Nested expansion maps
 explicit output aliases to the right-hand source when its input resolves directly
-to a nested join through aliases or `let` wrappers. Expanded fields remain schema
+to a nested join through aliases, `let` wrappers, or supported row filters. Expanded fields remain schema
 requirements even if later discarded. Unexpanded nested results protect all
 right-hand columns when retained.
 
-Dynamic keys, comparers, join algorithms, semi/anti joins, and transformations
+Dynamic keys, comparers, join algorithms, semi/anti joins, and other transformations
 between nested join and expansion remain unsupported and retain fallback.
+
+Supported scalar calls include text contains/starts/ends checks, case conversion,
+trimming, length, replacement and conversion; number absolute value, rounding and
+conversion; and date year/month/day extraction and conversion. The exact function
+names and accepted argument counts are listed in
+[`m_scalar_functions.py`](pbi_usage_analyzer/parsers/m_scalar_functions.py).
+Nested calls retain every argument's column reads. Custom comparers, additional
+culture/rounding options, and shadowed functions remain unsupported.
+
+Filters between a nested join and expansion retain their predicate dependencies.
+A predicate reading the nested value conservatively protects its contents.
 
 ## Next planned improvement
 
-Broaden row-expression support with explicit semantics for common scalar
-functions, then support more transformations between nested joins and expansion.
-Keep adding regression fixtures before reducing conservative protection.
+Support column selection, removal, and renaming between nested joins and
+expansion, tracking the nested column's identity and retaining schema requirements.
 
 ## Development
 
