@@ -408,9 +408,18 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Validate on more real PBIP projects, especially ones with auto-date tables, RLS,
-calculation groups, field parameters and report/page filters (the AdventureWorks
-check covered none of these). Then a thin desktop GUI over `analyze_project()`.
+Build the [bad-practice case study](docs/CASE_STUDY_ADVENTUREWORKS.md) in Power BI
+Desktop, save it as PBIP and score the analyzer against it. Then validate on more
+real projects and plan a thin desktop GUI over `analyze_project()`.
+
+## Case study: AdventureWorks, the inherited mess
+
+`tools/casestudy/adventureworks_mess.py` turns the AdventureWorks course CSVs
+(kept outside the repository) into a deliberately messy multi-source package:
+MariaDB scripts, Excel workbooks, a CSV folder and JSON. The
+[case study guide](docs/CASE_STUDY_ADVENTUREWORKS.md) describes how to build a
+Power BI project full of bad practices from it, with an answer key of what the
+analyzer should report.
 
 ## Development
 

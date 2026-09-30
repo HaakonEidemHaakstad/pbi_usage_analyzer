@@ -67,7 +67,8 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Real project | Latest change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
+| Case study | Latest change: multi-source bad-practice package generator and build guide. Details below. |
+| Real project | Previous change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
 | Report safety net | Previous change: one tighter rule for columns and measures in readable PBIR files. Details below. |
 | Performance | Previous change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
 | Report measures | Previous change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
@@ -76,7 +77,31 @@ then implemented. When asked to proceed, use the next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: first real-project validation (AdventureWorks)
+## Latest change: bad-practice case study sources
+
+- User request (2026-09-30): use the AdventureWorks raw data to assemble a complex
+  bad-practice case with multiple source types for a Power BI case study. Power BI
+  Desktop runs on a **separate Windows PC**; sources chosen: MariaDB, Excel, CSV
+  folder, JSON.
+- `tools/casestudy/adventureworks_mess.py RAW_DIR [--out] [--force]` writes a
+  portable package (default `~/Desktop/AW_case_sources`, outside the repo; the raw
+  data is course material and is not committed). Contents and traps: see
+  docs/CASE_STUDY_ADVENTUREWORKS.md. MariaDB runs on the Windows PC from the SQL
+  scripts; nothing on this host is exposed to the network (Docker is not
+  installed here, and the existing compose file binds to 127.0.0.1).
+- Real data defects found and used: the customer CSV is ISO-8859-1 and ends with
+  junk/footer rows (`30---`, `Export date ...`, `Source ...`); the typed `customers`
+  table keeps only integer keys (then unique), `stg_customers_raw` keeps the junk.
+  `Sales Data/` in the raw folder duplicates the yearly files byte for byte.
+- SQL is verified by executing the generator's SQLite dialect (identical data
+  statements; only DDL/date functions differ) in `tests/test_casestudy_sources.py`,
+  which uses a tiny synthetic raw folder so CI needs no course data. Not verified
+  against a real MariaDB server.
+- The guide's answer key is a prediction. When the user returns the PBIP, derive
+  ground truth independently (as for AdventureWorks), record expectations, and
+  investigate differences. Its "Not yet" items are the health-rule backlog.
+
+## Previous change: first real-project validation (AdventureWorks)
 
 - Project: `~/Desktop/AW` (`AdventureWorks Report.pbip`, user's course material;
   read-only, not in the repo; its M contains the author's local Windows paths).
@@ -313,13 +338,14 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Not started; confirm with the user before beginning. Highest value: **more real
-projects**, especially with auto-date tables (verifies `PropertyVariationSource`),
-RLS, calculation groups, field parameters and report/page filters. Engineering
-candidates found on AdventureWorks: a health rule for DAX references to missing
-objects (`Total Revenue (CC)`); clearer reporting for "referenced only by unused
-objects". The user asked about a GUI: none exists; a thin desktop front end over
-`analyze_project()` is the intended path after more validation.
+Waiting on the user: build the case study in Power BI Desktop (Windows PC) and
+return the PBIP. Then score it (independent ground truth vs analyzer; record
+expectations like `tests/integration/adventureworks_expected.json`). Engineering
+candidates meanwhile, from the answer key's "Not yet" rows: health rules for
+hard-coded paths/URLs in M, loaded staging/per-year queries, hard-coded annual
+appends, text-key relationships, duplicate measures, `Folder.Files` without a
+filter; a rule for DAX references to missing objects (AdventureWorks). GUI: none
+exists; thin desktop front end over `analyze_project()` after more validation.
 
 ## Verification and environment
 
@@ -343,8 +369,8 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 169 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
-  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the real-project fixes).
+- 175 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
+  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the case-study tools).
 - 251 synthetic checks passed across 32 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
