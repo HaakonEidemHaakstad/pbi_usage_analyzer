@@ -1,0 +1,17 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column 'Net Amount'
+        sourceColumn: Net Amount
+    column Region
+        sourceColumn: Region
+    column Code
+        sourceColumn: Code
+    column Year
+        sourceColumn: Year
+    column Notes
+        sourceColumn: Notes
+    column C1
+        sourceColumn: C1
+    column C10
+        sourceColumn: C10

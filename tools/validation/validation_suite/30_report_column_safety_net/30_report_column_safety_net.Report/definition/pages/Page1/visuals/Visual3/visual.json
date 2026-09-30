@@ -1,0 +1,6 @@
+{
+  "binding": {
+    "entity": "Products",
+    "property": "Name"
+  }
+}

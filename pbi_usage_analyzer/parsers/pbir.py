@@ -69,16 +69,16 @@ def _find_refs(obj, mappings: dict[str, str], out: list[tuple[str, str, str]]) -
             _find_refs(value, mappings, out)
 
 
-def _collect_strings(obj, values: list[str]) -> None:
+def _collect_strings(obj, values: list[str], keys: list[str]) -> None:
     if isinstance(obj, str):
         values.append(obj)
     elif isinstance(obj, dict):
         for k, v in obj.items():
-            values.append(str(k))
-            _collect_strings(v, values)
+            keys.append(str(k))
+            _collect_strings(v, values, keys)
     elif isinstance(obj, list):
         for v in obj:
-            _collect_strings(v, values)
+            _collect_strings(v, values, keys)
 
 
 def _unique_fallback(field: str, index: dict[tuple[str, str], ObjectRef]) -> ObjectRef | None:
@@ -105,23 +105,53 @@ def _qualified_field_refs(text: str) -> set[tuple[str, str]]:
     return refs
 
 
-def _measure_hit_files(ref: ObjectRef, file_strings: dict[Path, set[str]],
-                       file_refs: dict[Path, set[tuple[str, str]]], unique_name: bool) -> list[Path]:
-    """Files whose readable JSON credibly references a measure outside parsed nodes.
+UNQUALIFIED_FIELD_TEXT = re.compile(r"(?<![\w'\]])\[((?:[^\]]|\]\])*)\]")
 
-    Measure names are often ordinary words, so substrings are not enough: require
-    `Table.Measure` as a whole string, DAX-style `Table[Measure]` text, or the exact
-    measure name as a whole string when it is unique in the model and the same
-    file names its table.
+
+@dataclass(frozen=True)
+class ReportText:
+    """Casefolded text of one readable report file for the raw safety net."""
+    blob: str                       # string values and keys, newline-joined
+    values: frozenset[str]          # whole string values, stripped
+    qualified: frozenset[tuple[str, str]]  # DAX-style Table[Field] pairs
+    bracketed: frozenset[str]       # unqualified [Field] names
+
+    @classmethod
+    def from_strings(cls, values: list[str], keys: list[str]) -> "ReportText":
+        blob = "\n".join(values + keys).casefold()
+        return cls(blob, frozenset(v.strip().casefold() for v in values), frozenset(_qualified_field_refs(blob)),
+                   frozenset(m.group(1).replace("]]", "]") for m in UNQUALIFIED_FIELD_TEXT.finditer(blob)))
+
+
+def _dotted_occurs(blob: str, needle: str) -> bool:
+    """`Table.Field` in text, not preceded or followed by more identifier text."""
+    start = blob.find(needle)
+    while start >= 0:
+        end = start + len(needle)
+        before = blob[start - 1] if start else " "
+        after = blob[end] if end < len(blob) else " "
+        if not (before.isalnum() or before in "_.") and not (after.isalnum() or after == "_"):
+            return True
+        start = blob.find(needle, start + 1)
+    return False
+
+
+def _readable_hit_files(ref: ObjectRef, texts: dict[Path, ReportText]) -> list[Path]:
+    """Files whose readable JSON credibly references a field outside parsed nodes.
+
+    Names are often ordinary words, so substrings are not evidence. Require a
+    qualified form (`Table.Field` with boundaries, `'Table'[Field]`/`Table[Field]`),
+    or the exact name as a whole string value or unqualified `[Field]` in a file
+    that also has the table name as a whole string value. JSON keys only count
+    within qualified forms.
     """
     table, name = ref.table.casefold(), ref.name.casefold()
-    qualified = f"{table}.{name}"
-    hits = []
-    for path, strings in file_strings.items():
-        if (qualified in strings or (table, name) in file_refs[path]
-                or (unique_name and name in strings and table in strings)):
-            hits.append(path)
-    return hits
+    if not name:
+        return []
+    dotted = f"{table}.{name}"
+    return [path for path, text in texts.items()
+            if (table, name) in text.qualified or _dotted_occurs(text.blob, dotted)
+            or ((name in text.values or name in text.bracketed) and table in text.values)]
 
 
 def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef], measures: dict[tuple[str, str], ObjectRef], hierarchies: dict[tuple[str, str], ObjectRef]) -> ReportParseResult:
@@ -143,9 +173,7 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
 
     accounted_columns: set[ObjectRef] = set()
     accounted_measures: set[ObjectRef] = set()
-    file_strings: dict[Path, set[str]] = {}
-    file_refs: dict[Path, set[tuple[str, str]]] = {}
-    all_json_strings: dict[Path, str] = {}
+    texts: dict[Path, ReportText] = {}
     unreadable_text: dict[Path, str] = {}
 
     for path, scope in files:
@@ -201,53 +229,49 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
                     continue
             result.stale.append({"Type": typ, "Table": table, "Field": field, "Source file": str(path.relative_to(report_folder))})
 
-        strings: list[str] = []
-        _collect_strings(data, strings)
-        all_json_strings[path] = "\n".join(strings).casefold()
-        file_strings[path] = {value.strip().casefold() for value in strings}
-        file_refs[path] = _qualified_field_refs(all_json_strings[path])
+        values: list[str] = []
+        keys: list[str] = []
+        _collect_strings(data, values, keys)
+        texts[path] = ReportText.from_strings(values, keys)
 
-    # Conservative raw-report safety net. Require the field token plus either its table
-    # token or a unique field name. This is intentionally manual-review evidence only.
-    field_counts: dict[str, int] = {}
-    for (_, field), ref in columns.items():
-        field_counts[field] = field_counts.get(field, 0) + 1
-
-    def hit_files(ref: ObjectRef, blobs: dict[Path, str], counts: dict[str, int]) -> list[str]:
+    # Conservative raw-report safety net; manual-review evidence only. Readable files
+    # use the qualified/whole-name rule. Unreadable files have no structure, so their
+    # raw text uses a looser substring rule: field token plus its table token or a
+    # field name unique among fields of that kind.
+    def unreadable_hits(ref: ObjectRef, counts: dict[str, int]) -> list[Path]:
         table_token, field_token = ref.table.casefold(), ref.name.casefold()
         if not field_token:
             return []
-        return [str(path.relative_to(report_folder)) for path, blob in blobs.items()
+        return [path for path, blob in unreadable_text.items()
                 if field_token in blob and (table_token in blob or counts.get(field_token, 0) == 1)]
 
+    def record(ref: ObjectRef, paths: list[Path], reason: str) -> None:
+        files = " | ".join(str(path.relative_to(report_folder)) for path in paths)
+        result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, reason, files, "low"))
+        result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": files})
+
+    column_counts: dict[str, int] = {}
+    for (_, field), ref in columns.items():
+        column_counts[field] = column_counts.get(field, 0) + 1
     for (_, _), ref in columns.items():
         if ref in accounted_columns or is_internal_table(ref.table):
             continue
-        hits = hit_files(ref, {**all_json_strings, **unreadable_text}, field_counts)
+        hits = _readable_hit_files(ref, texts) + unreadable_hits(ref, column_counts)
         if hits:
-            result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Unparsed report reference detected", " | ".join(hits), "low"))
-            result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(hits)})
+            record(ref, hits, "Unparsed report reference detected")
 
-    # Measures: unreadable files have no structure, so their raw text uses the
-    # column rule. Readable files use the stricter measure rule for measures that
-    # structured parsing did not account for.
     measure_counts: dict[str, int] = {}
     for (_, field), ref in measures.items():
         measure_counts[field] = measure_counts.get(field, 0) + 1
     for (_, _), ref in measures.items():
         if is_internal_table(ref.table):
             continue
-        hits = hit_files(ref, unreadable_text, measure_counts)
+        hits = unreadable_hits(ref, measure_counts)
         if hits:
-            result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Reference in unreadable report file", " | ".join(hits), "low"))
-            result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(hits)})
+            record(ref, hits, "Reference in unreadable report file")
         if ref in accounted_measures:
             continue
-        name = ref.name.casefold()
-        unique = measure_counts.get(name, 0) + field_counts.get(name, 0) == 1
-        readable = [str(path.relative_to(report_folder))
-                    for path in _measure_hit_files(ref, file_strings, file_refs, unique)]
-        if readable:
-            result.evidence.append(Evidence(None, ref, EvidenceType.RAW_REPORT_REFERENCE, "Unparsed report measure reference detected", " | ".join(readable), "low"))
-            result.raw_hits.append({"Type": ref.object_type.value, "Table": ref.table, "Field": ref.name, "Source files": " | ".join(readable)})
+        hits = _readable_hit_files(ref, texts)
+        if hits:
+            record(ref, hits, "Unparsed report measure reference detected")
     return result

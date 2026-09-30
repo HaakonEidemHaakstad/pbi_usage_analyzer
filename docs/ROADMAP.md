@@ -138,4 +138,6 @@ DAX name indexes are built once per analysis, masking uses a regex tokenizer and
 the report measure net extracts qualified names once per file: the generated
 3,300-object model went from 5.4 s to about 1 s with identical output.
 Evidence order no longer depends on the hash seed.
-Next: tighten the substring column safety net; validate on a real project.
+The report safety net uses one qualified/whole-name rule for columns and measures
+in readable files (scenario 30); substrings and JSON keys no longer protect columns.
+Next: validate on a real project; then GUI planning.

@@ -9,7 +9,7 @@
     "Measure|Sales|Orphan": "Likely unused",
     "Measure|Sales|Never": "Likely unused",
     "Column|Sales|Amount": "Needs manual review",
-    "Column|Budget|Total": "Needs manual review"
+    "Column|Budget|Total": "Likely unused"
   },
-  "notes": "Unparsed measure references need a qualified form or an exact unique name alongside its table; titles and substrings do not protect measures. Budget[Total] reflects the existing substring-based column net."
+  "notes": "Unparsed measure references need a qualified form, or the exact name alongside its table name; titles and substrings do not protect measures."
 }

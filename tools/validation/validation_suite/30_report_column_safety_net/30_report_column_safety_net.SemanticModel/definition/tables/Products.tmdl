@@ -1,0 +1,3 @@
+table Products
+    column Name
+        sourceColumn: Name

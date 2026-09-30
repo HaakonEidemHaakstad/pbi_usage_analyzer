@@ -1159,7 +1159,7 @@ table Budget
     # None of these are structured PBIR field nodes.
     add_visual(report, "Page1", "Visual1", {"customBinding": {"fieldRef": "Sales.Revenue"}})
     add_visual(report, "Page1", "Visual2", {"custom": {"entity": "Sales", "nativeName": "Gross Margin"}})
-    add_visual(report, "Page1", "Visual3", {"title": "Total", "subtitle": "Revenue Growth rate", "entity": "Sales"})
+    add_visual(report, "Page1", "Visual3", {"title": "Total", "subtitle": "Revenue Growth rate"})
     add_visual(report, "Page1", "Visual4", {"expr": "CALCULATE('Sales'[Bob's Helper])"})
     add_visual(report, "Page1", "Visual5", visual_measure("Sales", "Structured"))
     add_visual(report, "Page1", "Visual6", {"label": "Orphan"})
@@ -1173,8 +1173,57 @@ table Budget
         "Measure|Sales|Orphan": "Likely unused",
         "Measure|Sales|Never": "Likely unused",
         "Column|Sales|Amount": "Needs manual review",
-        "Column|Budget|Total": "Needs manual review",
-    }, "Unparsed measure references need a qualified form or an exact unique name alongside its table; titles and substrings do not protect measures. Budget[Total] reflects the existing substring-based column net.")
+        "Column|Budget|Total": "Likely unused",
+    }, "Unparsed measure references need a qualified form, or the exact name alongside its table name; titles and substrings do not protect measures.")
+
+
+def build_report_column_safety_net(root: Path):
+    name = "30_report_column_safety_net"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column 'Net Amount'
+        sourceColumn: Net Amount
+    column Region
+        sourceColumn: Region
+    column Code
+        sourceColumn: Code
+    column Year
+        sourceColumn: Year
+    column Notes
+        sourceColumn: Notes
+    column C1
+        sourceColumn: C1
+    column C10
+        sourceColumn: C10
+""")
+    for table in ("Products", "Customers"):
+        write(model / "definition" / "tables" / f"{table}.tmdl", f"""
+table {table}
+    column Name
+        sourceColumn: Name
+""")
+    # None of these are structured PBIR field nodes.
+    add_visual(report, "Page1", "Visual1", {"custom": {"queryRef": "Sum(Sales.Net Amount)"}})
+    add_visual(report, "Page1", "Visual2", {"expr": "SUMX(Sales, Sales[Region])"})
+    add_visual(report, "Page1", "Visual3", {"binding": {"entity": "Products", "property": "Name"}})
+    add_visual(report, "Page1", "Visual4", {"visualCalc": "[Code] * 2", "source": {"entity": "Sales"}})
+    add_visual(report, "Page1", "Visual5", {"title": "Year", "entity": "Sales"})
+    add_visual(report, "Page1", "Visual6", {"title": "Notes about C10"})
+    save_expected(p, {
+        "Column|Sales|Net Amount": "Needs manual review",
+        "Column|Sales|Region": "Needs manual review",
+        "Column|Products|Name": "Needs manual review",
+        "Column|Sales|Code": "Needs manual review",
+        "Column|Sales|Year": "Needs manual review",
+        "Column|Sales|Amount": "Likely unused",
+        "Column|Customers|Name": "Likely unused",
+        "Column|Sales|Notes": "Likely unused",
+        "Column|Sales|C1": "Likely unused",
+        "Column|Sales|C10": "Likely unused",
+    }, "Readable report text protects a column only in a qualified form (Table.Column, Table[Column]) or as the exact name or [Name] alongside its table name; substrings, JSON keys and names without their table do not. A title equal to a column name next to its table name still counts.")
 
 
 def main():
@@ -1218,6 +1267,7 @@ def main():
         build_incomplete_sources,
         build_dax_unqualified_columns,
         build_report_measure_safety_net,
+        build_report_column_safety_net,
     ]
     for builder in builders:
         builder(root)

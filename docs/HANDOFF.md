@@ -67,14 +67,41 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Performance | Latest change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
+| Report safety net | Latest change: one tighter rule for columns and measures in readable PBIR files. Details below. |
+| Performance | Previous change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
 | Report measures | Previous change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
 | Unqualified DAX | Previous change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
 | Damaged sources | Previous change: scoped evidence recovery for unreadable/undecodable files. Details below. |
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: performance and determinism
+## Latest change: tighter report safety net for columns
+
+- Old column rule (readable files): column-name substring anywhere in the file's
+  values and keys, plus table-name substring or a unique column name. Observed
+  noise: key `"name"` protected `Customers[Name]` (scenarios 14–17); `t1`/`c1`
+  inside `t10`/`c10` produced 145 hits in the large model; title `Total` protected
+  `Budget[Total]` (scenario 29).
+- New shared rule `_readable_hit_files` (columns and measures) over `ReportText`
+  (blob of values+keys, whole values, DAX-style pairs, unqualified `[Field]` names):
+  `_dotted_occurs` `Table.Field` with identifier boundaries, `'Table'[Field]`, or the
+  exact name as a whole value / `[Field]` when the table name is a whole value in the
+  same file. For measures this replaced "unique name AND table present" with "table
+  present". Unreadable files keep the substring rule.
+- Bug caught during implementation: `before in "_."` is True for an empty string, so
+  a dotted match at the start of the text was rejected; now covered by a unit test.
+- Fixture edit: scenario 29's `Visual3` no longer has `"entity": "Sales"`; with it,
+  the new rule would give `Sales[Total]` manual review (title + table present). The
+  title-plus-table case is recorded explicitly as `Sales[Year]` in scenario 30.
+- Comparison with the previous commit: status changes only `Budget[Total]` (29)
+  Needs manual review -> Likely unused. Raw hits removed in 14–17 (statuses held by M
+  lineage) and 145 in the large model (statuses held by query-level M evidence).
+  New scenario `30_report_column_safety_net`.
+- Risk accepted: a real report that encodes a column only as a substring (e.g.
+  `"Sales Amount"` without a dot or table value) is no longer protected by the net.
+  Validate on real projects.
+
+## Previous change: performance and determinism
 
 - Profiled a generated 3,280-object model (`tools/validation/large_model.py`):
   5.4 s before, about 0.9–1.1 s after. Hotspots fixed:
@@ -253,16 +280,13 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 ## Next planned implementation
 
 Not started; confirm with the user before beginning. Highest value: **validate on a
-real PBIP project** (the user would need to provide one; record expected statuses
-for a sample and investigate every surprise). Engineering candidate: **tighten the
-substring-based column safety net** in `parse_report` (`hit_files`): `field_token in
-blob` matches substrings of any JSON text, so a title `Total` gives unique column
-`Budget[Total]` manual review. Options: whole-string/qualified matching like the
-measure rule, keeping substring matching only for unreadable files. This changes
-existing results (scenario 09 and 29 expectations); every change must be explained,
-and the risk is new false `Likely unused` if real reports encode columns in
-unrecognized substrings. Other candidates: show objects from failed TMDL files;
-TMDL inline-expression continuation.
+real PBIP project** (user must provide one; record expected statuses for a sample,
+investigate every surprise, especially safety-net misses now that substrings no
+longer count). The user asked about a GUI on 2026-09-30: none exists; AGENTS.md
+keeps it a later priority. A thin desktop front end over `analyze_project()` is the
+intended path once real-project validation has stabilized results. Other
+candidates: show objects from failed TMDL files; TMDL inline-expression
+continuation.
 
 ## Verification and environment
 
@@ -286,9 +310,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 160 unit/regression tests passed, 1 opt-in timing test skipped (2026-09-30,
-  after the performance change).
-- 220 synthetic checks passed across 29 scenarios, including JSON schema and
+- 164 unit/regression tests passed, 1 opt-in timing test skipped (2026-09-30,
+  after the safety-net change).
+- 232 synthetic checks passed across 30 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

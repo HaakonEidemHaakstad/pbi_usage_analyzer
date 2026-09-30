@@ -1,0 +1,3 @@
+{
+  "expr": "SUMX(Sales, Sales[Region])"
+}

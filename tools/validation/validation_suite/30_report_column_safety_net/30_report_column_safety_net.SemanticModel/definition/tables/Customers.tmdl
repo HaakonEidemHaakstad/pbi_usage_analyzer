@@ -1,0 +1,3 @@
+table Customers
+    column Name
+        sourceColumn: Name

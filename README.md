@@ -408,9 +408,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Tighten the substring-based column safety net for readable report files. A title
-such as `Total` currently sends a uniquely named column `Budget[Total]` to manual
-review. Validation against a real PBIP project would be the most valuable step.
+Validate against a real PBIP project: record expected statuses for a sample of
+objects and investigate every surprise. After that, a thin desktop GUI over
+`analyze_project()`.
 
 ## Development
 
