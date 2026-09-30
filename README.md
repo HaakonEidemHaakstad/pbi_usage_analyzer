@@ -403,9 +403,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Extend the raw report safety net to measures in readable report files. Measures
-referenced through report structures the structured parser does not recognize
-can currently be reported `Likely unused`.
+Precompute DAX resolution indexes and add a large synthetic performance fixture.
+`dax_dependencies` rescans all columns and measures for each expression, which is
+quadratic in model size.
 
 ## Development
 

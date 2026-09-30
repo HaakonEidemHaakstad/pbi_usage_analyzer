@@ -1135,6 +1135,48 @@ role North
     }, "Unqualified columns bind to a certain row context (calculated column, RLS table); iterator row context is manual review, narrowed by the table argument. RETURN before [Measure] is not a table name.")
 
 
+def build_report_measure_safety_net(root: Path):
+    name = "29_report_measure_safety_net"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    measure Revenue = SUM(Sales[Amount])
+    measure 'Gross Margin' = 1
+    measure Total = 2
+    measure Growth = 3
+    measure 'Bob''s Helper' = 4
+    measure Orphan = 5
+    measure Structured = 6
+    measure Never = 7
+""")
+    write(model / "definition" / "tables" / "Budget.tmdl", """
+table Budget
+    column Total
+        sourceColumn: Total
+""")
+    # None of these are structured PBIR field nodes.
+    add_visual(report, "Page1", "Visual1", {"customBinding": {"fieldRef": "Sales.Revenue"}})
+    add_visual(report, "Page1", "Visual2", {"custom": {"entity": "Sales", "nativeName": "Gross Margin"}})
+    add_visual(report, "Page1", "Visual3", {"title": "Total", "subtitle": "Revenue Growth rate", "entity": "Sales"})
+    add_visual(report, "Page1", "Visual4", {"expr": "CALCULATE('Sales'[Bob's Helper])"})
+    add_visual(report, "Page1", "Visual5", visual_measure("Sales", "Structured"))
+    add_visual(report, "Page1", "Visual6", {"label": "Orphan"})
+    save_expected(p, {
+        "Measure|Sales|Revenue": "Needs manual review",
+        "Measure|Sales|Gross Margin": "Needs manual review",
+        "Measure|Sales|Bob's Helper": "Needs manual review",
+        "Measure|Sales|Structured": "Used",
+        "Measure|Sales|Total": "Likely unused",
+        "Measure|Sales|Growth": "Likely unused",
+        "Measure|Sales|Orphan": "Likely unused",
+        "Measure|Sales|Never": "Likely unused",
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Budget|Total": "Needs manual review",
+    }, "Unparsed measure references need a qualified form or an exact unique name alongside its table; titles and substrings do not protect measures. Budget[Total] reflects the existing substring-based column net.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1175,6 +1217,7 @@ def main():
         build_tmdl_expression_boundaries,
         build_incomplete_sources,
         build_dax_unqualified_columns,
+        build_report_measure_safety_net,
     ]
     for builder in builders:
         builder(root)

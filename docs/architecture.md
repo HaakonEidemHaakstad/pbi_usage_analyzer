@@ -95,6 +95,14 @@ Structured PBIR parsing is preferred.
 
 The raw safety net exists only because Power BI can encode semantic references through structures not yet explicitly supported by the parser. A raw hit is never strong enough by itself to produce `Used`; it produces manual review.
 
+Columns not matched structurally are checked with a substring rule (column name
+plus table name, or a unique column name). Measures not matched structurally use a
+stricter rule because measure names are often ordinary words: a whole JSON string
+`Table.Measure`, DAX-style `'Table'[Measure]`/`Table[Measure]` text, or a whole
+string equal to the measure name when that name is unique among measures and
+columns and the same file contains the table name as a whole string. Substrings
+such as a title `Revenue Growth rate` do not protect `Revenue`.
+
 ## Extension rule
 
 When adding support for a new Power BI construct:

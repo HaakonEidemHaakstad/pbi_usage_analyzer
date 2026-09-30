@@ -132,4 +132,6 @@ DAX references, and BOM/invalid UTF-8 no longer abort or hide files.
 Unqualified DAX columns resolve in certain row contexts (calculated columns, RLS);
 other unqualified columns are manual review (scenario 28). Keywords/variables before
 `[` no longer swallow measure references (`RETURN [Measure]`).
-Next: measure-aware raw report safety net for readable files.
+The report safety net covers measures in readable files with a stricter rule
+(scenario 29).
+Next: precomputed DAX indexes and a large-model performance check.

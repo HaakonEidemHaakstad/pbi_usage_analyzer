@@ -1,0 +1,3 @@
+{
+  "expr": "CALCULATE('Sales'[Bob's Helper])"
+}

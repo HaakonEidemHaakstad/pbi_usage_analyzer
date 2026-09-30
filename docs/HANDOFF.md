@@ -67,12 +67,35 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Unqualified DAX | Latest change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
+| Report measures | Latest change: measure rule in the PBIR raw safety net (`parsers/pbir.py`). Details below. |
+| Unqualified DAX | Previous change: row-context column resolution and keyword-before-bracket fix in `parsers/dax.py`. Details below. |
 | Damaged sources | Previous change: scoped evidence recovery for unreadable/undecodable files. Details below. |
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: unqualified DAX references
+## Latest change: measure-aware report safety net
+
+- Readable PBIR files previously raw-scanned only columns, so a measure referenced
+  through an unrecognized structure (custom bindings, expression strings) was
+  `Likely unused`.
+- `parse_report` now tracks `accounted_measures` (structured or fallback matches)
+  and per-file whole-string sets. Other non-internal measures get
+  `RAW_REPORT_REFERENCE` (manual review) via `_measure_hit_files` when a file has a
+  whole string `table.measure`, DAX-style `'Table'[Measure]`/`Table[Measure]` text
+  (`_qualified_measure_pattern`, escaping `''`/`]]`, word boundary before plain
+  names), or the exact measure name as a whole string when the name is unique among
+  measures+columns and the file has the table name as a whole string.
+- Tests: `tests/test_report_measure_safety_net.py` (failed before the change),
+  scenario `29_report_measure_safety_net`.
+- Comparison: no changes in 01–28. Scenario 29: `Sales[Revenue]`,
+  `Sales[Gross Margin]`, `Sales[Bob's Helper]` Likely unused -> Needs manual review.
+  Title `Total` (name not unique), substring `Revenue Growth rate`, and a bare name
+  in a file without its table do not protect measures.
+- Observed, not changed: the column rule is substring-based, so a title `Total`
+  gives `Budget[Total]` manual review (recorded in scenario 29's expectations).
+  Tightening it would change existing behavior; consider it separately.
+
+## Previous change: unqualified DAX references
 
 - Bug found and fixed: `QUALIFIED_DAX_REF` allows spaces/hyphens in unquoted table
   names and `\s*` spans newlines, so `VAR … RETURN [Margin]`, `Total - [Discount]`,
@@ -205,14 +228,14 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Not started; confirm with the user before beginning. Candidate: **measure-aware
-raw report safety net for readable PBIR files**. The structured parser recognizes
-selected node shapes; the raw net for readable files covers columns only, so a
-measure referenced through an unrecognized structure can be `Likely unused`. Design
-care: measure names are often generic words (`Total`, `Sales`), so require table
-plus measure token co-occurrence or a unique, sufficiently specific name, and keep
-it manual-review evidence. Compare classifications across 01–28 and explain changes.
-Other candidates: precomputed DAX indexes for large models; showing objects from
+Not started; confirm with the user before beginning. Candidate: **precomputed DAX
+indexes and a large-model performance check**. `dax_dependencies` rebuilds the table
+set and scans all measures/columns for every unqualified name in every expression
+(O(objects x expressions)); build name indexes once in `build_graph` and pass them
+in, then add a generated large synthetic model (thousands of columns/measures) with
+a timing check that is not flaky in CI (e.g. a generous bound or opt-in). Behavior
+must be identical: compare classifications and evidence across 01–29.
+Other candidates: tighten the substring-based column safety net; show objects from
 failed TMDL files; TMDL inline-expression continuation; real-project benchmark.
 
 ## Verification and environment
@@ -237,8 +260,8 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 152 unit/regression tests passed (2026-09-30, after unqualified DAX resolution).
-- 208 synthetic checks passed across 28 scenarios, including JSON schema and
+- 156 unit/regression tests passed (2026-09-30, after the report measure net).
+- 220 synthetic checks passed across 29 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

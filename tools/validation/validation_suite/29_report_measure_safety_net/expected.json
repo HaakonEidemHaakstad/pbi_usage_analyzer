@@ -1,0 +1,15 @@
+{
+  "expected_status": {
+    "Measure|Sales|Revenue": "Needs manual review",
+    "Measure|Sales|Gross Margin": "Needs manual review",
+    "Measure|Sales|Bob's Helper": "Needs manual review",
+    "Measure|Sales|Structured": "Used",
+    "Measure|Sales|Total": "Likely unused",
+    "Measure|Sales|Growth": "Likely unused",
+    "Measure|Sales|Orphan": "Likely unused",
+    "Measure|Sales|Never": "Likely unused",
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Budget|Total": "Needs manual review"
+  },
+  "notes": "Unparsed measure references need a qualified form or an exact unique name alongside its table; titles and substrings do not protect measures. Budget[Total] reflects the existing substring-based column net."
+}

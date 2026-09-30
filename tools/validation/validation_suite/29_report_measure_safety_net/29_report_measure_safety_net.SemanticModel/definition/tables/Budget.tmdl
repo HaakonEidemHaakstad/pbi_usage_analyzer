@@ -1,0 +1,3 @@
+table Budget
+    column Total
+        sourceColumn: Total
