@@ -1,0 +1,12 @@
+{
+  "expected_status": {
+    "Column|Combined|Amount": "Used",
+    "Column|Archive|Amount": "Needs manual review",
+    "Column|Archive|Legacy": "Likely unused",
+    "Column|Archive|Unrelated": "Likely unused",
+    "Column|Current|Amount": "Needs manual review",
+    "Column|Current|Legacy": "Likely unused",
+    "Column|Current|Unrelated": "Likely unused"
+  },
+  "notes": "Supported append/remove/select lineage narrows upstream columns without claiming active use. MissingField.Ignore allows the removed column to be absent."
+}

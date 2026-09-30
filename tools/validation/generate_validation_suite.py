@@ -403,6 +403,74 @@ table Sales
     }, "Credible raw report occurrence should trigger manual review, not Used or Likely unused.")
 
 
+
+def build_m_column_lineage(root: Path):
+    name = "10_m_column_lineage"
+    p, report, model = project(root, name)
+    for table in ("Archive", "Current"):
+        write(model / "definition" / "tables" / f"{table}.tmdl", f"""
+table {table}
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    column Legacy
+        sourceColumn: Legacy
+        dataType: string
+    column Unrelated
+        sourceColumn: Unrelated
+        dataType: string
+""")
+    write(model / "definition" / "tables" / "Combined.tmdl", """
+table Combined
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    partition Combined = m
+        source =
+            let
+                Appended = Table.Combine({Archive, Current}),
+                Removed = Table.RemoveColumns(Appended, {"Legacy"}, MissingField.Ignore),
+                Selected = Table.SelectColumns(Removed, {"Amount"})
+            in
+                Selected
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Combined", "Amount"))
+    expected = {"Column|Combined|Amount": "Used"}
+    for table in ("Archive", "Current"):
+        expected.update({f"Column|{table}|Amount": "Needs manual review",
+                         f"Column|{table}|Legacy": "Likely unused",
+                         f"Column|{table}|Unrelated": "Likely unused"})
+    save_expected(p, expected, "Supported append/remove/select lineage narrows upstream columns without claiming active use. MissingField.Ignore allows the removed column to be absent.")
+
+
+def build_m_lineage_fallback(root: Path):
+    name = "11_m_lineage_fallback"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Archive.tmdl", """
+table Archive
+    column Amount
+        sourceColumn: Amount
+    column HiddenInput
+        sourceColumn: HiddenInput
+""")
+    write(model / "definition" / "tables" / "Output.tmdl", """
+table Output
+    column Amount
+        sourceColumn: Amount
+    partition Output = m
+        source =
+            let
+                Selected = Table.SelectColumns(Archive, {"Amount"}),
+                Transformed = CustomFunction(Selected)
+            in
+                Transformed
+""")
+    save_expected(p, {"Column|Archive|Amount": "Needs manual review",
+                      "Column|Archive|HiddenInput": "Needs manual review",
+                      "Column|Output|Amount": "Likely unused"},
+                  "Unsupported expressions must not turn a partial projection into complete lineage.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -424,6 +492,8 @@ def main():
         build_false_m_refs,
         build_autodate_guard,
         build_raw_safety_net,
+        build_m_column_lineage,
+        build_m_lineage_fallback,
     ]
     for builder in builders:
         builder(root)

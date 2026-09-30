@@ -61,7 +61,7 @@ A DAX dependency whose owner is not itself proven used does not automatically ma
 
 ## Power Query
 
-Power Query query lineage is currently query-level.
+Power Query supports bounded column-level lineage with a query-level fallback.
 
 For example:
 
@@ -72,16 +72,16 @@ If this edge is proven from the M partition source, columns in `Ledger 2024` are
 
 This is deliberately conservative because query-level lineage does not prove every upstream column is propagated.
 
-### Planned M column lineage
+### Bounded M column lineage
 
-The next major feature should model schemas through transformations.
+A separate M tokenizer/parser traces symbolic column demands backward through complete supported expressions.
 
 For example:
 
     Source = #"Ledger 2024",
     Selected = Table.SelectColumns(Source, {"Account", "Amount", "Company"})
 
-should eventually create column-level edges only for:
+creates column-level manual-review edges only for:
 
 - Ledger 2024[Account]
 - Ledger 2024[Amount]
@@ -125,5 +125,31 @@ inventing column edges. Do not interpret unprotected columns as safe to delete
 when these warnings are present; inspect the query and relationship evidence.
 Date-like names and data types are not used to guess a backing column.
 Only actual M partitions are parsed for query dependencies; calculated partition
-DAX is not interpreted as M. Ordinary business query dependencies retain the
-existing conservative query-level behavior.
+DAX is not interpreted as M. Ordinary business queries use complete column demands when available and otherwise
+retain conservative query-level behavior.
+
+### Supported M expressions and conservative boundaries
+
+`parsers/m_lineage.py` returns symbolic included/excluded column names and schema
+requirements. It parses named steps, direct query references, nested
+`Table.SelectColumns`, `Table.RemoveColumns`, and `Table.Combine`. Select/remove
+accept literal column lists and optionally `MissingField.Ignore`. Names and
+comments are tokenized separately; local bindings are case-sensitive.
+
+Default select/remove operations retain explicit schema requirements even when
+later steps discard those columns. Requirements are unioned across repeated
+inputs and partitions. No source schema is assumed complete. Graph construction
+maps source names through `sourceColumn`, then emits
+`POWERQUERY_COLUMN_DEPENDENCY` evidence with manual-review semantics.
+
+Every M partition must be supported before an ordinary query's blanket column
+protection is narrowed. Unsupported syntax, unresolved references, cycles, and
+complexity limits return unknown lineage and preserve the query-level fallback.
+An empty proven column demand is distinct from unknown lineage. Query nodes
+remain available for row-level dependencies even when no column is demanded.
+Internal auto-date scope continues to use the separately bounded projection path.
+
+Operation semantics follow Microsoft's documentation:
+[SelectColumns](https://learn.microsoft.com/en-us/powerquery-m/table-selectcolumns),
+[RemoveColumns](https://learn.microsoft.com/en-us/powerquery-m/table-removecolumns),
+and [Combine](https://learn.microsoft.com/en-us/powerquery-m/table-combine).

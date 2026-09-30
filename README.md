@@ -136,9 +136,31 @@ Internal `LocalDateTable_*` and `DateTableTemplate_*` objects are excluded from 
 
 V2 distinguishes query-level lineage from column-level lineage. A query-level dependency from a normal model table currently protects upstream columns conservatively as "Needs manual review." This does not mean that every column is required.
 
+## Column-level Power Query lineage
+
+The analyzer traces source-column requirements through complete expressions using
+`Table.SelectColumns`, `Table.RemoveColumns`, and `Table.Combine`, including named
+steps and nested calls. Column lists must be literal lists. Select/remove support
+an optional `MissingField.Ignore` argument. Requirements from multiple M
+partitions are combined.
+
+Supported expressions narrow upstream protection to output columns and columns
+required by the transformation's schema. For example, default `RemoveColumns`
+still requires the removed column to exist; `MissingField.Ignore` allows it to be
+absent. Column-level evidence remains **Needs manual review**, not proven active
+use. Source names are resolved through TMDL `sourceColumn` metadata.
+
+If any partition uses unsupported syntax, ordinary queries retain conservative
+query-level protection. Internal auto-date queries retain their separate bounded
+scope. This is static analysis, not execution of M or a complete schema inference
+engine.
+
 ## Next planned improvement
 
-The main planned improvement is column-level lineage through Power Query/M. The goal is to understand transformations such as `Table.SelectColumns`, `Table.RemoveColumns`, and `Table.Combine` so the analyzer can determine which upstream columns actually propagate to the result.
+Extend lineage to renaming and type transformations, then joins, filters, and
+computed columns while preserving their operational dependencies. General M
+expressions, dynamic column lists, and connector-specific schemas remain outside
+the current bounded implementation.
 
 ## Development
 

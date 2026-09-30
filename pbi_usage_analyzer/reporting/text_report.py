@@ -50,7 +50,7 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
         for row in ctx.powerquery.dependencies:
             lines.append(f"  - {row['Query']} <- {row['Depends on query']}")
         lines.append("")
-        lines.append("Query-level M dependencies from ordinary model tables conservatively protect upstream columns, but do not prove that every column is required. These columns receive manual-review status rather than 'Used'. Internal auto-date tables protect only specifically identified columns; unresolved references produce warnings.")
+        lines.append("Supported M lineage protects output and required schema columns. Unresolved query-level M dependencies from ordinary model tables conservatively protect upstream columns, but do not prove that every column is required. These columns receive manual-review status rather than 'Used'. Internal auto-date tables protect only specifically identified columns; unresolved references produce warnings.")
 
     if unused_cols:
         lines += ["", "LIKELY UNUSED COLUMNS", sub]

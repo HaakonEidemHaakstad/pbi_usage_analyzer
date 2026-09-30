@@ -17,7 +17,7 @@ Priority:
 - relationship/hierarchy/sort dependencies
 - precise Power Query query dependencies
 - auto-date isolation
-- column-level Power Query lineage
+- extend bounded column-level Power Query lineage beyond select/remove/combine
 - stale/fallback reference handling
 - synthetic regression fixtures
 

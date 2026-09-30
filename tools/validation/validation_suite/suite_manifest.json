@@ -8,7 +8,9 @@
     "06_powerquery_append",
     "07_m_false_positive_guards",
     "08_autodate_scope_guard",
-    "09_raw_report_safety_net"
+    "09_raw_report_safety_net",
+    "10_m_column_lineage",
+    "11_m_lineage_fallback"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

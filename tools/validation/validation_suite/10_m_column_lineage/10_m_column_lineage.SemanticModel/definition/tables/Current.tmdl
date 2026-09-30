@@ -1,0 +1,10 @@
+table Current
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    column Legacy
+        sourceColumn: Legacy
+        dataType: string
+    column Unrelated
+        sourceColumn: Unrelated
+        dataType: string

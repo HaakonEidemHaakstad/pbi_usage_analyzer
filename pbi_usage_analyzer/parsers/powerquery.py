@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import clean_name, norm
+from .m_lineage import ColumnDemand, infer_column_demands
 
 
 @dataclass
@@ -15,6 +16,7 @@ class PowerQueryResult:
     warnings: list[str] = field(default_factory=list)
     # Complete source-name projections for the bounded M shape below.
     projected_columns: dict[tuple[str, str], set[str]] = field(default_factory=dict)
+    column_demands: dict[tuple[str, str], ColumnDemand] = field(default_factory=dict)
 
 
 def _strip_comments_and_strings(text: str) -> str:
@@ -184,8 +186,11 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
         if not owner:
             continue
         sources = _extract_partition_m_sources(text)
-        for source in sources:
-            for dependency in sorted(_find_query_refs(source, owner, model_tables)):
+        inferred = [infer_column_demands(source, model_tables, owner) for source in sources]
+        complete = bool(sources) and all(demands is not None for demands in inferred)
+        for source, demands in zip(sources, inferred):
+            dependencies = demands.keys() if demands is not None else _find_query_refs(source, owner, model_tables)
+            for dependency in sorted(dependencies):
                 owner_ref = ObjectRef(ObjectType.QUERY, owner)
                 dep_ref = ObjectRef(ObjectType.QUERY, dependency)
                 ev = Evidence(owner_ref, dep_ref, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, f"Query '{owner}' references query '{dependency}'", str(path), "high")
@@ -194,4 +199,15 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
                     result.projected_columns[(owner, dependency)] = selected
                 result.evidence.append(ev)
                 result.dependencies.append({"Query": owner, "Depends on query": dependency, "Source file": str(path)})
+                if complete:
+                    key = (owner, dependency)
+                    demand = demands[dependency]
+                    if key in result.column_demands:
+                        demand = result.column_demands[key].union(demand)
+                    result.column_demands[key] = demand
+        if not complete and any(ev.source.table == owner for ev in result.evidence):
+            result.warnings.append(
+                f"Query {owner}: column lineage is incomplete; unsupported M expressions "
+                "retain conservative query-level evidence."
+            )
     return result

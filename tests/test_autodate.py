@@ -92,10 +92,34 @@ class AutoDateTests(unittest.TestCase):
         self.assertEqual(statuses[('Événements', 'Amount')], Status.LIKELY_UNUSED)
         self.assertEqual(statuses[('DateTableTemplate_test', 'Helper')], Status.INTERNAL)
 
-    def test_ordinary_query_keeps_existing_conservative_behavior(self):
+    def test_ordinary_query_uses_complete_column_projection(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
         p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery'))
         _, _, statuses = self.analyze()
+        self.assertEqual(statuses[('Sales', 'Date')], Status.MANUAL_REVIEW)
+        for name in ('Amount', 'Customer'):
+            self.assertEqual(statuses[('Sales', name)], Status.LIKELY_UNUSED)
+
+    def test_business_partitions_union_their_column_requirements(self):
+        p = self.tables / 'LocalDateTable_test.tmdl'
+        p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery') + '''
+    partition extra = m
+        source = Table.SelectColumns(Sales, {"Amount"})
+''')
+        _, _, statuses = self.analyze()
+        for name in ('Date', 'Amount'):
+            self.assertEqual(statuses[('Sales', name)], Status.MANUAL_REVIEW)
+        self.assertEqual(statuses[('Sales', 'Customer')], Status.LIKELY_UNUSED)
+
+    def test_one_unsupported_partition_preserves_business_query_fallback(self):
+        p = self.tables / 'LocalDateTable_test.tmdl'
+        p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery') + '''
+    partition extra = m
+        source = CustomFunction(Sales)
+''')
+        ctx, _, statuses = self.analyze()
+        self.assertFalse(ctx.powerquery.column_demands)
+        self.assertTrue(ctx.warnings)
         for name in ('Date', 'Amount', 'Customer'):
             self.assertEqual(statuses[('Sales', name)], Status.MANUAL_REVIEW)
 

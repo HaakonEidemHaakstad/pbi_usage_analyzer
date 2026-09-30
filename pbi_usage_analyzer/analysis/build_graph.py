@@ -139,8 +139,19 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                             ev.source_file, "medium",
                         ))
             continue
+        demand = pq.column_demands.get((ev.source.table, upstream)) if ev.source else None
         for col in columns_by_table.get(upstream.casefold(), []):
-            ctx.graph.add_evidence(Evidence(ev.source, col, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, f"Upstream query '{upstream}' is referenced by '{ev.source.table if ev.source else ''}'", ev.source_file, "medium"))
+            if demand is not None:
+                source_name = ctx.graph.objects[col].source_column or col.name
+                if not demand.accepts(source_name):
+                    continue
+                ctx.graph.add_evidence(Evidence(
+                    ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,
+                    f"Query {ev.source.table} -> supported M lineage -> {col.label} "
+                    "(output or required schema column)", ev.source_file, "medium",
+                ))
+            else:
+                ctx.graph.add_evidence(Evidence(ev.source, col, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, f"Upstream query '{upstream}' is referenced by '{ev.source.table if ev.source else ''}'", ev.source_file, "medium"))
 
     # Internal objects remain inspectable, separate from business cleanup candidates.
     for ref in ctx.graph.objects:

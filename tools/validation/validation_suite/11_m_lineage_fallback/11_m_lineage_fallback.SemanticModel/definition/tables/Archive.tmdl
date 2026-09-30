@@ -1,0 +1,5 @@
+table Archive
+    column Amount
+        sourceColumn: Amount
+    column HiddenInput
+        sourceColumn: HiddenInput

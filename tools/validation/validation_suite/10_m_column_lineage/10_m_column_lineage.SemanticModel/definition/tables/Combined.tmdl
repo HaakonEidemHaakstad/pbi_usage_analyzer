@@ -1,0 +1,12 @@
+table Combined
+    column Amount
+        sourceColumn: Amount
+        dataType: double
+    partition Combined = m
+        source =
+            let
+                Appended = Table.Combine({Archive, Current}),
+                Removed = Table.RemoveColumns(Appended, {"Legacy"}, MissingField.Ignore),
+                Selected = Table.SelectColumns(Removed, {"Amount"})
+            in
+                Selected

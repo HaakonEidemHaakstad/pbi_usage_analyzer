@@ -1,0 +1,10 @@
+table Output
+    column Amount
+        sourceColumn: Amount
+    partition Output = m
+        source =
+            let
+                Selected = Table.SelectColumns(Archive, {"Amount"}),
+                Transformed = CustomFunction(Selected)
+            in
+                Transformed

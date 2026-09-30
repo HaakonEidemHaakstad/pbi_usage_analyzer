@@ -1,0 +1,8 @@
+{
+  "expected_status": {
+    "Column|Archive|Amount": "Needs manual review",
+    "Column|Archive|HiddenInput": "Needs manual review",
+    "Column|Output|Amount": "Likely unused"
+  },
+  "notes": "Unsupported expressions must not turn a partial projection into complete lineage."
+}
