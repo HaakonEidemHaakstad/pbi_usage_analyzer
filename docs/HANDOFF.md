@@ -24,9 +24,11 @@ service is implemented. Correctness and evidence-based conservatism take priorit
 ## Repository and publication state
 
 - Working location: `/home/haakon/Desktop/pbi_usage_analyzer_ubuntu_agentic`.
-- Origin: `https://github.com/HaakonEidemHaakstad/pbi_usage_analyzer.git`. HTTPS
-  has no stored credentials here; SSH works (`git@github.com:HaakonEidemHaakstad/pbi_usage_analyzer.git`).
-  The configured origin URL was not changed; push/fetch used the SSH URL explicitly.
+- Origin: `https://github.com/HaakonEidemHaakstad/pbi_usage_analyzer.git` (private).
+  Plain HTTPS git has no stored credentials; SSH works
+  (`git@github.com:HaakonEidemHaakstad/pbi_usage_analyzer.git`). The `gh` CLI is
+  installed and authenticated (keyring, git protocol SSH) as of 2026-09-30, so
+  `gh run list` / `gh run view --log` can check CI.
 - 2026-09-30: local and remote histories had identical trees but different commit
   IDs (no merge base; earlier connector-based publication). Local `main` was moved
   onto remote `main` (`5a4e5f9`) with `git reset --soft`, keeping all work, and the
@@ -34,8 +36,9 @@ service is implemented. Correctness and evidence-based conservatism take priorit
   not pushed). All work described here was then committed as one commit on top of
   `5a4e5f9` and pushed as a fast-forward. Check `git log -1` / `git status` for the
   current state.
-- The GitHub workflow is part of that push; its hosted run has not been observed
-  by an agent. Do not claim CI passes remotely without checking.
+- Hosted CI ("Analyzer checks", Python 3.12 / Ubuntu) passed on `75d5132`
+  (run 36768770213): fixtures reproducible, 142 tests, 195 synthetic checks,
+  runtime smoke test. Check `gh run list` for later commits.
 - Follow AGENTS.md: do not commit or push without explicit user instructions. The
   user authorized committing/pushing on 2026-09-30 ("feel free to commit and push
   at your leisure"); treat that as covering routine completed work in this sequence.
@@ -212,8 +215,7 @@ Latest completed implementation checks:
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling.
-- Workflow actionlint validation passed when CI was first introduced; later steps
-  were added. No hosted Actions run has been observed.
+- Hosted GitHub Actions run passed on `75d5132` (2026-09-30).
 - `make check` reports missing Docker. Docker is optional; do not install host
   packages or require it for ordinary tests. No real PBIP accuracy benchmark or
   Power BI refresh verification was completed in this development sequence.

@@ -77,8 +77,8 @@ The synthetic corpus and unit tests establish bounded regression coverage.
 Fixture drift and runtime-only smoke checks improve reproducibility. They do not
 substitute for a varied real-world corpus reviewed in Power BI. The current
 validation work has not established representative real-project accuracy or
-large-model performance. A configured GitHub workflow is not evidence of a
-successful hosted run until it is published and observed.
+large-model performance. Hosted CI runs the same checks on Ubuntu; a passing run
+shows the synthetic suite is reproducible, not that real-project results are accurate.
 
 Basic RLS, calculation-item and field-parameter fixtures now check positive
 references and evidence provenance. Special-expression negative cases now cover comments, strings and unrelated
