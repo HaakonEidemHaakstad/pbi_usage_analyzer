@@ -354,6 +354,11 @@ participate in dependency evidence or cleanup classification.
 
 Reference: [TMDL descriptions](https://learn.microsoft.com/en-us/analysis-services/tmdl/tmdl-overview#descriptions).
 
+`DAX_REFERENCE_UNRESOLVED` uses `parsers.dax.unresolved_references` with a
+`DaxIndex` built from the model objects, so it applies the same masking and
+qualified-table rules as dependency extraction. Columns now record `source_line`
+like measures, so findings and JSON exports locate calculated columns.
+
 ### Health finding filters
 
 The health engine has one explicit registry of stable IDs, evaluators and input

@@ -3,13 +3,15 @@ from collections.abc import Iterable
 from ..model import ModelObject
 from ..parsers.relationships import Relationship
 from .model import HealthFinding
-from .rules import bidirectional_relationships, many_to_many_relationships, missing_measure_descriptions
+from .rules import (bidirectional_relationships, many_to_many_relationships, missing_measure_descriptions,
+                    unresolved_dax_references)
 
 
 RULES = (
     ("RELATIONSHIP_BIDIRECTIONAL", bidirectional_relationships, "relationships"),
     ("RELATIONSHIP_MANY_TO_MANY", many_to_many_relationships, "relationships"),
     ("MEASURE_DESCRIPTION_MISSING", missing_measure_descriptions, "objects"),
+    ("DAX_REFERENCE_UNRESOLVED", unresolved_dax_references, "objects"),
 )
 
 

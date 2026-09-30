@@ -21,6 +21,11 @@ class AdventureWorksIntegrationTests(unittest.TestCase):
         actual = {f'{f.ref.object_type.value}|{f.ref.table}|{f.ref.name}': f.status.value for f in result.findings}
         self.assertEqual(actual, expected['expected_status'])
         self.assertEqual([d.code for d in result.diagnostics], expected['expected_diagnostics'])
+        # Every rule except documentation opportunities, which fire on all 24 measures.
+        actual_findings = [{'rule_id': f.rule_id, 'scope': f.scope} for f in result.health_findings
+                           if f.rule_id != 'MEASURE_DESCRIPTION_MISSING']
+        self.assertEqual(actual_findings, [{k: v for k, v in f.items() if k != 'note'}
+                                           for f in expected['expected_findings']])
 
 
 if __name__ == '__main__':

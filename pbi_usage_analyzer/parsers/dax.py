@@ -138,3 +138,30 @@ def dax_dependencies(owner: ObjectRef, expression: str, columns: dict[tuple[str,
                                      f"Unqualified [{field}] in {owner.label}; row context not resolved",
                                      confidence="low"))
     return evidence
+
+
+def unresolved_references(expression: str, index: DaxIndex) -> list[tuple[str, str, bool]]:
+    """Qualified references that name no column or measure in the model.
+
+    Returns ``(table, field, table_known)`` in order of appearance, without
+    duplicates. Strings and comments are masked. An unquoted word before ``[``
+    counts only when it names a known table (it may be ``RETURN`` or a variable);
+    a quoted table always counts. Unqualified names are not checked because they
+    may be virtual columns (``ADDCOLUMNS``) that static parsing cannot see.
+    """
+    if not expression:
+        return []
+    expression = mask_dax(expression, keep_unterminated=True).text
+    found: list[tuple[str, str, bool]] = []
+    for match in QUALIFIED_DAX_REF.finditer(expression):
+        table = _qualified_table(match, index.tables)
+        if table is None:
+            continue
+        field = _field_name(match.group("field"))
+        key = norm_key(table, field)
+        if key in index.columns or key in index.measures:
+            continue
+        item = (table, field, table.casefold() in index.tables)
+        if item not in found:
+            found.append(item)
+    return found

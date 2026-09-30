@@ -1346,6 +1346,48 @@ table Returns
     }, "M is case-sensitive: type keywords and library identifiers must not create a dependency on a query named Date (found in a real project).")
 
 
+def build_dax_unresolved_references(root: Path):
+    name = "33_dax_unresolved_references"
+    p, report, model = project(root, name)
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column 'Bad Calc' = Sales[Nope] * 2
+    /// Valid; case differs from the table name.
+    measure Good = SUM('SALES'[amount])
+    /// Column was renamed away.
+    measure Stale = SUM('Sales'[Revenue]) + [Good]
+    /// Table does not exist in the model.
+    measure 'Missing Table' = SUM('Old Sales'[Amount])
+    /// Keyword before a bracket, a comment and a string are not references.
+    measure Clean = ```
+            VAR x = 1
+            RETURN [Good] + x // 'Sales'[Ghost]
+                & "Sales[Ghost]"
+            ```
+    /// Unqualified names may be ADDCOLUMNS extension columns; not checked.
+    measure Unqualified = SUMX(ADDCOLUMNS(Sales, "Rev", 1), [Rev])
+""")
+    save_expected(p, {
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Sales|Bad Calc": "Likely unused",
+        "Measure|Sales|Good": "Needs manual review",
+        "Measure|Sales|Stale": "Likely unused",
+        "Measure|Sales|Missing Table": "Likely unused",
+        "Measure|Sales|Clean": "Likely unused",
+        "Measure|Sales|Unqualified": "Likely unused",
+    }, "Qualified DAX references to a missing column/measure or a missing quoted table are reported; comments, strings, keywords and unqualified names are not.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "DAX_REFERENCE_UNRESOLVED", "scope": "Sales[Bad Calc]"},
+        {"rule_id": "DAX_REFERENCE_UNRESOLVED", "scope": "Sales[Stale]"},
+        {"rule_id": "DAX_REFERENCE_UNRESOLVED", "scope": "Sales[Missing Table]"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1390,6 +1432,7 @@ def main():
         build_report_column_safety_net,
         build_pbir_entity_refs,
         build_m_case_sensitive_refs,
+        build_dax_unresolved_references,
     ]
     for builder in builders:
         builder(root)

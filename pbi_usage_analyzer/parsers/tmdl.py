@@ -178,6 +178,7 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, tup
                 source_column=source_column,
                 data_type=data_type,
                 expression=expression,
+                source_line=i + 1,
                 sort_by_column=sort_by,
             ))
             i = next_i

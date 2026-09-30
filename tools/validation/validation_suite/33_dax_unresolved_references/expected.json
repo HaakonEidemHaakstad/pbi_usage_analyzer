@@ -1,0 +1,26 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Sales|Bad Calc": "Likely unused",
+    "Measure|Sales|Good": "Needs manual review",
+    "Measure|Sales|Stale": "Likely unused",
+    "Measure|Sales|Missing Table": "Likely unused",
+    "Measure|Sales|Clean": "Likely unused",
+    "Measure|Sales|Unqualified": "Likely unused"
+  },
+  "notes": "Qualified DAX references to a missing column/measure or a missing quoted table are reported; comments, strings, keywords and unqualified names are not.",
+  "expected_health": [
+    {
+      "rule_id": "DAX_REFERENCE_UNRESOLVED",
+      "scope": "Sales[Bad Calc]"
+    },
+    {
+      "rule_id": "DAX_REFERENCE_UNRESOLVED",
+      "scope": "Sales[Stale]"
+    },
+    {
+      "rule_id": "DAX_REFERENCE_UNRESOLVED",
+      "scope": "Sales[Missing Table]"
+    }
+  ]
+}

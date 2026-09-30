@@ -67,7 +67,8 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Case study | Latest change: multi-source bad-practice package generator and build guide. Details below. |
+| DAX health rule | Latest change: `DAX_REFERENCE_UNRESOLVED`. Details below. |
+| Case study | Previous change: multi-source bad-practice package generator and build guide. Details below. |
 | Real project | Previous change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
 | Report safety net | Previous change: one tighter rule for columns and measures in readable PBIR files. Details below. |
 | Performance | Previous change: DAX indexes, regex masker, per-file report extraction, determinism fix, `make benchmark`. Details below. |
@@ -77,7 +78,20 @@ then implemented. When asked to proceed, use the next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: bad-practice case study sources
+## Latest change: unresolved DAX reference rule
+
+- `DAX_REFERENCE_UNRESOLVED` (warning, category `dax`) in `health/rules.py`, via
+  `parsers.dax.unresolved_references(expression, index)`. Checks qualified
+  references in measures and calculated columns only; high confidence when the
+  table exists, medium for a quoted table absent from the parsed model; unquoted
+  unknown words (`RETURN`, variables) and unqualified names are skipped.
+- TMDL columns now record `source_line` (JSON exports gain column line numbers).
+- Fires only on the intended scenario-33 cases and on AdventureWorks
+  `Total Revenue (CC)`; none in the other 32 scenarios or the large model. The
+  AdventureWorks integration test now also pins non-documentation health findings.
+- Not covered: calculation items, RLS and field-parameter expressions.
+
+## Previous change: bad-practice case study sources
 
 - User request (2026-09-30): use the AdventureWorks raw data to assemble a complex
   bad-practice case with multiple source types for a Power BI case study. Power BI
@@ -341,10 +355,10 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 Waiting on the user: build the case study in Power BI Desktop (Windows PC) and
 return the PBIP. Then score it (independent ground truth vs analyzer; record
 expectations like `tests/integration/adventureworks_expected.json`). Engineering
-candidates meanwhile, from the answer key's "Not yet" rows: health rules for
-hard-coded paths/URLs in M, loaded staging/per-year queries, hard-coded annual
-appends, text-key relationships, duplicate measures, `Folder.Files` without a
-filter; a rule for DAX references to missing objects (AdventureWorks). GUI: none
+candidates meanwhile, from the answer key's "Not yet" rows. Next: hard-coded paths
+in M, which needs parsing of shared queries in `expressions.tmdl` (currently not
+read at all). Then loaded staging/per-year queries, hard-coded annual appends,
+text-key relationships, duplicate measures, `Folder.Files` without a filter. GUI: none
 exists; thin desktop front end over `analyze_project()` after more validation.
 
 ## Verification and environment
@@ -369,9 +383,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 175 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
-  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the case-study tools).
-- 251 synthetic checks passed across 32 scenarios, including JSON schema and
+- 177 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
+  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the DAX reference rule).
+- 261 synthetic checks passed across 33 scenarios, including JSON schema and
   export consistency validation.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

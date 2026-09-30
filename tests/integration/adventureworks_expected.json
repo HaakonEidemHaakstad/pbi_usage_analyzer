@@ -118,5 +118,12 @@
     "Measure|Measure Table|Total Cost": "Referenced only by DAX of objects that are themselves not used",
     "Measure|Measure Table|Total Customers": "Referenced only by DAX of objects that are themselves not used"
   },
-  "expected_diagnostics": []
+  "expected_diagnostics": [],
+  "expected_findings": [
+    {
+      "rule_id": "DAX_REFERENCE_UNRESOLVED",
+      "scope": "Measure Table[Total Revenue (CC)]",
+      "note": "References 'Sales data'[Revenue], which does not exist"
+    }
+  ]
 }

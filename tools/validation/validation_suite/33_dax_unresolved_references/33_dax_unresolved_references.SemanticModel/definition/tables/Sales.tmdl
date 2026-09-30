@@ -1,0 +1,18 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column 'Bad Calc' = Sales[Nope] * 2
+    /// Valid; case differs from the table name.
+    measure Good = SUM('SALES'[amount])
+    /// Column was renamed away.
+    measure Stale = SUM('Sales'[Revenue]) + [Good]
+    /// Table does not exist in the model.
+    measure 'Missing Table' = SUM('Old Sales'[Amount])
+    /// Keyword before a bracket, a comment and a string are not references.
+    measure Clean = ```
+            VAR x = 1
+            RETURN [Good] + x // 'Sales'[Ghost]
+                & "Sales[Ghost]"
+            ```
+    /// Unqualified names may be ADDCOLUMNS extension columns; not checked.
+    measure Unqualified = SUMX(ADDCOLUMNS(Sales, "Rev", 1), [Rev])

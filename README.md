@@ -247,6 +247,14 @@ TMDL `///` description lines, including multiline descriptions. Internal auto-da
 measures and uncertain alternate description syntax are skipped. The finding
 does not imply an incorrect calculation or change cleanup status.
 
+`DAX_REFERENCE_UNRESOLVED` warns when a measure or calculated column references
+a column or measure that does not exist, such as `SUM('Sales'[Revenue])` after the
+column was renamed. Power BI shows an error wherever that expression is used.
+Only qualified references are checked, after masking strings and comments;
+unqualified names may be virtual columns and are skipped. A quoted table missing
+from the parsed model gives medium confidence, since its file may have failed to
+parse.
+
 ## Filtering model-health findings
 
 ```bash

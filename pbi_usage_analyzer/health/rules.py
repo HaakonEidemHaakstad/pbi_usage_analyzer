@@ -1,6 +1,8 @@
 from collections.abc import Iterable
 
 from ..model import ModelObject, ObjectType
+from ..parsers.dax import DaxIndex, unresolved_references
+from ..util import norm_key
 from ..util import is_internal_table
 from ..parsers.relationships import Relationship
 from .model import HealthFinding, HealthSeverity
@@ -84,6 +86,45 @@ def missing_measure_descriptions(objects: Iterable[ModelObject]) -> list[HealthF
             recommendation="Add a description immediately above the measure using TMDL /// lines. "
                            "Explain its business meaning, units, and relevant filter or time assumptions. "
                            "Prioritize measures that other model authors or report users need to understand.",
+            source_file=obj.source_file, line=obj.source_line,
+        ))
+    return findings
+
+
+def unresolved_dax_references(objects: Iterable[ModelObject]) -> list[HealthFinding]:
+    objects = tuple(objects)
+    columns = {norm_key(o.ref.table, o.ref.name): o.ref for o in objects if o.ref.object_type == ObjectType.COLUMN}
+    measures = {norm_key(o.ref.table, o.ref.name): o.ref for o in objects if o.ref.object_type == ObjectType.MEASURE}
+    index = DaxIndex.build(columns, measures)
+    findings = []
+    for obj in objects:
+        if obj.ref.object_type not in {ObjectType.COLUMN, ObjectType.MEASURE} or not obj.expression:
+            continue
+        # Findings need a source location; TMDL-parsed objects always have one.
+        if is_internal_table(obj.ref.table) or obj.source_line is None:
+            continue
+        missing = unresolved_references(obj.expression, index)
+        if not missing:
+            continue
+        evidence = tuple(
+            f"'{table}'[{field}]: " + (f"table {table} has no column or measure named {field}" if known
+                                       else f"no table named {table} in the parsed model")
+            for table, field, known in missing)
+        kind = "measure" if obj.ref.object_type == ObjectType.MEASURE else "calculated column"
+        findings.append(HealthFinding(
+            rule_id="DAX_REFERENCE_UNRESOLVED", category="dax",
+            severity=HealthSeverity.WARNING,
+            # A missing table may be one whose TMDL file could not be parsed.
+            confidence="high" if all(known for _, _, known in missing) else "medium",
+            scope=obj.ref.label,
+            title=f"Fix references to missing model objects in this {kind}",
+            explanation=f"This {kind} references model objects that do not exist in the parsed model. "
+                        "Power BI reports an error when it evaluates such an expression, so visuals "
+                        "using it show errors. This often follows a renamed or removed column.",
+            evidence=evidence,
+            recommendation="Update the reference to the current column or measure name, or remove the "
+                           f"{kind} if it is no longer needed. If the referenced table exists but was not "
+                           "parsed (see diagnostics), resolve that first and re-run the analysis.",
             source_file=obj.source_file, line=obj.source_line,
         ))
     return findings
