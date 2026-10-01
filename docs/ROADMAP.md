@@ -155,5 +155,9 @@ inputs and year-named append inputs (scenario 35).
 `RELATIONSHIP_TEXT_KEY` notes relationships on text columns (scenario 39).
 The answer key's statically detectable items are now covered; the remainder needs
 data access or name heuristics.
-Next: build the case study in Power BI Desktop and score the analyzer; then GUI
-planning over `analyze_project()`.
+A good-practice twin (same data and report, built well; docs/CASE_STUDY_GOOD_TWIN.md)
+measures specificity: its answer key expects silence, including on look-alikes of
+bad practices. Both models have a click-by-click guide (docs/CASE_STUDY_BUILD_GUIDE.md).
+Next: build both case studies in Power BI Desktop and score the analyzer
+(sensitivity on the mess, specificity on the twin); then GUI planning over
+`analyze_project()`.

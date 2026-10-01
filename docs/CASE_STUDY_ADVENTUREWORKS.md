@@ -8,7 +8,7 @@ scored test case for the analyzer: every bad practice has an ID, and the
 Build it faithfully, including the mistakes. If you deviate, note it; the answer
 key is re-derived from the saved files anyway, but deviations explain surprises.
 
-## 1. Generate the source package (Ubuntu)
+## 1. Generate the source package
 
 The raw data is course material and is not in this repository.
 
@@ -38,18 +38,19 @@ in section 2, step 1):
 
 ## 2. Prepare the Windows PC
 
-1. Copy the whole package to `C:\AWCase` (the steps below hard-code that path;
+Click-by-click instructions for this section and for building the model and
+report: [build guide](CASE_STUDY_BUILD_GUIDE.md) (Parts A and B).
+
+1. The package must be at `C:\AWCase` (the steps below hard-code that path;
    that is bad practice BP-11).
 2. Install MariaDB Server and load the database:
    `mysql -u root -p < mariadb\01_schema.sql`, then `02_data.sql`, then `03_views.sql`.
 3. Create a read-only login for Power BI (choose your own password):
    `CREATE USER 'pbi_reader'@'localhost' IDENTIFIED BY '...'; GRANT SELECT ON aw_ops.* TO 'pbi_reader'@'localhost';`
-4. Install the 64-bit MariaDB Connector/ODBC, which Power BI's MariaDB connector
-   uses (check Microsoft's current connector documentation if it asks for another
-   driver).
-5. In Power BI Desktop, *Options → Preview features*: make sure projects are saved
-   with **TMDL** and **PBIR** (the enhanced report format), if those are still
-   options in your version.
+4. Install the 64-bit MariaDB Connector/ODBC **3.1.x** (3.1.10 or later); Power
+   BI's MariaDB connector looks for the driver named "MariaDB ODBC 3.1 Driver".
+5. Current Power BI Desktop saves PBIP with PBIR by default; check after saving
+   that the semantic model folder contains `definition\tables\*.tmdl` (TMDL).
 6. *Options → Current file → Data load*: leave **Auto date/time** switched on (BP-09).
 
 ## 3. Power Query (Get Data)
@@ -123,8 +124,9 @@ Return Rate = DIVIDE([Total Returns], SUM(Sales[OrderQuantity]))
 **Calculated column** in `customers` (BP-12, belongs in Power Query):
 `Age = DATEDIFF(customers[birth_date], TODAY(), YEAR)`
 
-**Calculation group** `Time Calc` with column `Calculation` and items:
-`Current = SELECTEDMEASURE()` and `YTD = CALCULATE(SELECTEDMEASURE(), DATESYTD(Calendar[Date]))`.
+No calculation group here: creating one forces *Discourage implicit measures* on,
+which would prevent the deliberate implicit-measure card on the Overview page.
+The [good twin](CASE_STUDY_GOOD_TWIN.md) covers calculation groups.
 
 **Field parameter** `Metric Selector` (*Modeling → New parameter → Fields*) with
 `Total Revenue` and `Total Orders`.
@@ -140,16 +142,16 @@ Return Rate = DIVIDE([Total Returns], SUM(Sales[OrderQuantity]))
 | Products | Matrix rows `Categories[CategoryName]` → `Subcategories[SubcategoryName]` → `Products[Product Name]`, values `Total Revenue`; background conditional formatting by `Return Rate`; visual-level filter `Products[Colour]` | Field used only in formatting; field used only in a filter |
 | Customers | Table `customers[first_name]`, `customers[last_name]`, `customers[occupation]`; set as **drillthrough** on `customers[occupation]` | Drillthrough field |
 | Return tooltip | Page type *Tooltip*; card `Return Rate`; assign it as the tooltip of the Products matrix | Tooltip page |
-| Metrics | Slicer on `Metric Selector`; column chart of `Metric Selector` by `Calendar[Month Name]`; apply `Time Calc` as a slicer | Field parameter; calculation group; sort-by |
+| Metrics | Slicer on `Metric Selector`; column chart of `Metric Selector` by `Calendar[Month Name]` | Field parameter; sort-by |
 | Old analysis | Table of `v_sales_report[product_name]` and `v_sales_report[region]`, plus `Revenue (view)`; then **hide the page** | Hidden page still counts |
 
 Also add a **page-level filter** on Overview: `Categories[CategoryName]` is not
 `Components`, and a **report-level filter** `territories[continent]` (all selected).
 Create one bookmark that hides the implicit-measure card.
 
-Finally, *File → Save as* **Power BI project (.pbip)**, e.g. `C:\AWCase\pbip\AW Mess.pbip`,
-and copy the whole `pbip` folder back to Ubuntu (for example `~/Desktop/AW_case_pbip`).
-The analyzer and an independent review will then produce the actual answer key.
+Finally, *File → Save as* **Power BI project (.pbip)** as `C:\AWCase\pbip\AW Mess.pbip`
+(not inside OneDrive). The analyzer and an independent review will then produce
+the actual answer key.
 
 ## Answer key
 

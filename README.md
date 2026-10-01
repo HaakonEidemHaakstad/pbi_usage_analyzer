@@ -459,18 +459,26 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Build the [bad-practice case study](docs/CASE_STUDY_ADVENTUREWORKS.md) in Power BI
-Desktop, save it as PBIP and score the analyzer against it. Then validate on more
-real projects and plan a thin desktop GUI over `analyze_project()`.
+Build both AdventureWorks case studies in Power BI Desktop, save them as PBIP and
+score the analyzer against them. Then validate on more real projects and plan a
+thin desktop GUI over `analyze_project()`.
 
-## Case study: AdventureWorks, the inherited mess
+## Case studies: AdventureWorks, mess and good twin
 
-`tools/casestudy/adventureworks_mess.py` turns the AdventureWorks course CSVs
-(kept outside the repository) into a deliberately messy multi-source package:
-MariaDB scripts, Excel workbooks, a CSV folder and JSON. The
-[case study guide](docs/CASE_STUDY_ADVENTUREWORKS.md) describes how to build a
-Power BI project full of bad practices from it, with an answer key of what the
-analyzer should report.
+Two Power BI projects built from the same AdventureWorks course CSVs (kept outside
+the repository), as scored test cases:
+
+- **The inherited mess**: `tools/casestudy/adventureworks_mess.py` writes a
+  deliberately messy multi-source package (MariaDB scripts, Excel workbooks, a
+  CSV folder, JSON). [Specification and answer key](docs/CASE_STUDY_ADVENTUREWORKS.md):
+  what the analyzer should report for each bad practice.
+- **The good twin**: `tools/casestudy/adventureworks_good.py` writes the same data
+  as a clean warehouse, tidy Excel tables, a filtered folder and one JSON source.
+  [Specification and answer key](docs/CASE_STUDY_GOOD_TWIN.md): the analyzer
+  should stay silent, including on good practices that resemble bad ones.
+
+The [build guide](docs/CASE_STUDY_BUILD_GUIDE.md) gives click-by-click Power BI
+Desktop instructions for both on Windows.
 
 ## Development
 

@@ -73,9 +73,10 @@ Windows machine state (verified 2026-10-01):
   `$env:PBI_AW_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW"`; it passes.
 - No `make`; Docker not checked. Symlinks need Developer Mode/admin, so
   `test_symlinks_are_rejected` now skips when the OS refuses (CI still runs it).
-- Case-study source package generated on 2026-10-01 directly into `C:\AWCase` (the
-  path the guide's M steps use). MariaDB is not installed yet; the user builds the
-  PBIP in Power BI Desktop.
+- Case-study source packages generated on 2026-10-01: mess in `C:\AWCase` (the path
+  its M steps hard-code), good twin in `C:\AWGood`. MariaDB is not installed yet;
+  the user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md and saves them to
+  `C:\AWCase\pbip\AW Mess.pbip` and `C:\AWGood\pbip\AW Good.pbip`.
 - Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
 
@@ -85,7 +86,8 @@ generate the case-study package and start the folder-source rule; then "proceed"
 three times (duplicate measures, local servers, text keys). Done: Windows
 verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`,
 `MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_LOCAL_SERVER`, `RELATIONSHIP_TEXT_KEY`.
-The case study's statically detectable backlog is now exhausted.
+The case study's statically detectable backlog is now exhausted. Then: agreed to
+add a good-practice twin case study and detailed Power BI build instructions (done).
 
 ## Implemented work in the current tree
 
@@ -105,7 +107,8 @@ The case study's statically detectable backlog is now exhausted.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Text keys | Latest change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
+| Good twin | Latest change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
+| Text keys | Previous change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
 | Local servers | Previous change: `LOCAL_SERVER` pattern and `POWERQUERY_LOCAL_SERVER` in `health/rules.py`. Details below. |
 | Duplicate measures | Previous change: `normalize_dax` in `parsers/dax_lexer.py`; `MEASURE_DUPLICATE_EXPRESSION`. Details below. |
 | Folder rule | Previous change: `folder_listing` in `parsers/m_queries.py`; `POWERQUERY_FOLDER_UNFILTERED`. Details below. |
@@ -123,7 +126,38 @@ The case study's statically detectable backlog is now exhausted.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: text-key relationships (2026-10-01)
+## Latest change: good-twin case study and build guide (2026-10-01)
+
+- Rationale (agreed with the user): the mess case measures sensitivity only; a
+  clean model on the same data measures specificity (false positives, the costlier
+  error per AGENTS.md). Pairing means each difference maps to one practice.
+- `tools/casestudy/adventureworks_good.py RAW_DIR [--out] [--force]` (default
+  `C:\AWGood` on Windows): MariaDB `aw_dw` (`fact_sales` all years with composite
+  PK, `dim_customer`, `dim_territory`, PascalCase, integer keys), Excel tables
+  `Products`/`Subcategories`, `csv/returns/returns_YYYY.csv` + `README.txt` (the
+  folder query must filter), `csv/calendar.csv`, `json/categories.json`. Reuses
+  `load_raw`/`sql_literal` from the mess generator. Raises if
+  OrderNumber+OrderLineItem is not unique (holds on the real data: 56,046 rows).
+  Tests: `tests/test_casestudy_good_sources.py` (SQLite execution, PKs, Excel
+  tables, folder contents).
+- docs/CASE_STUDY_GOOD_TWIN.md: model/report spec, look-alikes GP-01..GP-09 with
+  must-not-fire rules, predicted answer key (all Used, no health findings; calc
+  group/field parameter extra columns uncertain), comparison with BP-xx.
+- docs/CASE_STUDY_BUILD_GUIDE.md: Parts A (MariaDB 12.3 LTS MSI, loading SQL from
+  the MariaDB command prompt, `pbi_reader`, Connector/ODBC **3.1.x** because Power
+  BI's connector looks for "MariaDB ODBC 3.1 Driver"), B (mess), C (good twin,
+  parameters `SourceFolder`/`DbServer`/`DbName`, filter-before-combine folder flow,
+  edit `Sample File` too), D (check TMDL/PBIR folders, NOTES.txt, report paths).
+  Facts researched 2026-10-01: PBIR is GA/default; TMDL likely default (checked in
+  Part D); calculation groups force *Discourage implicit measures*.
+- Mess-case change: its calculation group was removed (it would block the
+  deliberate implicit-measure card); the twin covers calculation groups.
+- Unverified until the PBIPs exist: exact M from the MariaDB connector
+  (`MariaDB.Contents(server, db)` expected), helper-query load state, columns
+  added to calc-group/field-parameter tables. A synthetic model mimicking the
+  guide's edited M gave no Power Query findings.
+
+## Previous change: text-key relationships (2026-10-01)
 
 - `health/engine.py`: the third registry element is now a tuple of input names
   passed positionally (`("relationships", "objects")` etc.); CLI/filter code only
@@ -531,10 +565,14 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Waiting on the user: install MariaDB, load `C:\AWCase\mariadb\*.sql`, build the case
-study in Power BI Desktop per docs/CASE_STUDY_ADVENTUREWORKS.md and save the PBIP.
-Then score it (independent ground truth vs analyzer; record expectations like
-`tests/integration/adventureworks_expected.json`). Engineering candidates
+Waiting on the user: build both case studies per docs/CASE_STUDY_BUILD_GUIDE.md
+(MariaDB setup, AW Mess, AW Good) and report the two PBIP paths. Then for each:
+check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
+independently (subagent without analyzer output), run the analyzer, record
+expectations like `tests/integration/adventureworks_expected.json` (optional env
+var tests), and investigate every difference. For the good twin, any
+`Likely unused` on a used object or any health finding on a look-alike is a
+false-positive bug: reduce it to a synthetic fixture first. Engineering candidates
 meanwhile: the answer key's statically detectable rows are all covered. Remaining
 gaps need data access (encoding, totals rows, folder duplicates) or name
 heuristics (`stg_*` staging). Recommended next engineering step: GUI planning
