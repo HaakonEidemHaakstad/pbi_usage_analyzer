@@ -56,6 +56,59 @@ def mask_dax(expression: str, *, keep_unterminated: bool = False) -> MaskedDax:
     return MaskedDax("".join(pieces))
 
 
+_SIMPLE_TABLE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_SPACE_BY_SYMBOL = re.compile(r" (?=\W)|(?<=\W) ")
+
+
+def _normalize_plain(text: str) -> str:
+    text = " ".join(text.split()).casefold()
+    return _SPACE_BY_SYMBOL.sub("", text)
+
+
+def normalize_dax(expression: str) -> str | None:
+    """Comparison key for DAX that differs only lexically, or None if unterminated.
+
+    Comments are removed, whitespace is collapsed, and keywords, functions and
+    object names compare case-insensitively (as DAX resolves them); `'Sales'`
+    equals `Sales`. String literals stay exact.
+    """
+    parts: list[str] = []
+    plain: list[str] = []
+    position = 0
+
+    def flush():
+        parts.append(_normalize_plain("".join(plain)))
+        plain.clear()
+
+    for match in _TOKEN.finditer(expression):
+        plain.append(expression[position:match.start()])
+        position = match.end()
+        token = match.group()
+        kind = match.lastgroup
+        if kind in {"line", "block"}:
+            if kind == "block" and not match.group("block_end"):
+                return None
+            plain.append(" ")
+            continue
+        if kind == "string" and not match.group("closed"):
+            return None
+        flush()
+        if kind == "string":
+            parts.append(token)
+        elif token.startswith("'"):
+            if len(token) < 2 or not token.endswith("'"):
+                return None
+            name = token[1:-1].replace("''", "'").strip().casefold()
+            parts.append(name if _SIMPLE_TABLE.fullmatch(name) else "'" + name.replace("'", "''") + "'")
+        else:
+            if not token.endswith("]"):
+                return None
+            parts.append("[" + token[1:-1].strip().casefold() + "]")
+    plain.append(expression[position:])
+    flush()
+    return "".join(parts)
+
+
 def mask_dax_literals(expression: str) -> str:
     """Remove strings/comments while preserving quoted identifiers and line breaks."""
     return mask_dax(expression).text

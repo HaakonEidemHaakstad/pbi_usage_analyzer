@@ -1,0 +1,22 @@
+{
+  "expected_status": {
+    "Column|Sales|Qty": "Used",
+    "Column|Sales|Price": "Used",
+    "Column|Budget|Amount": "Needs manual review",
+    "Measure|Sales|Total Revenue": "Used",
+    "Measure|Sales|Copy of Total Revenue": "Likely unused",
+    "Measure|Budget|Budget Revenue": "Likely unused",
+    "Measure|Budget|Plain": "Likely unused"
+  },
+  "notes": "Measures with identical DAX after lexical normalization (comments, whitespace, name/function case, table quoting) are grouped; differing strings, extra terms, alias measures and constant placeholders are not duplicates.",
+  "expected_health": [
+    {
+      "rule_id": "MEASURE_DUPLICATE_EXPRESSION",
+      "scope": "Budget[Budget Revenue]"
+    },
+    {
+      "rule_id": "MEASURE_DUPLICATE_EXPRESSION",
+      "scope": "Budget[Plain]"
+    }
+  ]
+}

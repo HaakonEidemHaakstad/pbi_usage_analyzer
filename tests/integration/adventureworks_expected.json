@@ -126,6 +126,16 @@
       "note": "References 'Sales data'[Revenue], which does not exist"
     },
     {
+      "rule_id": "MEASURE_DUPLICATE_EXPRESSION",
+      "scope": "Measure Table[Total Returns]",
+      "note": "Same DAX as Returns Data[Return Quantity Sum]: SUM('Returns Data'[ReturnQuantity])"
+    },
+    {
+      "rule_id": "MEASURE_DUPLICATE_EXPRESSION",
+      "scope": "Measure Table[Quantity Sold]",
+      "note": "Same DAX as Sales data[Order Quantity Sum]: SUM('Sales data'[OrderQuantity])"
+    },
+    {
       "rule_id": "POWERQUERY_HARDCODED_PATH",
       "scope": "Customer Lookup",
       "note": "CSV path in the author's OneDrive folder"

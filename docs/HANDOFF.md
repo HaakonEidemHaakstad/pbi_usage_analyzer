@@ -81,8 +81,9 @@ Windows machine state (verified 2026-10-01):
 
 Latest user requests (2026-10-01, Windows): familiarize and keep this handoff
 current; use `..\AW` as dummy data; commits and pushes are now allowed (AGENTS.md);
-generate the case-study package and start the folder-source rule. Done: Windows
-verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`.
+generate the case-study package and start the folder-source rule; then "proceed"
+(duplicate measures). Done: Windows verification, append rules, package,
+`POWERQUERY_FOLDER_UNFILTERED`, `MEASURE_DUPLICATE_EXPRESSION`.
 
 ## Implemented work in the current tree
 
@@ -92,7 +93,7 @@ verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`.
 | Auto-date | Internal objects excluded from business totals and cleanup candidates. Only resolved backing columns receive internal-query protection; no blanket upstream-table protection. See `tests/test_autodate.py` and scenario 08. |
 | Application API | `api.py`: `analyze_project(path, *, health_rule_ids=None, health_severities=None)`. No terminal output or report writes. Returns project paths, graph, cleanup findings, diagnostics, summaries, selected health findings and filter scope. CLI and synthetic validator share this entry point. |
 | Diagnostics | `diagnostics.py` provides stable codes, severity, message, source file, optional location/object reference. Parser/context `warnings` is a derived compatibility list; append to `diagnostics`, not `warnings`. |
-| Health rules | `health/engine.py` registry: `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `MEASURE_DESCRIPTION_MISSING`, `DAX_REFERENCE_UNRESOLVED`, `POWERQUERY_HARDCODED_PATH`, `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`, `POWERQUERY_FOLDER_UNFILTERED`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
+| Health rules | `health/engine.py` registry: `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `MEASURE_DESCRIPTION_MISSING`, `DAX_REFERENCE_UNRESOLVED`, `MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_HARDCODED_PATH`, `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`, `POWERQUERY_FOLDER_UNFILTERED`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
 | Relationships | Structured records in `parsers/relationships.py` shared by graph and rules. Adjacent declarations no longer lose endpoint evidence. Cardinalities are explicit-only for health detection. |
 | Descriptions | `ModelObject.description` is empty for absent/blank parsed descriptions, `None` when unknown/not parsed. Adjacent TMDL `///` descriptions are read for measures. Internal measures excluded from documentation rule. |
 | Health selection | `health/filtering.py`: exact IDs/severities, OR within each selection and AND between selections. `None` is unrestricted; empty iterable selects none. Unknown values fail before project I/O. `HealthFilterScope` records canonical selections and before/after counts. |
@@ -102,7 +103,8 @@ verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Folder rule | Latest change: `folder_listing` in `parsers/m_queries.py`; `POWERQUERY_FOLDER_UNFILTERED`. Details below. |
+| Duplicate measures | Latest change: `normalize_dax` in `parsers/dax_lexer.py`; `MEASURE_DUPLICATE_EXPRESSION`. Details below. |
+| Folder rule | Previous change: `folder_listing` in `parsers/m_queries.py`; `POWERQUERY_FOLDER_UNFILTERED`. Details below. |
 | Append rules | Previous change: `appended_query_refs` in `parsers/m_queries.py`; `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`. Details below. |
 | Windows readiness | Previous change: `.gitattributes`, LF fixture generation, explicit UTF-8, Windows CI job. Details below. |
 | M path rule | Previous change: `parsers/m_queries.py` and `POWERQUERY_HARDCODED_PATH`. Details below. |
@@ -117,7 +119,27 @@ verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: unfiltered folder sources (2026-10-01)
+## Latest change: duplicate measures (2026-10-01)
+
+- `parsers/dax_lexer.py`: `normalize_dax(expression)` reuses `_TOKEN`: comments become
+  a space, plain text is whitespace-collapsed and casefolded (spaces next to symbols
+  removed), `[names]` trimmed/casefolded, simple `'Table'` names unquoted, strings
+  exact; unterminated strings/comments/identifiers return None. A space kept at a
+  plain-text edge (e.g. `RETURN [X]` vs `RETURN[X]`) can only cause a missed match.
+- `MEASURE_DUPLICATE_EXPRESSION` (info, high, category `dax`): one finding per group
+  of non-internal measures with equal keys; groups need a `[` in the key (skips
+  constant placeholders). Scope/line = first member in declaration order (table files
+  sorted by name); evidence lists every member with file and line, plus the first
+  expression.
+- AdventureWorks: 2 findings, verified in the TMDL (`Measure Table[Total Returns]` =
+  `Returns Data[Return Quantity Sum]`; `Measure Table[Quantity Sold]` =
+  `Sales data[Order Quantity Sum]`). Added to the integration expectations.
+- Scenario 37 `37_duplicate_measures` (3-member cross-table group with case/quoting/
+  spacing/comment variants and a multiline copy; comment-only difference; traps:
+  string case, extra factor, alias, constants). No other scenario changed.
+- Not detected: semantic equivalents, calculated-column duplicates.
+
+## Previous change: unfiltered folder sources (2026-10-01)
 
 - `parsers/m_queries.py`: `folder_listing(source)` returns `FolderListing`
   (`Folder.Files` calls with argument text, first `[Content]` field access, possible
@@ -474,8 +496,9 @@ Waiting on the user: install MariaDB, load `C:\AWCase\mariadb\*.sql`, build the 
 study in Power BI Desktop per docs/CASE_STUDY_ADVENTUREWORKS.md and save the PBIP.
 Then score it (independent ground truth vs analyzer; record expectations like
 `tests/integration/adventureworks_expected.json`). Engineering candidates
-meanwhile, from the answer key's "Not yet" rows. Next: duplicate measures (BP-17),
-database server literals in M (BP-11), text-key relationships. GUI: none exists; thin desktop
+meanwhile, from the answer key's "Not yet" rows. Next: database server literals
+in M (BP-11), then text-key relationships (needs data types on relationship
+endpoint columns; cardinality is not visible statically). GUI: none exists; thin desktop
 front end over `analyze_project()` after more validation.
 
 ## Verification and environment
@@ -500,10 +523,10 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- Windows, Python 3.14, 2026-10-01 after the folder rule: 197 tests OK with
-  `PBI_AW_PROJECT` set (AdventureWorks passes); 2 skipped (opt-in timing; symlink
-  privilege). 280 synthetic checks pass across 36 scenarios. Compilation, fixture
-  drift and `git diff --check` pass. Large-model benchmark 0.31 s.
+- Windows, Python 3.14, 2026-10-01 after the duplicate-measure rule: 203 tests OK
+  with `PBI_AW_PROJECT` set (AdventureWorks passes); 2 skipped (opt-in timing;
+  symlink privilege). 290 synthetic checks pass across 37 scenarios. Compilation,
+  fixture drift and `git diff --check` pass. Large-model benchmark 0.33 s.
 - Earlier (Ubuntu, 2026-09-30): 180 tests, 266 checks across 34 scenarios.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;

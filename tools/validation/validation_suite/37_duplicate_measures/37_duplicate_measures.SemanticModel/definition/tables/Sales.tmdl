@@ -1,0 +1,22 @@
+table Sales
+    column Qty
+        sourceColumn: Qty
+    column Price
+        sourceColumn: Price
+
+    /// Revenue
+    measure 'Total Revenue' = SUMX(Sales, Sales[Qty] * Sales[Price])
+    /// Copy
+    measure 'Copy of Total Revenue' = sumx( 'Sales' , Sales[ qty ]*SALES[Price] ) // copied
+    /// Converted
+    measure 'Revenue EUR' = SUMX(Sales, Sales[Qty] * Sales[Price]) * 0.9
+    /// Alias
+    measure Alias = [Total Revenue]
+    /// Label
+    measure 'Label A' = IF([Total Revenue] > 0, "Yes")
+    /// Label
+    measure 'Label B' = IF([Total Revenue] > 0, "YES")
+    /// Placeholder
+    measure 'Placeholder 1' = 0
+    /// Placeholder
+    measure 'Placeholder 2' = 0

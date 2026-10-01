@@ -1642,6 +1642,72 @@ expression 'Transform File' =
     write_json(expected_path, expected)
 
 
+def build_duplicate_measures(root: Path):
+    name = "37_duplicate_measures"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    # Descriptions keep MEASURE_DESCRIPTION_MISSING out of the expected findings.
+    write(tables / "Sales.tmdl", """
+table Sales
+    column Qty
+        sourceColumn: Qty
+    column Price
+        sourceColumn: Price
+
+    /// Revenue
+    measure 'Total Revenue' = SUMX(Sales, Sales[Qty] * Sales[Price])
+    /// Copy
+    measure 'Copy of Total Revenue' = sumx( 'Sales' , Sales[ qty ]*SALES[Price] ) // copied
+    /// Converted
+    measure 'Revenue EUR' = SUMX(Sales, Sales[Qty] * Sales[Price]) * 0.9
+    /// Alias
+    measure Alias = [Total Revenue]
+    /// Label
+    measure 'Label A' = IF([Total Revenue] > 0, "Yes")
+    /// Label
+    measure 'Label B' = IF([Total Revenue] > 0, "YES")
+    /// Placeholder
+    measure 'Placeholder 1' = 0
+    /// Placeholder
+    measure 'Placeholder 2' = 0
+""")
+    write(tables / "Budget.tmdl", """
+table Budget
+    column Amount
+        sourceColumn: Amount
+
+    /// Same as Sales[Total Revenue]
+    measure 'Budget Revenue' =
+            SUMX(
+                Sales,
+                Sales[Qty] * Sales[Price]
+            )
+    /// Budget
+    measure Plain = SUM(Budget[Amount])
+    /// Budget
+    measure Commented = SUM(Budget[Amount]) /* old: SUM(Budget[Old]) */
+""")
+    add_visual(report, "Page1", "Visual1", visual_measure("Sales", "Total Revenue"))
+    save_expected(p, {
+        "Column|Sales|Qty": "Used",
+        "Column|Sales|Price": "Used",
+        "Column|Budget|Amount": "Needs manual review",
+        "Measure|Sales|Total Revenue": "Used",
+        "Measure|Sales|Copy of Total Revenue": "Likely unused",
+        "Measure|Budget|Budget Revenue": "Likely unused",
+        "Measure|Budget|Plain": "Likely unused",
+    }, "Measures with identical DAX after lexical normalization (comments, whitespace, "
+                         "name/function case, table quoting) are grouped; differing strings, extra terms, "
+                         "alias measures and constant placeholders are not duplicates.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "MEASURE_DUPLICATE_EXPRESSION", "scope": "Budget[Budget Revenue]"},
+        {"rule_id": "MEASURE_DUPLICATE_EXPRESSION", "scope": "Budget[Plain]"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1690,6 +1756,7 @@ def main():
         build_m_hardcoded_paths,
         build_m_append_health,
         build_m_folder_sources,
+        build_duplicate_measures,
     ]
     for builder in builders:
         builder(root)

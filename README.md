@@ -255,6 +255,12 @@ unqualified names may be virtual columns and are skipped. A quoted table missing
 from the parsed model gives medium confidence, since its file may have failed to
 parse.
 
+`MEASURE_DUPLICATE_EXPRESSION` (info) groups measures whose DAX is identical
+apart from comments, whitespace, letter case and table-name quoting, such as a
+`Copy of Total Revenue` left behind. String literals must match exactly, and
+constant placeholder measures (`0`, `BLANK()`) are not reported. Measures that
+compute the same result differently are not detected.
+
 `POWERQUERY_HARDCODED_PATH` warns when a Power Query reads from a literal drive
 (`C:\...`) or network (`\\server\share`) path, listing each path and its line
 and calling out user-profile or OneDrive folders. Table partitions and shared

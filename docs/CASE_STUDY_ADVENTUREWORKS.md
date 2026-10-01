@@ -177,7 +177,7 @@ investigate every difference.
 | BP-14 | Unrelated/technical tables loaded (`Largest companies`, `etl_log`) | All columns **Likely unused** | Detected (cleanup) |
 | BP-15 | Pivoted layout left unpivoted | Columns Likely unused (unused) | No rule for the layout |
 | BP-16 | Wrong text encoding for a Latin-1 file | — | Not yet (M `Encoding` vs file encoding needs data access) |
-| BP-17 | Duplicate measures (`Copy of Total Revenue`; `Revenue (view)` vs `Total Revenue`) | Unused ones Likely unused | No duplicate-measure rule yet |
+| BP-17 | Duplicate measures (`Copy of Total Revenue`; `Revenue (view)` vs `Total Revenue`) | Unused ones Likely unused; `MEASURE_DUPLICATE_EXPRESSION` (info) for `Copy of Total Revenue` with `Total Revenue` | Exact copies detected; `Revenue (view)` reads another table, so that semantic duplicate is not |
 
 Also expected: `Sales[OrderLineItem]` stays **Likely unused**, because it appears
 only in a DAX comment; `territories[continent]` is **Used** via the RLS role (an

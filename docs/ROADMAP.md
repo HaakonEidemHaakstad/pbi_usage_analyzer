@@ -150,6 +150,7 @@ generator and a build guide with an answer key (docs/CASE_STUDY_ADVENTUREWORKS.m
 `POWERQUERY_APPEND_INPUT_LOADED` and `POWERQUERY_ANNUAL_APPEND` report loaded append
 inputs and year-named append inputs (scenario 35).
 `POWERQUERY_FOLDER_UNFILTERED` reports folder combines without file selection (scenario 36).
+`MEASURE_DUPLICATE_EXPRESSION` reports measures with lexically identical DAX (scenario 37).
 Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
-remaining "not yet" items (duplicate measures, server names, text keys,
-name-based staging) into health rules; then GUI planning.
+remaining "not yet" items (server names, text keys, name-based staging) into
+health rules; then GUI planning.

@@ -1,0 +1,14 @@
+table Budget
+    column Amount
+        sourceColumn: Amount
+
+    /// Same as Sales[Total Revenue]
+    measure 'Budget Revenue' =
+            SUMX(
+                Sales,
+                Sales[Qty] * Sales[Price]
+            )
+    /// Budget
+    measure Plain = SUM(Budget[Amount])
+    /// Budget
+    measure Commented = SUM(Budget[Amount]) /* old: SUM(Budget[Old]) */

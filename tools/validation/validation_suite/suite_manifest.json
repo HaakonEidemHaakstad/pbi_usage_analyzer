@@ -35,7 +35,8 @@
     "33_dax_unresolved_references",
     "34_m_hardcoded_paths",
     "35_m_append_health",
-    "36_m_folder_sources"
+    "36_m_folder_sources",
+    "37_duplicate_measures"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

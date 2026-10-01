@@ -4,7 +4,8 @@ from ..model import ModelObject
 from ..parsers.relationships import Relationship
 from .model import HealthFinding
 from ..parsers.m_queries import MQuery
-from .rules import (annual_appends, bidirectional_relationships, hardcoded_m_paths, loaded_append_inputs,
+from .rules import (annual_appends, bidirectional_relationships, duplicate_measures, hardcoded_m_paths,
+                    loaded_append_inputs,
                     many_to_many_relationships, missing_measure_descriptions, unfiltered_folder_sources,
                     unresolved_dax_references)
 
@@ -14,6 +15,7 @@ RULES = (
     ("RELATIONSHIP_MANY_TO_MANY", many_to_many_relationships, "relationships"),
     ("MEASURE_DESCRIPTION_MISSING", missing_measure_descriptions, "objects"),
     ("DAX_REFERENCE_UNRESOLVED", unresolved_dax_references, "objects"),
+    ("MEASURE_DUPLICATE_EXPRESSION", duplicate_measures, "objects"),
     ("POWERQUERY_HARDCODED_PATH", hardcoded_m_paths, "m_queries"),
     ("POWERQUERY_APPEND_INPUT_LOADED", loaded_append_inputs, "m_queries"),
     ("POWERQUERY_ANNUAL_APPEND", annual_appends, "m_queries"),

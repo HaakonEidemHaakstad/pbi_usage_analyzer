@@ -359,6 +359,11 @@ Reference: [TMDL descriptions](https://learn.microsoft.com/en-us/analysis-servic
 qualified-table rules as dependency extraction. Columns now record `source_line`
 like measures, so findings and JSON exports locate calculated columns.
 
+`MEASURE_DUPLICATE_EXPRESSION` groups measures by `parsers.dax_lexer.normalize_dax`,
+a comparison key built from the same tokenizer as `mask_dax`: comments dropped,
+whitespace collapsed, names/functions casefolded, simple quoted table names
+unquoted, string literals exact; unterminated input yields no key.
+
 `parsers/m_queries.py` collects every M source as an `MQuery` (name, kind:
 partition / expression / parameter, source, file, per-line file numbers) from
 table partitions and `expressions.tmdl`, stored on the analysis context as

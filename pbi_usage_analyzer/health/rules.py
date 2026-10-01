@@ -4,6 +4,7 @@ import re
 
 from ..model import ModelObject, ObjectType
 from ..parsers.dax import DaxIndex, unresolved_references
+from ..parsers.dax_lexer import normalize_dax
 from ..parsers.m_queries import MQuery, MQueryKind, appended_query_refs, folder_listing, m_string_literals
 from ..util import norm_key
 from ..util import is_internal_table
@@ -129,6 +130,42 @@ def unresolved_dax_references(objects: Iterable[ModelObject]) -> list[HealthFind
                            f"{kind} if it is no longer needed. If the referenced table exists but was not "
                            "parsed (see diagnostics), resolve that first and re-run the analysis.",
             source_file=obj.source_file, line=obj.source_line,
+        ))
+    return findings
+
+
+def duplicate_measures(objects: Iterable[ModelObject]) -> list[HealthFinding]:
+    groups: dict[str, list[ModelObject]] = {}
+    for obj in objects:
+        if obj.ref.object_type != ObjectType.MEASURE or is_internal_table(obj.ref.table):
+            continue
+        if not obj.expression or obj.source_line is None:
+            continue
+        key = normalize_dax(obj.expression)
+        # Constant measures (0, BLANK(), "") are often deliberate placeholders.
+        if key and "[" in key:
+            groups.setdefault(key, []).append(obj)
+    findings = []
+    for members in groups.values():
+        if len(members) < 2:
+            continue
+        first = members[0]
+        findings.append(HealthFinding(
+            rule_id="MEASURE_DUPLICATE_EXPRESSION", category="dax",
+            severity=HealthSeverity.INFO, confidence="high", scope=first.ref.label,
+            title="Consolidate measures with identical DAX",
+            explanation=f"{len(members)} measures have the same DAX expression, ignoring comments, "
+                        "whitespace, letter case of names and functions, and table-name quoting. "
+                        "Copies drift apart when only one is edited later, so reports can show "
+                        "different numbers under different names.",
+            evidence=(*(f"{m.ref.label} ({Path(m.source_file).name} line {m.source_line})" for m in members),
+                      "Expression: " + " ".join(first.expression.split())),
+            recommendation="Keep one measure, repoint visuals and other measures to it (check each "
+                           "copy's cleanup status for its uses), then delete the copies. If a copy "
+                           "exists for a different format or folder, consider one measure with a "
+                           "dynamic format string, or make the copy reference the original "
+                           "([Original]) so the logic lives in one place.",
+            source_file=first.source_file, line=first.source_line,
         ))
     return findings
 
