@@ -28,7 +28,7 @@ service is implemented. Correctness and evidence-based conservatism take priorit
   2026-10-01 from the Windows machine. Run `git log -1` and `gh run list --limit 3`
   to see the current state.
 - CI ("Analyzer checks") has two jobs: Python 3.12 / Ubuntu and Python 3.12 /
-  Windows. Both passed on `ee82b5b` (run 36826537862); check the latest run.
+  Windows. Both passed on `6a58253` (run 36838540916, 2026-10-01); check the latest run.
 - History note: on 2026-09-30 the local history was rebased onto the remote by
   `git reset --soft` (identical trees, different commit IDs from earlier
   connector-based publication). The old local history exists only as the unpushed
