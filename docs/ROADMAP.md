@@ -57,7 +57,8 @@ Add progress reporting/cancellation hooks if analysis duration makes them useful
 
 ## Phase 4 — Intuitive GUI
 
-Build a thin GUI over the application API.
+Build a thin GUI over the application API. Design: [GUI_DESIGN.md](GUI_DESIGN.md)
+(phases G0 core preparation, G1 read-only viewer, G2 workflow aids, G3 distribution).
 
 Likely capabilities:
 - choose PBIP project
@@ -170,4 +171,8 @@ Query references through load-disabled (shared expression) queries are followed,
 with column lineage when their M is supported (scenario 42); before, a loaded table
 read only through such a query was Likely unused. Quoted identifiers in M comments
 no longer create dependencies.
-Next: more real projects, then GUI planning over `analyze_project()`.
+A GUI design document (docs/GUI_DESIGN.md) proposes a PySide6 front end over a new
+UI-agnostic `views` layer, preceded by core changes C1–C6 (evidence paths, label
+catalog, structured health scope, stable finding keys, shared report writing, rows).
+Next: owner decisions in GUI_DESIGN.md section 13, then phase G0; more real projects
+when available.

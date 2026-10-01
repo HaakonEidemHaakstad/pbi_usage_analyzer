@@ -135,7 +135,8 @@ Then: "reinitiate everything necessary, such as MariaDB" (nothing needed: the
 `MariaDB` service runs automatically, `aw_ops`/`aw_dw` persist, regenerated sources
 match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1"
 (usage-aware M lineage, done), then "proceed" (references through load-disabled
-queries, done).
+queries, done), then option 4 because no other real project is available (GUI
+design document, done; no code).
 
 ## Implemented work in the current tree
 
@@ -155,7 +156,8 @@ queries, done).
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Shared-query references | Latest change: references through load-disabled queries are followed (exact lineage and fallback); comment `#"..."` fix. Details below. |
+| GUI design | Latest change: docs/GUI_DESIGN.md (design only; no code). Facts checked 2026-10-01: analysis 0.04–0.09 s on the real projects; PySide6 6.11.2 supports Python 3.10–3.14 with Windows wheels; Tk 9.0 present in this Python. |
+| Shared-query references | Previous change: references through load-disabled queries are followed (exact lineage and fallback); comment `#"..."` fix. Details below. |
 | Usage-aware lineage | Previous change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
 | AW Good scoring | Previous change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
 | Real-export fixes | Previous change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
@@ -178,7 +180,7 @@ queries, done).
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: references through load-disabled queries (2026-10-01)
+## Previous change: references through load-disabled queries (2026-10-01)
 
 - Safety bug found while scoping the follow-up (user said "proceed"): a loaded table
   read only through a load-disabled query (`expressions.tmdl` shared expression) had
@@ -733,16 +735,19 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Both case studies are built and scored, and usage-aware lineage is done; nothing
-waits on the user. Candidate next steps (ask the user which):
+Both case studies are built and scored, usage-aware lineage and shared-query
+references are done, and the GUI design exists (docs/GUI_DESIGN.md, 2026-10-01).
+**Waiting on the user:** the open decisions in GUI_DESIGN.md section 13 (framework
+PySide6?, Windows build?, UI language, start G0?). G0 (core changes C1–C6: evidence
+paths, catalog, structured health scope, stable keys, `write_reports`, `views` rows)
+is useful without a GUI and changes no status. Other candidates:
 1. Lineage through currently unsupported steps seen in real exports (e.g. the folder
    combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`; matters only
    when such a step sits between two model queries).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
-4. GUI planning: thin desktop front end over `analyze_project()` (AGENTS.md "Future
-   GUI requirement"); write a design document before code.
+4. GUI: designed (docs/GUI_DESIGN.md); implementation starts with phase G0.
 Remaining answer-key gaps need data access (encoding, totals rows, folder
 duplicates) or name heuristics (`stg_*` staging).
 

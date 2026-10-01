@@ -470,8 +470,9 @@ results. Synthetic validation does not establish real-project accuracy.
 
 Both AdventureWorks case studies are built and scored (no object the report needs
 is Likely unused in either; the good twin produces no findings). Usage-aware M lineage
-then resolved all 37 append-input manual reviews in the mess case. Next: validation
-on more real projects and planning a thin desktop GUI over `analyze_project()`.
+then resolved all 37 append-input manual reviews in the mess case. A thin desktop
+GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md);
+validation on more real projects continues when projects are available.
 
 ## Case studies: AdventureWorks, mess and good twin
 
