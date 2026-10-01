@@ -97,12 +97,18 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
             if actual:
                 ctx.graph.add_evidence(Evidence(hierarchy, actual, EvidenceType.HIERARCHY_DEPENDENCY, f"Hierarchy {hierarchy.label} uses {actual.label}", confidence="high"))
 
-    # Sort-by edges.
+    # Sort-by and group-by edges: a used column needs these columns.
     for ref, obj in list(ctx.graph.objects.items()):
         if ref.object_type == ObjectType.COLUMN and obj.sort_by_column:
             target = columns.get(norm_key(ref.table, obj.sort_by_column))
             if target:
                 ctx.graph.add_evidence(Evidence(ref, target, EvidenceType.SORT_DEPENDENCY, f"SortByColumn for {ref.label}", obj.source_file, "high"))
+        if ref.object_type == ObjectType.COLUMN:
+            for name in obj.group_by_columns:
+                target = columns.get(norm_key(ref.table, name))
+                if target:
+                    ctx.graph.add_evidence(Evidence(ref, target, EvidenceType.GROUP_BY_DEPENDENCY,
+                                                    f"GroupByColumn for {ref.label}", obj.source_file, "high"))
 
     # Relationships.
     ctx.relationships = parse_relationship_metadata(model_folder)

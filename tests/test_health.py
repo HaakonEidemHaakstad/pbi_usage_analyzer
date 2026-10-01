@@ -80,10 +80,18 @@ class HealthTests(unittest.TestCase):
         self.assertIn('toCardinality: many', finding.evidence)
         self.assertEqual((finding.source_file, finding.line), (str(self.source), 1))
 
-    def test_many_to_many_requires_both_explicit_cardinalities(self):
+    def test_many_to_many_as_power_bi_writes_it(self):
+        # TMDL omits the default fromCardinality (many); observed in a Power BI Desktop export.
+        self.source.write_text(self.source.read_text(encoding='utf-8') + '    toCardinality: many\n', encoding='utf-8')
+        finding, = analyze_project(self.root).health_findings
+        self.assertEqual(finding.rule_id, 'RELATIONSHIP_MANY_TO_MANY')
+        self.assertIn('fromCardinality: many (default, omitted in TMDL)', finding.evidence)
+
+    def test_many_to_many_requires_many_on_both_ends(self):
         original = self.source.read_text(encoding='utf-8')
-        for extra in ('    toCardinality: many\n',
-                      '    fromCardinality: many\n',
+        for extra in ('',                                       # many-to-one (both defaults)
+                      '    fromCardinality: many\n',            # still many-to-one
+                      '    fromCardinality: one\n',             # one-to-one
                       '    fromCardinality: one\n    toCardinality: many\n',
                       '    fromCardinality: many\n    toCardinality: unknown\n',
                       '    annotation Note =\n        fromCardinality: many\n        toCardinality: many\n',

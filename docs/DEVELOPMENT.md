@@ -167,6 +167,11 @@ folder containing `AdventureWorks Report.pbip`; otherwise it is skipped. The
 project is not committed. Update the expectations only after explaining each
 change against the project files.
 
+`tests/test_integration_case_studies.py` does the same for the hand-built case
+studies: `PBI_AW_MESS_PROJECT` (folder with `AW Mess.pbip`) against
+`tests/integration/aw_mess_expected.json`. Its `manual_review_notes` explain every
+status that differs from the independent ground truth.
+
 ## Performance check
 
 `make benchmark` generates a large synthetic model in a temporary folder

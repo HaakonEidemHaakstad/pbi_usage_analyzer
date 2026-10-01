@@ -52,7 +52,10 @@ class AutoDateTests(unittest.TestCase):
         self.assertEqual(book['Column analysis'].max_row, 6)
         self.assertEqual(book['Likely unused columns'].max_row, 3)
 
-    def test_relationship_protects_only_backing_column(self):
+    def test_autodate_relationship_alone_does_not_protect(self):
+        # Power BI links every date column to its own auto-date table while Auto
+        # date/time is on (20 such tables in the AW Mess case study), so the link
+        # is not evidence of use. Report use of the hierarchy is (see test_pbir_entity_refs).
         internal = self.tables / 'LocalDateTable_test.tmdl'
         internal.write_text(internal.read_text(encoding='utf-8').split('    partition ')[0] + '''    partition calendar = calculated
         source = CALENDAR(MIN(Sales[Date]), MAX(Sales[Date]))
@@ -64,10 +67,11 @@ class AutoDateTests(unittest.TestCase):
     toColumn: LocalDateTable_test.Date
 ''', encoding='utf-8')
         ctx, _, statuses = self.analyze()
-        self.assertEqual(statuses[('Sales', 'Date')], Status.USED)
-        self.assertEqual(statuses[('Sales', 'Amount')], Status.LIKELY_UNUSED)
+        self.assertEqual(len(ctx.relationships), 1)           # still parsed, e.g. for health rules
+        self.assertFalse([e for e in ctx.graph.evidence if e.evidence_type == EvidenceType.RELATIONSHIP_DEPENDENCY])
+        for name in ('Date', 'Amount', 'OtherDate'):
+            self.assertEqual(statuses[('Sales', name)], Status.LIKELY_UNUSED)
         self.assertFalse(ctx.powerquery.evidence)
-        self.assertEqual(statuses[('Sales', 'OtherDate')], Status.LIKELY_UNUSED)
 
     def test_unresolved_internal_query_warns_without_blanket_edges(self):
         p = self.tables / 'LocalDateTable_test.tmdl'

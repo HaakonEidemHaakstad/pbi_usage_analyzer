@@ -108,6 +108,15 @@ Windows machine state (verified 2026-10-01):
   differs from its column list, before writing SQL.
 - Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
+  Also: never append a comment to a Python line that holds several tuples; it twice
+  silently removed column definitions in the generators (caught by `check_rows`).
+- **AW Mess is built and scored** (2026-10-01): `USBL\AWProjects\Mess\AW Mess.pbip`,
+  TMDL + PBIR, deviations in its `NOTES.txt` (Norwegian step names; M pasted via
+  Advanced Editor; relationships/measures/role applied as TMDL scripts; no auto-date
+  hierarchy used in the report). Result and bugs: docs/CASE_STUDY_ADVENTUREWORKS.md
+  "Scored result". Expectations: `tests/integration/aw_mess_expected.json`, run with
+  `$env:PBI_AW_MESS_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess"`.
+  AW Good is not built yet.
 
 Latest user requests (2026-10-01, Windows): familiarize and keep this handoff
 current; use `..\AW` as dummy data; commits and pushes are now allowed (AGENTS.md);
@@ -136,7 +145,8 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Good twin | Latest change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
+| Real-export fixes | Latest change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
+| Good twin | Previous change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
 | Text keys | Previous change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
 | Local servers | Previous change: `LOCAL_SERVER` pattern and `POWERQUERY_LOCAL_SERVER` in `health/rules.py`. Details below. |
 | Duplicate measures | Previous change: `normalize_dax` in `parsers/dax_lexer.py`; `MEASURE_DUPLICATE_EXPRESSION`. Details below. |
@@ -155,7 +165,32 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: good-twin case study and build guide (2026-10-01)
+## Latest change: AW Mess scoring and real-export fixes (2026-10-01)
+
+- Method as for AdventureWorks: independent ground-truth subagent (no analyzer
+  access) vs `analyze_project`; every difference investigated. Final: 0 false
+  `Likely unused`; 39 conservative manual reviews documented per object.
+- Fixes (scenario 40 `40_power_bi_desktop_shapes` copies the real shapes; it failed
+  on the previous commit, checked in a temporary git worktree):
+  1. `parsers/tmdl.py` reads `groupByColumn:` (under `relatedColumnDetails`) into
+     `ModelObject.group_by_columns`; `build_graph` adds
+     `EvidenceType.GROUP_BY_DEPENDENCY` edges, treated like sort-by in `classify`.
+     Field parameter fields columns were dangerously `Likely unused` before.
+  2. `RELATIONSHIP_MANY_TO_MANY` applies TMDL defaults (from many, to one); Power BI
+     writes many-to-many as only `toCardinality: many`. Microsoft docs do not state
+     the defaults (researched); the TMDL doc example and the real export imply them.
+     `tests/test_health.py` updated (old test pinned explicit-only).
+  3. `relationship_evidence` skips relationships with an internal endpoint: Power BI
+     auto-creates a `LocalDateTable_*` link for every date column. Report variation
+     use still protects the backing column. `tests/test_autodate.py` updated (old test
+     pinned link-as-use); AdventureWorks (auto-date off) and all scenarios unchanged.
+  4. `util.clean_name` no longer strips whitespace inside quotes; `norm` trims for
+     matching keys. Display names such as `' Country'` are preserved (AGENTS.md).
+- Not changed (candidate feature): "usage-aware" M lineage that maps a combined
+  table's column status back to append inputs; it would resolve all 35 append-input
+  manual reviews in AW Mess. Changes core semantics; design it deliberately.
+
+## Previous change: good-twin case study and build guide (2026-10-01)
 
 - Rationale (agreed with the user): the mess case measures sensitivity only; a
   clean model on the same data measures specificity (false positives, the costlier
@@ -594,10 +629,12 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Waiting on the user: build both case studies per docs/CASE_STUDY_BUILD_GUIDE.md
-(MariaDB setup, AW Mess, AW Good) into `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess` and
-`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`, and say when done. Then for each:
-check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
+AW Mess is scored (see "Latest change"). Waiting on the user: build AW Good per
+docs/CASE_STUDY_BUILD_GUIDE.md Part C into
+`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`, and say when done. Then, as
+for AW Mess (reuse the approach: temp scripts that dump analyzer output and compare
+with the ground-truth JSON; add a `PBI_AW_GOOD_PROJECT` class to
+`tests/test_integration_case_studies.py`): check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
 independently (subagent without analyzer output), run the analyzer, record
 expectations like `tests/integration/adventureworks_expected.json` (optional env
 var tests), and investigate every difference. For the good twin, any
@@ -632,9 +669,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- Windows, Python 3.14, 2026-10-01 after the text-key rule: 208 tests OK
-  with `PBI_AW_PROJECT` set (AdventureWorks passes); 2 skipped (opt-in timing;
-  symlink privilege). 306 synthetic checks pass across 39 scenarios. Compilation,
+- Windows, Python 3.14, 2026-10-01 after the AW Mess fixes: 220 tests OK with
+  `PBI_AW_PROJECT` and `PBI_AW_MESS_PROJECT` set (both real projects pass); 2 skipped
+  (opt-in timing; symlink privilege). 318 synthetic checks pass across 40 scenarios. Compilation,
   fixture drift and `git diff --check` pass. Large-model benchmark 0.33 s.
 - Earlier (Ubuntu, 2026-09-30): 180 tests, 266 checks across 34 scenarios.
 - Fixture reproducibility, compilation, and `git diff --check` passed.

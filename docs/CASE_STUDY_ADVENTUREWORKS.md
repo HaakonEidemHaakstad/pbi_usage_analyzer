@@ -155,6 +155,31 @@ generators refuse to replace a folder that contains a `.pbip`). `USBL` is synced
 by OneDrive; see the build guide (A1, A5) for keeping the project folder local. The analyzer and an independent review will then produce
 the actual answer key.
 
+## Scored result (2026-10-01)
+
+Built by the user as `USBL\AWProjects\Mess\AW Mess.pbip` (deviations in its
+`NOTES.txt`; notably the line chart uses plain `Sales[OrderDate]`, so no auto-date
+hierarchy is used). An independent ground truth was derived from the raw files
+without analyzer code or output, then compared object by object. Expectations:
+`tests/integration/aw_mess_expected.json` (run with `PBI_AW_MESS_PROJECT`).
+
+- **Cleanup:** 178 business objects: 41 Used, 39 Needs manual review, 98 Likely
+  unused (plus 140 internal auto-date objects). **No object the report needs is
+  Likely unused.** All 39 differences from the ground truth are conservative manual
+  reviews: 35 columns of the yearly append inputs (lineage does not map the combined
+  table's column status upstream) and 2+2 objects referenced only by unused DAX.
+- **Health:** every predicted finding below, and nothing else: paths ×14, local
+  server ×9, undocumented measures ×8, loaded append inputs ×6, annual appends ×2,
+  bidirectional ×2, many-to-many, text key, duplicate measures, unfiltered folder.
+- **Analyzer bugs found and fixed** (synthetic scenario 40 reproduces each):
+  1. The field parameter's hidden NAMEOF column was **Likely unused** although the
+     report needs it: Power BI ties it to the name column with
+     `relatedColumnDetails`/`groupByColumn`, which was not parsed.
+  2. The many-to-many relationship (BP-08) was missed: Power BI writes only
+     `toCardinality: many` (`fromCardinality` many is the omitted default).
+  3. Automatic links to the 19 auto-date tables made every date column Used.
+  4. Column names with a leading space (`' Country'` from the CSV header) lost it.
+
 ## Answer key
 
 What the analyzer is expected to report for each bad practice today. "Detected"
@@ -172,8 +197,8 @@ investigate every difference.
 | BP-05 | Duplicate/conflicting sources (`dim_product`, customers CSV, categories JSON, territories JSON) | Their columns **Likely unused** (no relationships or references) | Detected (cleanup) |
 | BP-06 | Relationship on a text key | Keys **Used** (relationship endpoints); `RELATIONSHIP_TEXT_KEY` (info) on `Sales[TerritoryKey]` → `territories[territory_key]` | Detected (data type only; the key has few values, so the finding is a prompt to check, not a defect) |
 | BP-07 | Bidirectional relationships | `RELATIONSHIP_BIDIRECTIONAL` (warning) ×2 | Detected |
-| BP-08 | Many-to-many relationship at month grain | `RELATIONSHIP_MANY_TO_MANY` (warning) | Detected |
-| BP-09 | Auto date/time on | `LocalDateTable_*`/`DateTableTemplate_*` reported as **Internal**, not cleanup candidates; the auto-date hierarchy on `Sales[OrderDate]` protects `Sales[OrderDate]` | Detected; PBIR `PropertyVariationSource` handling first verified here. No "many auto-date tables" rule yet |
+| BP-08 | Many-to-many relationship at month grain | `RELATIONSHIP_MANY_TO_MANY` (warning) | Detected (after fixing cardinality defaults; see Scored result) |
+| BP-09 | Auto date/time on | `LocalDateTable_*`/`DateTableTemplate_*` reported as **Internal**, not cleanup candidates; the auto-date hierarchy on `Sales[OrderDate]` protects `Sales[OrderDate]` | Internal objects detected (140). The built report did not use the hierarchy (NOTES.txt), so `PropertyVariationSource` remains unverified on a real file; automatic auto-date links no longer protect date columns. No "many auto-date tables" rule yet |
 | BP-10 | Measures without descriptions, scattered | `MEASURE_DESCRIPTION_MISSING` (info) for every measure | Detected (descriptions); display folders not checked |
 | BP-11 | Hard-coded file paths and server | `POWERQUERY_HARDCODED_PATH` (warning) for each query reading from `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\...` (evidence also flags the user-profile/OneDrive location); `POWERQUERY_LOCAL_SERVER` (warning) for each MariaDB query on `localhost` | Detected, assuming Power BI writes the server as a `localhost` literal (verify in the saved PBIP) |
 | BP-12 | Calculated column that belongs in Power Query (`Age`) | `customers[Age]` Likely unused (unused), `customers[birth_date]` Needs manual review | Cleanup detected; no rule for the practice itself |

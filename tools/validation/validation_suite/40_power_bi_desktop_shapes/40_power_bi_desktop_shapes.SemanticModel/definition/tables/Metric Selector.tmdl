@@ -1,0 +1,33 @@
+table 'Metric Selector'
+
+	column 'Metric Selector'
+		summarizeBy: none
+		sourceColumn: [Value1]
+		sortByColumn: 'Metric Selector Rekkefølge'
+
+		relatedColumnDetails
+			groupByColumn: 'Metric Selector Felt'
+
+	column 'Metric Selector Felt'
+		isHidden
+		summarizeBy: none
+		sourceColumn: [Value2]
+		sortByColumn: 'Metric Selector Rekkefølge'
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 3,
+				  "kind": 2
+				}
+
+	column 'Metric Selector Rekkefølge'
+		isHidden
+		summarizeBy: sum
+		sourceColumn: [Value3]
+
+	partition 'Metric Selector' = calculated
+		mode: import
+		source =
+				{
+				    ("Total Revenue", NAMEOF('Sales'[Total Revenue]), 0)
+				}

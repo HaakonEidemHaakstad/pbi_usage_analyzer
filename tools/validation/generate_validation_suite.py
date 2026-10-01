@@ -1846,6 +1846,124 @@ relationship SalesStore
     write_json(expected_path, expected)
 
 
+def build_power_bi_desktop_shapes(root: Path):
+    """Shapes copied from a real Power BI Desktop TMDL export (AW Mess case study)."""
+    name = "40_power_bi_desktop_shapes"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    write(tables / "Sales.tmdl", """
+table Sales
+\t/// Revenue in USD
+\tmeasure 'Total Revenue' = SUM(Sales[Amount])
+\tcolumn Amount
+\t\tdataType: double
+\t\tsourceColumn: Amount
+\tcolumn MonthKey
+\t\tdataType: int64
+\t\tsourceColumn: MonthKey
+\tcolumn ' Country'
+\t\tdataType: string
+\t\tsourceColumn: " Country"
+\tcolumn StockDate
+\t\tdataType: dateTime
+\t\tsourceColumn: StockDate
+
+\t\tvariation Variasjon
+\t\t\tisDefault
+\t\t\trelationship: auto_stock
+\t\t\tdefaultHierarchy: LocalDateTable_stock.Datohierarki
+""")
+    write(tables / "LocalDateTable_stock.tmdl", """
+table LocalDateTable_stock
+\tisHidden
+\tshowAsVariationsOnly
+
+\tcolumn Date
+\t\tdataType: dateTime
+\t\tisHidden
+\t\tsourceColumn: [Date]
+
+\tpartition LocalDateTable_stock = calculated
+\t\tmode: import
+\t\tsource = Calendar(Date(Year(MIN('Sales'[StockDate])), 1, 1), Date(Year(MAX('Sales'[StockDate])), 12, 31))
+""")
+    write(tables / "Months.tmdl", """
+table Months
+\tcolumn MonthKey
+\t\tdataType: int64
+\t\tsourceColumn: MonthKey
+""")
+    write(tables / "Metric Selector.tmdl", """
+table 'Metric Selector'
+
+\tcolumn 'Metric Selector'
+\t\tsummarizeBy: none
+\t\tsourceColumn: [Value1]
+\t\tsortByColumn: 'Metric Selector Rekkefølge'
+
+\t\trelatedColumnDetails
+\t\t\tgroupByColumn: 'Metric Selector Felt'
+
+\tcolumn 'Metric Selector Felt'
+\t\tisHidden
+\t\tsummarizeBy: none
+\t\tsourceColumn: [Value2]
+\t\tsortByColumn: 'Metric Selector Rekkefølge'
+
+\t\textendedProperty ParameterMetadata =
+\t\t\t\t{
+\t\t\t\t  "version": 3,
+\t\t\t\t  "kind": 2
+\t\t\t\t}
+
+\tcolumn 'Metric Selector Rekkefølge'
+\t\tisHidden
+\t\tsummarizeBy: sum
+\t\tsourceColumn: [Value3]
+
+\tpartition 'Metric Selector' = calculated
+\t\tmode: import
+\t\tsource =
+\t\t\t\t{
+\t\t\t\t    ("Total Revenue", NAMEOF('Sales'[Total Revenue]), 0)
+\t\t\t\t}
+""")
+    # Auto-date links carry joinOnDateBehavior; many-to-many writes only toCardinality.
+    write(model / "definition" / "relationships.tmdl", """
+relationship auto_stock
+\tjoinOnDateBehavior: datePartOnly
+\tfromColumn: Sales.StockDate
+\ttoColumn: LocalDateTable_stock.Date
+
+relationship 2abb65fb-c58c-4ab3-a2be-4c92223982bb
+\ttoCardinality: many
+\tfromColumn: Sales.MonthKey
+\ttoColumn: Months.MonthKey
+""")
+    add_visual(report, "Page1", "Slicer", visual_column("Metric Selector", "Metric Selector"))
+    add_visual(report, "Page1", "Table", visual_column("Sales", " Country"))
+    save_expected(p, {
+        "Column|Metric Selector|Metric Selector": "Used",
+        "Column|Metric Selector|Metric Selector Felt": "Used",
+        "Column|Metric Selector|Metric Selector Rekkefølge": "Used",
+        "Measure|Sales|Total Revenue": "Used",
+        "Column|Sales|Amount": "Used",
+        "Column|Sales| Country": "Used",
+        "Column|Sales|MonthKey": "Used",
+        "Column|Months|MonthKey": "Used",
+        "Column|Sales|StockDate": "Likely unused",
+    }, "Field parameter name column protects its relatedColumnDetails groupByColumn (the NAMEOF "
+       "fields column); an automatic auto-date relationship alone protects nothing; a many-to-many "
+       "relationship written with only toCardinality: many is reported; display names keep the "
+       "leading space Power BI took from a CSV header.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "RELATIONSHIP_MANY_TO_MANY", "scope": "2abb65fb-c58c-4ab3-a2be-4c92223982bb"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1897,6 +2015,7 @@ def main():
         build_duplicate_measures,
         build_m_local_servers,
         build_text_key_relationships,
+        build_power_bi_desktop_shapes,
     ]
     for builder in builders:
         builder(root)

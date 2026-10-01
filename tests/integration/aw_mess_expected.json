@@ -1,0 +1,409 @@
+{
+  "project": "AW Mess case study (PBIP, PBIR, TMDL; docs/CASE_STUDY_ADVENTUREWORKS.md), built 2026-10-01",
+  "provenance": "Statuses verified against an independent ground truth derived from the raw files without analyzer code or output (2026-10-01). Every difference is a conservative 'Needs manual review' explained in manual_review_notes. Scoring found and fixed four analyzer bugs (field-parameter groupByColumn, many-to-many cardinality defaults, auto-date relationships as use, trimmed display names); scenario 40 reproduces them.",
+  "internal_objects": 140,
+  "expected_status": {
+    "Column|Calendar|Date": "Used",
+    "Column|Calendar|Month Name": "Used",
+    "Column|Calendar|Month Number": "Used",
+    "Column|Calendar|Year": "Likely unused",
+    "Column|Calendar|YearMonth": "Used",
+    "Column|Categories|CategoryName": "Used",
+    "Column|Categories|ProductCategoryKey": "Used",
+    "Column|Customer Lookup (latin1)|AnnualIncome": "Likely unused",
+    "Column|Customer Lookup (latin1)|BirthDate": "Likely unused",
+    "Column|Customer Lookup (latin1)|CustomerKey": "Likely unused",
+    "Column|Customer Lookup (latin1)|EducationLevel": "Likely unused",
+    "Column|Customer Lookup (latin1)|EmailAddress": "Likely unused",
+    "Column|Customer Lookup (latin1)|FirstName": "Likely unused",
+    "Column|Customer Lookup (latin1)|Gender": "Likely unused",
+    "Column|Customer Lookup (latin1)|HomeOwner": "Likely unused",
+    "Column|Customer Lookup (latin1)|LastName": "Likely unused",
+    "Column|Customer Lookup (latin1)|MaritalStatus": "Likely unused",
+    "Column|Customer Lookup (latin1)|Occupation": "Likely unused",
+    "Column|Customer Lookup (latin1)|Prefix": "Likely unused",
+    "Column|Customer Lookup (latin1)|TotalChildren": "Likely unused",
+    "Column|customers|Age": "Likely unused",
+    "Column|customers|annual_income": "Likely unused",
+    "Column|customers|birth_date": "Needs manual review",
+    "Column|customers|customer_key": "Used",
+    "Column|customers|education_level": "Likely unused",
+    "Column|customers|email_address": "Likely unused",
+    "Column|customers|first_name": "Used",
+    "Column|customers|gender": "Likely unused",
+    "Column|customers|home_owner": "Likely unused",
+    "Column|customers|last_name": "Used",
+    "Column|customers|marital_status": "Likely unused",
+    "Column|customers|occupation": "Used",
+    "Column|customers|prefix": "Likely unused",
+    "Column|customers|total_children": "Likely unused",
+    "Column|dim_product|product_cost": "Likely unused",
+    "Column|dim_product|product_key": "Likely unused",
+    "Column|dim_product|product_name": "Likely unused",
+    "Column|dim_product|product_price": "Likely unused",
+    "Column|dim_product|product_subcategory_key": "Likely unused",
+    "Column|etl_log|job_name": "Likely unused",
+    "Column|etl_log|rows_loaded": "Likely unused",
+    "Column|etl_log|run_id": "Likely unused",
+    "Column|etl_log|started_at": "Likely unused",
+    "Column|etl_log|status": "Likely unused",
+    "Column|Largest companies| AUM (billion USD)": "Likely unused",
+    "Column|Largest companies| Country": "Likely unused",
+    "Column|Largest companies| Firm/Company": "Likely unused",
+    "Column|Largest companies|Rank": "Likely unused",
+    "Column|Metric Selector|Metric Selector": "Used",
+    "Column|Metric Selector|Metric Selector Felt": "Used",
+    "Column|Metric Selector|Metric Selector Rekkefølge": "Used",
+    "Column|Product Category Sales (Unpivot Demo)|Central Region": "Likely unused",
+    "Column|Product Category Sales (Unpivot Demo)|Date": "Likely unused",
+    "Column|Product Category Sales (Unpivot Demo)|North Region": "Likely unused",
+    "Column|Product Category Sales (Unpivot Demo)|Product Category": "Likely unused",
+    "Column|Product Category Sales (Unpivot Demo)|South Region": "Likely unused",
+    "Column|product_categories|id": "Likely unused",
+    "Column|product_categories|name": "Likely unused",
+    "Column|Products|Colour": "Used",
+    "Column|Products|Cost": "Needs manual review",
+    "Column|Products|Description": "Likely unused",
+    "Column|Products|Model": "Likely unused",
+    "Column|Products|Price": "Used",
+    "Column|Products|Product Name": "Used",
+    "Column|Products|ProductKey": "Used",
+    "Column|Products|Size": "Likely unused",
+    "Column|Products|SKU": "Likely unused",
+    "Column|Products|Style": "Likely unused",
+    "Column|Products|Subcategory": "Used",
+    "Column|Returns|Product": "Used",
+    "Column|Returns|Qty": "Used",
+    "Column|Returns|Return Date": "Likely unused",
+    "Column|Returns|Territory": "Likely unused",
+    "Column|Returns 2020|Product": "Needs manual review",
+    "Column|Returns 2020|Qty": "Needs manual review",
+    "Column|Returns 2020|Return Date": "Needs manual review",
+    "Column|Returns 2020|Territory": "Needs manual review",
+    "Column|Returns 2021|Product": "Needs manual review",
+    "Column|Returns 2021|Qty": "Needs manual review",
+    "Column|Returns 2021|Return Date": "Needs manual review",
+    "Column|Returns 2021|Territory": "Needs manual review",
+    "Column|Returns 2022|Product": "Needs manual review",
+    "Column|Returns 2022|Qty": "Needs manual review",
+    "Column|Returns 2022|Return Date": "Needs manual review",
+    "Column|Returns 2022|Territory": "Needs manual review",
+    "Column|Sales|CustomerKey": "Used",
+    "Column|Sales|OrderDate": "Used",
+    "Column|Sales|OrderLineItem": "Likely unused",
+    "Column|Sales|OrderNumber": "Used",
+    "Column|Sales|OrderQuantity": "Used",
+    "Column|Sales|ProductKey": "Used",
+    "Column|Sales|Source.Name": "Likely unused",
+    "Column|Sales|StockDate": "Likely unused",
+    "Column|Sales|TerritoryKey": "Used",
+    "Column|Sales 2020|CustomerKey": "Needs manual review",
+    "Column|Sales 2020|OrderDate": "Needs manual review",
+    "Column|Sales 2020|OrderLineItem": "Needs manual review",
+    "Column|Sales 2020|OrderNumber": "Needs manual review",
+    "Column|Sales 2020|OrderQuantity": "Needs manual review",
+    "Column|Sales 2020|ProductKey": "Needs manual review",
+    "Column|Sales 2020|Source.Name": "Needs manual review",
+    "Column|Sales 2020|StockDate": "Needs manual review",
+    "Column|Sales 2020|TerritoryKey": "Needs manual review",
+    "Column|sales_2021|CustomerKey": "Needs manual review",
+    "Column|sales_2021|OrderDate": "Needs manual review",
+    "Column|sales_2021|OrderLineItem": "Needs manual review",
+    "Column|sales_2021|OrderNumber": "Needs manual review",
+    "Column|sales_2021|OrderQuantity": "Needs manual review",
+    "Column|sales_2021|ProductKey": "Needs manual review",
+    "Column|sales_2021|StockDate": "Needs manual review",
+    "Column|sales_2021|TerritoryKey": "Needs manual review",
+    "Column|sales_2022|CustomerKey": "Needs manual review",
+    "Column|sales_2022|OrderDate": "Needs manual review",
+    "Column|sales_2022|OrderLineItem": "Needs manual review",
+    "Column|sales_2022|OrderNumber": "Needs manual review",
+    "Column|sales_2022|OrderQuantity": "Needs manual review",
+    "Column|sales_2022|ProductKey": "Needs manual review",
+    "Column|sales_2022|StockDate": "Needs manual review",
+    "Column|sales_2022|TerritoryKey": "Needs manual review",
+    "Column|stg_customers_raw|BIRTHDATE_TXT": "Likely unused",
+    "Column|stg_customers_raw|CUSTOMERKEY": "Likely unused",
+    "Column|stg_customers_raw|EMAIL": "Likely unused",
+    "Column|stg_customers_raw|FULL_NAME_RAW": "Likely unused",
+    "Column|stg_customers_raw|INCOME_TXT": "Likely unused",
+    "Column|stg_customers_raw|LOADED_BY": "Likely unused",
+    "Column|Subcategories|ProductCategoryKey": "Used",
+    "Column|Subcategories|ProductSubcategoryKey": "Used",
+    "Column|Subcategories|SubcategoryName": "Used",
+    "Column|territories|continent": "Used",
+    "Column|territories|country": "Used",
+    "Column|territories|region": "Likely unused",
+    "Column|territories|territory_key": "Used",
+    "Column|territories json|key": "Likely unused",
+    "Column|territories json|name": "Likely unused",
+    "Column|territories json|name.1": "Likely unused",
+    "Column|territories json|region": "Likely unused",
+    "Column|v_sales_by_month|order_month": "Likely unused",
+    "Column|v_sales_by_month|order_year": "Likely unused",
+    "Column|v_sales_by_month|quantity": "Likely unused",
+    "Column|v_sales_by_month|territory_key": "Likely unused",
+    "Column|v_sales_by_month|YearMonth": "Used",
+    "Column|v_sales_report|annual_income": "Likely unused",
+    "Column|v_sales_report|birth_date": "Likely unused",
+    "Column|v_sales_report|continent": "Likely unused",
+    "Column|v_sales_report|cost": "Likely unused",
+    "Column|v_sales_report|country": "Likely unused",
+    "Column|v_sales_report|customer_key": "Likely unused",
+    "Column|v_sales_report|education_level": "Likely unused",
+    "Column|v_sales_report|email_address": "Likely unused",
+    "Column|v_sales_report|first_name": "Likely unused",
+    "Column|v_sales_report|gender": "Likely unused",
+    "Column|v_sales_report|home_owner": "Likely unused",
+    "Column|v_sales_report|last_name": "Likely unused",
+    "Column|v_sales_report|marital_status": "Likely unused",
+    "Column|v_sales_report|occupation": "Likely unused",
+    "Column|v_sales_report|order_date": "Likely unused",
+    "Column|v_sales_report|order_line_item": "Likely unused",
+    "Column|v_sales_report|order_number": "Likely unused",
+    "Column|v_sales_report|order_quantity": "Likely unused",
+    "Column|v_sales_report|prefix": "Likely unused",
+    "Column|v_sales_report|product_cost": "Likely unused",
+    "Column|v_sales_report|product_key": "Likely unused",
+    "Column|v_sales_report|product_name": "Used",
+    "Column|v_sales_report|product_price": "Likely unused",
+    "Column|v_sales_report|product_subcategory_key": "Likely unused",
+    "Column|v_sales_report|region": "Used",
+    "Column|v_sales_report|revenue": "Used",
+    "Column|v_sales_report|stock_date": "Likely unused",
+    "Column|v_sales_report|territory_key": "Likely unused",
+    "Column|v_sales_report|total_children": "Likely unused",
+    "Measure|Returns|Return Rate": "Used",
+    "Measure|Returns|Total Returns": "Used",
+    "Measure|Sales|Avg Quantity": "Likely unused",
+    "Measure|Sales|Copy of Total Revenue": "Likely unused",
+    "Measure|Sales|Old Profit": "Likely unused",
+    "Measure|Sales|Total Orders": "Used",
+    "Measure|Sales|Total Revenue": "Used",
+    "Measure|v_sales_report|Revenue (view)": "Used"
+  },
+  "manual_review_notes": {
+    "Column|Products|Cost": "Independent review: Likely unused. Referenced only by DAX of objects that are themselves not used.",
+    "Column|Returns 2020|Product": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2020|Qty": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2020|Return Date": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2020|Territory": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2021|Product": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2021|Qty": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2021|Return Date": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2021|Territory": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2022|Product": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2022|Qty": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2022|Return Date": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Returns 2022|Territory": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|CustomerKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|OrderDate": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|OrderLineItem": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|OrderNumber": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|OrderQuantity": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|ProductKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|Source.Name": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|StockDate": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|Sales 2020|TerritoryKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|customers|birth_date": "Independent review: Likely unused. Referenced only by DAX of objects that are themselves not used.",
+    "Column|sales_2021|CustomerKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|OrderDate": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|OrderLineItem": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|OrderNumber": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|OrderQuantity": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|ProductKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|StockDate": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2021|TerritoryKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|CustomerKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|OrderDate": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|OrderLineItem": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|OrderNumber": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|OrderQuantity": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|ProductKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|StockDate": "Independent review: Likely unused. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review.",
+    "Column|sales_2022|TerritoryKey": "Independent review: Used. Yearly input appended by Table.Combine; M lineage does not map the combined table's column status upstream, so query-level evidence stays manual review."
+  },
+  "expected_diagnostics": [],
+  "expected_findings": [
+    {
+      "rule_id": "RELATIONSHIP_BIDIRECTIONAL",
+      "scope": "4d8bbbd6-7477-43c3-8ab5-f29cb8908e18"
+    },
+    {
+      "rule_id": "RELATIONSHIP_BIDIRECTIONAL",
+      "scope": "8bb1aae6-1d33-4181-874c-464f13319f1d"
+    },
+    {
+      "rule_id": "RELATIONSHIP_MANY_TO_MANY",
+      "scope": "2abb65fb-c58c-4ab3-a2be-4c92223982bb"
+    },
+    {
+      "rule_id": "RELATIONSHIP_TEXT_KEY",
+      "scope": "421109dd-755b-4421-baa3-6ec015c3069e"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Returns[Total Returns]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Returns[Return Rate]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Total Revenue]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Total Orders]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Avg Quantity]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Copy of Total Revenue]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "Sales[Old Profit]"
+    },
+    {
+      "rule_id": "MEASURE_DESCRIPTION_MISSING",
+      "scope": "v_sales_report[Revenue (view)]"
+    },
+    {
+      "rule_id": "MEASURE_DUPLICATE_EXPRESSION",
+      "scope": "Sales[Total Revenue]"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Calendar"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Categories"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Customer Lookup (latin1)"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Largest companies"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Product Category Sales (Unpivot Demo)"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "product_categories"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Products"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Returns 2020"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Returns 2021"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Returns 2022"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Sales 2020"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Subcategories"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "territories json"
+    },
+    {
+      "rule_id": "POWERQUERY_HARDCODED_PATH",
+      "scope": "Eksempelfil"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "customers"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "dim_product"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "etl_log"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "sales_2021"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "sales_2022"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "stg_customers_raw"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "territories"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "v_sales_by_month"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "v_sales_report"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "Returns 2020"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "Returns 2021"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "Returns 2022"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "Sales 2020"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "sales_2021"
+    },
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "sales_2022"
+    },
+    {
+      "rule_id": "POWERQUERY_ANNUAL_APPEND",
+      "scope": "Returns"
+    },
+    {
+      "rule_id": "POWERQUERY_ANNUAL_APPEND",
+      "scope": "Sales"
+    },
+    {
+      "rule_id": "POWERQUERY_FOLDER_UNFILTERED",
+      "scope": "Sales 2020"
+    }
+  ]
+}

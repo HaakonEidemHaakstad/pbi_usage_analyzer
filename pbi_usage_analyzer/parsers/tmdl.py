@@ -158,6 +158,7 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, tup
             expression = extract_expression(inline, block, base_indent) if calculated else ""
             hidden = False
             sort_by = None
+            group_by: list[str] = []
             source_column = None
             data_type = None
             for bl in block:
@@ -166,6 +167,9 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, tup
                     hidden = True
                 elif stripped.startswith("sortByColumn:"):
                     sort_by = clean_name(stripped.split(":", 1)[1].strip())
+                elif stripped.startswith("groupByColumn:"):
+                    # Nested under relatedColumnDetails (field parameters).
+                    group_by.append(clean_name(stripped.split(":", 1)[1].strip()) or "")
                 elif stripped.startswith("sourceColumn:"):
                     source_column = clean_name(stripped.split(":", 1)[1].strip())
                 elif stripped.startswith("dataType:"):
@@ -180,6 +184,7 @@ def parse_table_file(path: Path) -> tuple[list[ModelObject], dict[ObjectRef, tup
                 expression=expression,
                 source_line=i + 1,
                 sort_by_column=sort_by,
+                group_by_columns=tuple(name for name in group_by if name),
             ))
             i = next_i
             continue

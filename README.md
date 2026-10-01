@@ -133,7 +133,7 @@ should identify `Ledger` as depending on `Ledger 2024`.
 
 A table name appearing only in metadata, DAX, a string, or a comment must not create a Power Query dependency.
 
-Internal `LocalDateTable_*` and `DateTableTemplate_*` objects are excluded from business-object counts. They protect only specifically identified columns through relationships or supported `Table.SelectColumns` expressions. Unresolved auto-date lineage produces warnings.
+Internal `LocalDateTable_*` and `DateTableTemplate_*` objects are excluded from business-object counts. Power BI links every date column to its own auto-date table, so that automatic relationship is not evidence of use; a backing column is protected when the report uses its date hierarchy (or DAX references it), and supported `Table.SelectColumns` projections give manual-review evidence. Unresolved auto-date lineage produces warnings.
 
 V2 distinguishes query-level lineage from column-level lineage. A query-level dependency from a normal model table currently protects upstream columns conservatively as "Needs manual review." This does not mean that every column is required.
 
@@ -234,9 +234,10 @@ unknown filter settings are skipped. High confidence describes the detected
 configuration, not certainty of a performance problem. Findings do not modify
 cleanup status. See [Microsoft's guidance](https://learn.microsoft.com/en-us/power-bi/guidance/relationships-bidirectional-filtering).
 
-`RELATIONSHIP_MANY_TO_MANY` flags active relationships only when both
-`fromCardinality` and `toCardinality` explicitly say `many`. Omitted or unknown
-cardinalities are not inferred. Recommendations distinguish shared dimensions,
+`RELATIONSHIP_MANY_TO_MANY` flags active relationships with many cardinality at
+both ends. TMDL omits default cardinalities (`fromCardinality` many,
+`toCardinality` one), so Power BI writes many-to-many as only `toCardinality: many`;
+the evidence says when a side came from the default. Recommendations distinguish shared dimensions,
 bridge designs, and legitimate higher-grain facts; the rule does not inspect
 source data or prove incorrect totals. Inactive relationships are skipped.
 See [Microsoft's many-to-many guidance](https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many).

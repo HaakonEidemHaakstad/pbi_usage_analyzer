@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
-from ..util import clean_name, norm_key, read_source_text
+from ..util import clean_name, is_internal_table, norm_key, read_source_text
 
 # Handles e.g. fromColumn: 'Hovedbok'.firma and fromColumn: Hovedbok.firma
 REF_RE = re.compile(r"(?:(?:'(?P<quoted>(?:[^']|'')+)')|(?P<plain>[^.]+))\.(?P<field>.+)$")
@@ -83,7 +83,14 @@ def parse_relationship_metadata(model_folder: Path) -> list[Relationship]:
 def relationship_evidence(relationships: list[Relationship], columns: dict[tuple[str, str], ObjectRef]) -> list[Evidence]:
     evidence = []
     for relationship in relationships:
-        for endpoint in (relationship.from_column, relationship.to_column):
+        endpoints = (relationship.from_column, relationship.to_column)
+        # Power BI links every date column to its own auto-date table while Auto
+        # date/time is on. That link is automatic, not evidence of use: use of
+        # the auto-date table shows up in the report (PropertyVariationSource) or
+        # in DAX, which protect the backing column themselves.
+        if any(endpoint and is_internal_table(endpoint[0]) for endpoint in endpoints):
+            continue
+        for endpoint in endpoints:
             if endpoint:
                 ref = columns.get(norm_key(*endpoint))
                 if ref:

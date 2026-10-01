@@ -121,7 +121,10 @@ inspection and receive internal evidence. Internal columns and measures are
 excluded from business totals and cleanup candidates in both reports.
 
 Internal query owners never expand a query dependency to every upstream column.
-Relationship endpoints still protect the exact backing column as `Used`.
+Relationships to an internal auto-date table give no evidence: Power BI creates one
+for every date column while Auto date/time is on (19 in the AW Mess case study), so
+the link says nothing about use. Report use of the auto-date hierarchy
+(`PropertyVariationSource`) protects the backing column as `Used`.
 For a single M partition with the complete shape
 `let Source = Query, Selected = Table.SelectColumns(Source, {"Date"}) in Selected`,
 the parser records the projection and graph construction resolves its source
@@ -326,10 +329,12 @@ Reference: [Microsoft bidirectional relationship guidance](https://learn.microso
 ### Many-to-many relationship rule
 
 Relationship metadata retains explicit `fromCardinality` and `toCardinality`
-values, leaving omissions empty. `RELATIONSHIP_MANY_TO_MANY` requires both to be
-`many`, an active state (explicit or default), and parsed endpoints. Unknown,
-incomplete and inactive configurations are skipped. This deliberately does not
-infer omitted cardinalities, data uniqueness, table roles or runtime behavior.
+values, leaving omissions empty. `RELATIONSHIP_MANY_TO_MANY` applies the TMDL
+defaults to omissions (`fromCardinality` many, `toCardinality` one; Power BI Desktop
+writes many-to-many as only `toCardinality: many`) and requires many at both ends,
+an active state (explicit or default), and parsed endpoints. Unknown and inactive
+configurations are skipped. It does not infer data uniqueness, table roles or
+runtime behavior.
 
 The rule emits an advisory warning with endpoint/cardinality evidence and source
 location. Its recommendation distinguishes fact-to-fact shared dimensions,

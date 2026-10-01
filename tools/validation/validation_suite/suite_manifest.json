@@ -38,7 +38,8 @@
     "36_m_folder_sources",
     "37_duplicate_measures",
     "38_m_local_servers",
-    "39_text_key_relationships"
+    "39_text_key_relationships",
+    "40_power_bi_desktop_shapes"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

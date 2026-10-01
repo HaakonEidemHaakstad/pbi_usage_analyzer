@@ -1,0 +1,20 @@
+table Sales
+	/// Revenue in USD
+	measure 'Total Revenue' = SUM(Sales[Amount])
+	column Amount
+		dataType: double
+		sourceColumn: Amount
+	column MonthKey
+		dataType: int64
+		sourceColumn: MonthKey
+	column ' Country'
+		dataType: string
+		sourceColumn: " Country"
+	column StockDate
+		dataType: dateTime
+		sourceColumn: StockDate
+
+		variation Variasjon
+			isDefault
+			relationship: auto_stock
+			defaultHierarchy: LocalDateTable_stock.Datohierarki

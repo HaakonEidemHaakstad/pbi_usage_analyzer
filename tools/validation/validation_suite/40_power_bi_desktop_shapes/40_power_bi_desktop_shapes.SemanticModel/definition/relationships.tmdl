@@ -1,0 +1,9 @@
+relationship auto_stock
+	joinOnDateBehavior: datePartOnly
+	fromColumn: Sales.StockDate
+	toColumn: LocalDateTable_stock.Date
+
+relationship 2abb65fb-c58c-4ab3-a2be-4c92223982bb
+	toCardinality: many
+	fromColumn: Sales.MonthKey
+	toColumn: Months.MonthKey

@@ -24,6 +24,9 @@ class EvidenceType(str, Enum):
     RELATIONSHIP_DEPENDENCY = "RELATIONSHIP_DEPENDENCY"
     HIERARCHY_DEPENDENCY = "HIERARCHY_DEPENDENCY"
     SORT_DEPENDENCY = "SORT_DEPENDENCY"
+    # relatedColumnDetails/groupByColumn, e.g. a field parameter's name column
+    # grouped by its hidden NAMEOF fields column.
+    GROUP_BY_DEPENDENCY = "GROUP_BY_DEPENDENCY"
     FIELD_PARAMETER_DEPENDENCY = "FIELD_PARAMETER_DEPENDENCY"
     RLS_DEPENDENCY = "RLS_DEPENDENCY"
     CALCULATION_GROUP_DEPENDENCY = "CALCULATION_GROUP_DEPENDENCY"
@@ -65,6 +68,7 @@ class ModelObject:
     data_type: str | None = None
     expression: str = ""
     sort_by_column: str | None = None
+    group_by_columns: tuple[str, ...] = ()
     metadata: dict = field(default_factory=dict)
     description: str | None = None
     source_line: int | None = None

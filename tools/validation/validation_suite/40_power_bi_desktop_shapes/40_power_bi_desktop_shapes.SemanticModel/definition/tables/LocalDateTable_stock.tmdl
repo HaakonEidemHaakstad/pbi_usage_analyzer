@@ -1,0 +1,12 @@
+table LocalDateTable_stock
+	isHidden
+	showAsVariationsOnly
+
+	column Date
+		dataType: dateTime
+		isHidden
+		sourceColumn: [Date]
+
+	partition LocalDateTable_stock = calculated
+		mode: import
+		source = Calendar(Date(Year(MIN('Sales'[StockDate])), 1, 1), Date(Year(MAX('Sales'[StockDate])), 12, 31))

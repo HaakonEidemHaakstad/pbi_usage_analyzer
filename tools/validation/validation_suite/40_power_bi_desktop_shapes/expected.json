@@ -1,0 +1,20 @@
+{
+  "expected_status": {
+    "Column|Metric Selector|Metric Selector": "Used",
+    "Column|Metric Selector|Metric Selector Felt": "Used",
+    "Column|Metric Selector|Metric Selector Rekkefølge": "Used",
+    "Measure|Sales|Total Revenue": "Used",
+    "Column|Sales|Amount": "Used",
+    "Column|Sales| Country": "Used",
+    "Column|Sales|MonthKey": "Used",
+    "Column|Months|MonthKey": "Used",
+    "Column|Sales|StockDate": "Likely unused"
+  },
+  "notes": "Field parameter name column protects its relatedColumnDetails groupByColumn (the NAMEOF fields column); an automatic auto-date relationship alone protects nothing; a many-to-many relationship written with only toCardinality: many is reported; display names keep the leading space Power BI took from a CSV header.",
+  "expected_health": [
+    {
+      "rule_id": "RELATIONSHIP_MANY_TO_MANY",
+      "scope": "2abb65fb-c58c-4ab3-a2be-4c92223982bb"
+    }
+  ]
+}

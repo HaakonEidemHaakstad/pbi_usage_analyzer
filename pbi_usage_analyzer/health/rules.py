@@ -44,7 +44,12 @@ def bidirectional_relationships(relationships: list[Relationship]) -> list[Healt
 def many_to_many_relationships(relationships: list[Relationship]) -> list[HealthFinding]:
     findings = []
     for relationship in relationships:
-        if relationship.from_cardinality != "many" or relationship.to_cardinality != "many":
+        # TMDL omits default cardinalities: fromCardinality defaults to many and
+        # toCardinality to one, so Power BI writes many-to-many as only
+        # `toCardinality: many` (observed in a Power BI Desktop export).
+        from_cardinality = relationship.from_cardinality or "many"
+        to_cardinality = relationship.to_cardinality or "one"
+        if from_cardinality != "many" or to_cardinality != "many":
             continue
         if relationship.is_active != "true":
             continue
@@ -56,11 +61,11 @@ def many_to_many_relationships(relationships: list[Relationship]) -> list[Health
             rule_id="RELATIONSHIP_MANY_TO_MANY", category="relationships",
             severity=HealthSeverity.WARNING, confidence="high", scope=relationship.name,
             title="Review many-to-many relationship design",
-            explanation="This active relationship explicitly declares many cardinality at both "
-                        "ends. Review its intended grain and filter behavior. Metadata alone "
-                        "does not establish duplicate keys, incorrect totals, or a performance problem.",
-            evidence=("fromCardinality: many", "toCardinality: many",
-                      "isActive: true (explicit or default)", *endpoints),
+            explanation="This active relationship has many cardinality at both ends. Review its "
+                        "intended grain and filter behavior. Metadata alone does not establish "
+                        "duplicate keys, incorrect totals, or a performance problem.",
+            evidence=("fromCardinality: many" + ("" if relationship.from_cardinality else " (default, omitted in TMDL)"),
+                      "toCardinality: many", "isActive: true (explicit or default)", *endpoints),
             recommendation="Confirm the grain and intended filtering of both tables. For fact-to-fact "
                            "relationships, consider shared dimensions; for many-to-many dimension "
                            "associations, consider a bridge with unique entity keys. Higher-grain fact "

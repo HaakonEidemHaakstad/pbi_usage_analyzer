@@ -1,0 +1,4 @@
+table Months
+	column MonthKey
+		dataType: int64
+		sourceColumn: MonthKey

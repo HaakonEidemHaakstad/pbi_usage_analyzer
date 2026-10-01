@@ -10,6 +10,7 @@ HIGH_CONFIDENCE_USE = {
     EvidenceType.RELATIONSHIP_DEPENDENCY,
     EvidenceType.HIERARCHY_DEPENDENCY,
     EvidenceType.SORT_DEPENDENCY,
+    EvidenceType.GROUP_BY_DEPENDENCY,
     EvidenceType.FIELD_PARAMETER_DEPENDENCY,
     EvidenceType.RLS_DEPENDENCY,
     EvidenceType.CALCULATION_GROUP_DEPENDENCY,
@@ -47,6 +48,7 @@ def propagate_used(graph: DependencyGraph) -> set[ObjectRef]:
                 EvidenceType.DAX_DEPENDENCY,
                 EvidenceType.HIERARCHY_DEPENDENCY,
                 EvidenceType.SORT_DEPENDENCY,
+                EvidenceType.GROUP_BY_DEPENDENCY,
                 EvidenceType.FIELD_PARAMETER_DEPENDENCY,
                 EvidenceType.RLS_DEPENDENCY,
                 EvidenceType.CALCULATION_GROUP_DEPENDENCY,
@@ -77,7 +79,9 @@ def classify(graph: DependencyGraph) -> list[Finding]:
             status = Status.USED
         elif any(ev.evidence_type in MANUAL_REVIEW for ev in incoming):
             status = Status.MANUAL_REVIEW
-        elif any(ev.evidence_type in {EvidenceType.DAX_DEPENDENCY, EvidenceType.HIERARCHY_DEPENDENCY, EvidenceType.SORT_DEPENDENCY, EvidenceType.CALCULATION_GROUP_DEPENDENCY} for ev in incoming):
+        elif any(ev.evidence_type in {EvidenceType.DAX_DEPENDENCY, EvidenceType.HIERARCHY_DEPENDENCY, EvidenceType.SORT_DEPENDENCY,
+                                       EvidenceType.GROUP_BY_DEPENDENCY, EvidenceType.CALCULATION_GROUP_DEPENDENCY}
+                 for ev in incoming):
             # A model dependency exists, but its owner is not proven to be active.
             status = Status.MANUAL_REVIEW
         else:

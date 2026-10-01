@@ -28,13 +28,15 @@ def clean_name(name: object | None) -> str | None:
         return None
     value = str(name).strip()
     if len(value) >= 2 and value.startswith("'") and value.endswith("'"):
+        # Whitespace inside quotes is part of the display name (e.g. ' Country'
+        # from a CSV header); only matching keys (norm) trim it.
         value = value[1:-1].replace("''", "'")
-    return value.strip()
+    return value
 
 
 def norm(value: object | None) -> str:
     cleaned = clean_name(value)
-    return "" if cleaned is None else cleaned.casefold()
+    return "" if cleaned is None else cleaned.strip().casefold()
 
 
 def norm_key(table: object | None, field: object | None) -> tuple[str, str]:
