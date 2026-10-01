@@ -25,12 +25,37 @@ MANUAL_REVIEW = {
 }
 
 
+# Evidence that makes its target used on its own.
+ROOT_EVIDENCE = frozenset({
+    EvidenceType.DIRECT_REPORT_USE,
+    EvidenceType.RELATIONSHIP_DEPENDENCY,
+    EvidenceType.FIELD_PARAMETER_DEPENDENCY,
+    EvidenceType.RLS_DEPENDENCY,
+})
+# Edges whose target is used when their source is used.
+PROPAGATING_EVIDENCE = frozenset({
+    EvidenceType.DAX_DEPENDENCY,
+    EvidenceType.HIERARCHY_DEPENDENCY,
+    EvidenceType.SORT_DEPENDENCY,
+    EvidenceType.GROUP_BY_DEPENDENCY,
+    EvidenceType.FIELD_PARAMETER_DEPENDENCY,
+    EvidenceType.RLS_DEPENDENCY,
+    EvidenceType.CALCULATION_GROUP_DEPENDENCY,
+    EvidenceType.POWERQUERY_COLUMN_LINEAGE,
+})
+
+# Model dependencies that give manual review when their owner is not proven used.
+OWNER_DEPENDENCY = frozenset({
+    EvidenceType.DAX_DEPENDENCY,
+    EvidenceType.HIERARCHY_DEPENDENCY,
+    EvidenceType.SORT_DEPENDENCY,
+    EvidenceType.GROUP_BY_DEPENDENCY,
+    EvidenceType.CALCULATION_GROUP_DEPENDENCY,
+})
+
+
 def _root_used(graph: DependencyGraph) -> set[ObjectRef]:
-    roots: set[ObjectRef] = set()
-    for ev in graph.evidence:
-        if ev.evidence_type in {EvidenceType.DIRECT_REPORT_USE, EvidenceType.RELATIONSHIP_DEPENDENCY, EvidenceType.FIELD_PARAMETER_DEPENDENCY, EvidenceType.RLS_DEPENDENCY}:
-            roots.add(ev.target)
-    return roots
+    return {ev.target for ev in graph.evidence if ev.evidence_type in ROOT_EVIDENCE}
 
 
 def propagate_used(graph: DependencyGraph) -> set[ObjectRef]:
@@ -44,16 +69,7 @@ def propagate_used(graph: DependencyGraph) -> set[ObjectRef]:
     while queue:
         source = queue.popleft()
         for ev in graph.outgoing(source):
-            if ev.evidence_type in {
-                EvidenceType.DAX_DEPENDENCY,
-                EvidenceType.HIERARCHY_DEPENDENCY,
-                EvidenceType.SORT_DEPENDENCY,
-                EvidenceType.GROUP_BY_DEPENDENCY,
-                EvidenceType.FIELD_PARAMETER_DEPENDENCY,
-                EvidenceType.RLS_DEPENDENCY,
-                EvidenceType.CALCULATION_GROUP_DEPENDENCY,
-                EvidenceType.POWERQUERY_COLUMN_LINEAGE,
-            } and ev.target not in used:
+            if ev.evidence_type in PROPAGATING_EVIDENCE and ev.target not in used:
                 used.add(ev.target)
                 queue.append(ev.target)
     return used
@@ -80,9 +96,7 @@ def classify(graph: DependencyGraph) -> list[Finding]:
             status = Status.USED
         elif any(ev.evidence_type in MANUAL_REVIEW for ev in incoming):
             status = Status.MANUAL_REVIEW
-        elif any(ev.evidence_type in {EvidenceType.DAX_DEPENDENCY, EvidenceType.HIERARCHY_DEPENDENCY, EvidenceType.SORT_DEPENDENCY,
-                                       EvidenceType.GROUP_BY_DEPENDENCY, EvidenceType.CALCULATION_GROUP_DEPENDENCY}
-                 for ev in incoming):
+        elif any(ev.evidence_type in OWNER_DEPENDENCY for ev in incoming):
             # A model dependency exists, but its owner is not proven to be active.
             status = Status.MANUAL_REVIEW
         else:

@@ -136,7 +136,8 @@ Then: "reinitiate everything necessary, such as MariaDB" (nothing needed: the
 match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1"
 (usage-aware M lineage, done), then "proceed" (references through load-disabled
 queries, done), then option 4 because no other real project is available (GUI
-design document, done; no code).
+design document, done; no code), then "go with the toolkit you think is best. build
+windows app. interface language english, start G0 now" (G0 done).
 
 ## Implemented work in the current tree
 
@@ -156,7 +157,8 @@ design document, done; no code).
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| GUI design | Latest change: docs/GUI_DESIGN.md (design only; no code). Facts checked 2026-10-01: analysis 0.04–0.09 s on the real projects; PySide6 6.11.2 supports Python 3.10–3.14 with Windows wheels; Tk 9.0 present in this Python. |
+| GUI phase G0 | Latest change: `pbi_usage_analyzer.views` (catalog, explain, rows), `RULE_INFO`, `HealthFinding.object_ref`, `reporting.files.write_reports`, Excel evidence paths. Details below. |
+| GUI design | Previous change: docs/GUI_DESIGN.md (design only; no code). Facts checked 2026-10-01: analysis 0.04–0.09 s on the real projects; PySide6 6.11.2 supports Python 3.10–3.14 with Windows wheels; Tk 9.0 present in this Python. |
 | Shared-query references | Previous change: references through load-disabled queries are followed (exact lineage and fallback); comment `#"..."` fix. Details below. |
 | Usage-aware lineage | Previous change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
 | AW Good scoring | Previous change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
@@ -179,6 +181,32 @@ design document, done; no code).
 | Damaged sources | Previous change: scoped evidence recovery for unreadable/undecodable files. Details below. |
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
+
+## Latest change: GUI phase G0, core presentation layer (2026-10-01)
+
+- Decisions recorded in docs/GUI_DESIGN.md (status: accepted). G0 table there.
+- `analysis/classify.py` exposes `ROOT_EVIDENCE`, `PROPAGATING_EVIDENCE`,
+  `OWNER_DEPENDENCY` (pure refactor); `views/explain.py` uses them.
+- `views/explain.py`: `Explainer` (build once per result; `propagate_used` once) with
+  `use_path` (BFS backward over propagating edges with used sources until a node with
+  root evidence; root priority report > field parameter > RLS > relationship) and
+  `review_path` (lineage edges from review sources back to a node with its own review
+  cause: `MANUAL_REVIEW` or `OWNER_DEPENDENCY` evidence). `format_path` starts at the
+  owning object when the first evidence has a non-`Special:` source.
+- `health/engine.py` `RULE_INFO` (`RuleInfo`: id, category, severity, name, summary),
+  same order as `RULES`; `health/model.py` `object_ref` (default None) set in
+  `health/rules.py` (`_query_ref` returns a QUERY ref only for partitions);
+  `json_report` drops `object_ref` (schema v1 unchanged).
+- `PowerQueryResult.dependencies` rows gained `"Via"` (tuple of load-disabled query
+  names); Excel shows it as "Through load-disabled queries", text report as
+  "(through ...)".
+- `reporting/files.py` `write_reports`; `main.run` uses it (file names from
+  `ProjectPaths`). Excel builds finding rows once (was four times) and adds "Evidence
+  path".
+- Comparison with the previous commit: no status or evidence-count change in 42
+  scenarios + 3 real projects. Tests: `tests/test_views.py` (19, incl. an import guard
+  that core imports load no GUI toolkit). Large model: explain all 3,200 objects
+  0.01 s; `write_reports` 1.05 s.
 
 ## Previous change: references through load-disabled queries (2026-10-01)
 
@@ -737,17 +765,19 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 Both case studies are built and scored, usage-aware lineage and shared-query
 references are done, and the GUI design exists (docs/GUI_DESIGN.md, 2026-10-01).
-**Waiting on the user:** the open decisions in GUI_DESIGN.md section 13 (framework
-PySide6?, Windows build?, UI language, start G0?). G0 (core changes C1–C6: evidence
-paths, catalog, structured health scope, stable keys, `write_reports`, `views` rows)
-is useful without a GUI and changes no status. Other candidates:
+Owner decisions (2026-10-01): toolkit left to the agent (PySide6 chosen), a
+standalone Windows app (G3), English UI, start G0 immediately. **G0 is done**
+(GUI_DESIGN.md section 13 lists where each change lives). **Next: G1**, the read-only
+PySide6 viewer in a separate `pbi_usage_analyzer_gui` package with a `gui` optional
+extra (PySide6 6.11.2 supports Python 3.14 on this machine); it renders only
+`pbi_usage_analyzer.views` rows. Other candidates:
 1. Lineage through currently unsupported steps seen in real exports (e.g. the folder
    combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`; matters only
    when such a step sits between two model queries).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
-4. GUI: designed (docs/GUI_DESIGN.md); implementation starts with phase G0.
+4. GUI: G0 done; G1 next (see above).
 Remaining answer-key gaps need data access (encoding, totals rows, folder
 duplicates) or name heuristics (`stg_*` staging).
 
@@ -773,6 +803,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
+- Windows, Python 3.14, 2026-10-01 after GUI phase G0: 259 tests OK with all three
+  real-project variables set (2 skipped); 359 synthetic checks across 42 scenarios;
+  compilation, fixture drift, `git diff --check` pass; benchmark 0.32 s.
 - Windows, Python 3.14, 2026-10-01 after shared-query references: 240 tests OK with
   all three real-project variables set (2 skipped); 359 synthetic checks across 42
   scenarios; compilation, fixture drift, `git diff --check` pass; benchmark 0.32 s.

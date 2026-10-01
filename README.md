@@ -103,6 +103,10 @@ The analyzer creates:
 <Project>_usage_analysis_v2.xlsx
 ```
 
+The Excel column and measure sheets include an "Evidence path" for every Used
+object (and for manual review passed on through Power Query lineage); the Power
+Query dependency sheet shows paths through load-disabled queries.
+
 ## Analysis sources
 
 V2 inspects:
@@ -227,6 +231,35 @@ carry stable codes, source files, optional object references, and JSON error
 line/column positions when available. Existing renderers can use
 `result.context`. Results own mutable graph/finding data; they are not deeply
 immutable or a JSON serialization format. Progress/cancellation hooks are not yet implemented.
+
+### Presentation helpers (`pbi_usage_analyzer.views`)
+
+UI-agnostic helpers for front ends and reports, built only from the result:
+
+```python
+from pbi_usage_analyzer.views import (Explainer, STATUS_INFO, filter_objects, format_path,
+                                      object_rows)
+from pbi_usage_analyzer.model import Status
+from pbi_usage_analyzer.reporting.files import write_reports
+
+rows = object_rows(result)                     # frozen rows with stable keys
+for row in filter_objects(rows, statuses=[Status.LIKELY_UNUSED]):
+    print(row.key, STATUS_INFO[row.status].summary)
+
+explainer = Explainer(result.graph, result.findings)
+explanation = explainer.explain(rows[0].ref)
+print(format_path(explanation.use_path))       # e.g. Report -> Sales[Revenue] -> DAX -> Sales[Amount]
+
+write_reports(result, "C:/reports", json=True)  # text, Excel and JSON in a chosen folder
+```
+
+`views.catalog` holds the status, evidence-type, category and rule labels (rule
+metadata comes from `health.engine.RULE_INFO`); `views.rows` provides object,
+health, diagnostic and query-dependency rows with filters; `views.explain` gives
+the shortest path from root evidence to a Used object and, for manual review passed
+on through Power Query lineage, the path from the object that has its own review
+evidence. Health findings carry `object_ref` (measure, column or loaded query;
+none for relationships) in memory; JSON schema version 1 does not export it.
 
 ## Model health
 
@@ -471,8 +504,9 @@ results. Synthetic validation does not establish real-project accuracy.
 Both AdventureWorks case studies are built and scored (no object the report needs
 is Likely unused in either; the good twin produces no findings). Usage-aware M lineage
 then resolved all 37 append-input manual reviews in the mess case. A thin desktop
-GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md);
-validation on more real projects continues when projects are available.
+GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md)
+(PySide6, Windows app, English). Phase G0, the core presentation layer
+(`pbi_usage_analyzer.views`), is done; next is G1, the read-only viewer.
 
 ## Case studies: AdventureWorks, mess and good twin
 

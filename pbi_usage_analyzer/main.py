@@ -6,9 +6,7 @@ from pathlib import Path
 from .api import analyze_project
 from .health.engine import RULES
 from .health.model import HealthSeverity
-from .reporting.excel_report import write_excel
-from .reporting.text_report import generate_text
-from .reporting.json_report import write_json
+from .reporting.files import write_reports
 
 
 def run(project_folder: Path, *, health_rule_ids=None, health_severities=None, json_output: bool = False) -> tuple[Path, Path]:
@@ -28,15 +26,7 @@ def run(project_folder: Path, *, health_rule_ids=None, health_severities=None, j
     print()
 
     ctx = result.context
-    findings = result.findings
-
-    text_report = generate_text(project.project_name, findings, ctx, result.health_findings, result.health_filter_scope)
-    project.text_output.write_text(text_report, encoding="utf-8")
-    write_excel(project.excel_output, project.project_name, findings, ctx, result.health_findings, result.health_filter_scope)
-
-    json_path = project.root / f"{project.project_name}_usage_analysis_v2.json"
-    if json_output:
-        write_json(json_path, result)
+    files = write_reports(result, json=json_output)
 
     cols = result.summary.columns
     measures = result.summary.measures
@@ -51,11 +41,11 @@ def run(project_folder: Path, *, health_rule_ids=None, health_severities=None, j
         for row in ctx.powerquery.dependencies:
             print(f"  {row['Query']} <- {row['Depends on query']}")
     print()
-    print(f"Text report: {project.text_output}")
-    print(f"Technical report: {project.excel_output}")
-    if json_output:
-        print(f"JSON report: {json_path}")
-    return project.text_output, project.excel_output
+    print(f"Text report: {files.text}")
+    print(f"Technical report: {files.excel}")
+    if files.json:
+        print(f"JSON report: {files.json}")
+    return files.text, files.excel
 
 
 def cli() -> None:

@@ -51,7 +51,8 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
         lines.append("These dependencies were extracted from actual M expressions in TMDL partitions:")
         lines.append("")
         for row in ctx.powerquery.dependencies:
-            lines.append(f"  - {row['Query']} <- {row['Depends on query']}")
+            via = f" (through {' -> '.join(row['Via'])})" if row["Via"] else ""
+            lines.append(f"  - {row['Query']} <- {row['Depends on query']}{via}")
         lines.append("")
         lines.append("Supported M lineage protects output and required schema columns. Unresolved query-level M dependencies from ordinary model tables conservatively protect upstream columns, but do not prove that every column is required. These columns receive manual-review status rather than 'Used'. Internal auto-date tables protect only specifically identified columns; unresolved references produce warnings.")
 

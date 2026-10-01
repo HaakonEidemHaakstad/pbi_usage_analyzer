@@ -8,17 +8,21 @@ from ..health.model import HealthFinding
 from ..health.filtering import HealthFilterScope
 from .health_scope import health_scope_rows
 from ..model import Finding, ObjectType, Status
+from ..views.explain import Explainer, format_path
 
 
-def _finding_rows(findings: list[Finding], obj_type: ObjectType) -> list[dict]:
+def _finding_rows(findings: list[Finding], obj_type: ObjectType, explainer: Explainer) -> list[dict]:
     rows = []
     for f in findings:
         if f.ref.object_type != obj_type:
             continue
+        explanation = explainer.explain(f.ref)
         rows.append({
             "Table": f.ref.table,
             "Object": f.ref.name,
             "Status": f.status.value,
+            # Why Used, or how manual review arrived through Power Query lineage.
+            "Evidence path": format_path(explanation.use_path or explanation.review_path),
             "Evidence types": " | ".join(f.evidence_types),
             "Reasons": " | ".join(f.reasons),
         })
@@ -49,12 +53,15 @@ def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: Ana
         "Source file": ev.source_file,
     } for ev in ctx.graph.evidence]
 
+    explainer = Explainer(ctx.graph, findings)
+    column_rows = _finding_rows(findings, ObjectType.COLUMN, explainer)
+    measure_rows = _finding_rows(findings, ObjectType.MEASURE, explainer)
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         summary.to_excel(writer, sheet_name="Summary", index=False)
-        pd.DataFrame(_finding_rows(findings, ObjectType.COLUMN)).to_excel(writer, sheet_name="Column analysis", index=False)
-        pd.DataFrame([r for r in _finding_rows(findings, ObjectType.COLUMN) if r["Status"] == Status.LIKELY_UNUSED.value]).to_excel(writer, sheet_name="Likely unused columns", index=False)
-        pd.DataFrame(_finding_rows(findings, ObjectType.MEASURE)).to_excel(writer, sheet_name="Measure analysis", index=False)
-        pd.DataFrame([r for r in _finding_rows(findings, ObjectType.MEASURE) if r["Status"] == Status.LIKELY_UNUSED.value]).to_excel(writer, sheet_name="Likely unused measures", index=False)
+        pd.DataFrame(column_rows).to_excel(writer, sheet_name="Column analysis", index=False)
+        pd.DataFrame([r for r in column_rows if r["Status"] == Status.LIKELY_UNUSED.value]).to_excel(writer, sheet_name="Likely unused columns", index=False)
+        pd.DataFrame(measure_rows).to_excel(writer, sheet_name="Measure analysis", index=False)
+        pd.DataFrame([r for r in measure_rows if r["Status"] == Status.LIKELY_UNUSED.value]).to_excel(writer, sheet_name="Likely unused measures", index=False)
         pd.DataFrame(evidence_rows).to_excel(writer, sheet_name="Dependency evidence", index=False)
         health_columns = ["Rule ID", "Category", "Severity", "Confidence", "Scope", "Title",
                           "Explanation", "Evidence", "Recommendation", "Source file", "Line"]
@@ -69,5 +76,8 @@ def write_excel(path: Path, project_name: str, findings: list[Finding], ctx: Ana
             pd.DataFrame(ctx.report.fallback).to_excel(writer, sheet_name="Fallback matches", index=False)
             pd.DataFrame(ctx.report.auto_date).to_excel(writer, sheet_name="Auto date references", index=False)
         if ctx.powerquery:
-            pd.DataFrame(ctx.powerquery.dependencies).to_excel(writer, sheet_name="Power Query dependencies", index=False)
+            dependency_rows = [{"Query": row["Query"], "Depends on query": row["Depends on query"],
+                                "Through load-disabled queries": " -> ".join(row["Via"]),
+                                "Source file": row["Source file"]} for row in ctx.powerquery.dependencies]
+            pd.DataFrame(dependency_rows).to_excel(writer, sheet_name="Power Query dependencies", index=False)
         pd.DataFrame({"Warning": ctx.warnings}).to_excel(writer, sheet_name="Warnings", index=False)

@@ -174,5 +174,8 @@ no longer create dependencies.
 A GUI design document (docs/GUI_DESIGN.md) proposes a PySide6 front end over a new
 UI-agnostic `views` layer, preceded by core changes C1–C6 (evidence paths, label
 catalog, structured health scope, stable finding keys, shared report writing, rows).
-Next: owner decisions in GUI_DESIGN.md section 13, then phase G0; more real projects
-when available.
+Owner decisions (2026-10-01): PySide6, Windows app, English. Phase G0 is done: the
+`pbi_usage_analyzer.views` presentation layer (evidence paths, label/rule catalog,
+rows with stable keys and filters), `HealthFinding.object_ref`, and shared
+`write_reports`; Excel shows evidence paths.
+Next: G1 read-only viewer; more real projects when available.

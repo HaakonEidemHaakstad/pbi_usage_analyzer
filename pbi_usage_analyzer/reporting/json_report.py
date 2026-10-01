@@ -49,7 +49,9 @@ def analysis_to_dict(result: AnalysisResult) -> dict:
         "cleanup_findings": [{**asdict(finding), "status_id": finding.status.name}
                              for finding in result.findings],
         "diagnostics": [asdict(diagnostic) for diagnostic in result.diagnostics],
-        "health_findings": [asdict(finding) for finding in result.health_findings],
+        # object_ref is not part of schema version 1.
+        "health_findings": [{key: value for key, value in asdict(finding).items() if key != "object_ref"}
+                            for finding in result.health_findings],
         "health_filter_scope": asdict(result.health_filter_scope),
     })
 

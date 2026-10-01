@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from pathlib import Path
 import re
 
-from ..model import ModelObject, ObjectType
+from ..model import ModelObject, ObjectRef, ObjectType
 from ..parsers.dax import DaxIndex, unresolved_references
 from ..parsers.dax_lexer import normalize_dax
 from ..parsers.m_queries import MQuery, MQueryKind, appended_query_refs, folder_listing, m_string_literals
@@ -129,7 +129,7 @@ def missing_measure_descriptions(objects: Iterable[ModelObject]) -> list[HealthF
             recommendation="Add a description immediately above the measure using TMDL /// lines. "
                            "Explain its business meaning, units, and relevant filter or time assumptions. "
                            "Prioritize measures that other model authors or report users need to understand.",
-            source_file=obj.source_file, line=obj.source_line,
+            source_file=obj.source_file, line=obj.source_line, object_ref=obj.ref,
         ))
     return findings
 
@@ -168,7 +168,7 @@ def unresolved_dax_references(objects: Iterable[ModelObject]) -> list[HealthFind
             recommendation="Update the reference to the current column or measure name, or remove the "
                            f"{kind} if it is no longer needed. If the referenced table exists but was not "
                            "parsed (see diagnostics), resolve that first and re-run the analysis.",
-            source_file=obj.source_file, line=obj.source_line,
+            source_file=obj.source_file, line=obj.source_line, object_ref=obj.ref,
         ))
     return findings
 
@@ -204,7 +204,7 @@ def duplicate_measures(objects: Iterable[ModelObject]) -> list[HealthFinding]:
                            "exists for a different format or folder, consider one measure with a "
                            "dynamic format string, or make the copy reference the original "
                            "([Original]) so the logic lives in one place.",
-            source_file=first.source_file, line=first.source_line,
+            source_file=first.source_file, line=first.source_line, object_ref=first.ref,
         ))
     return findings
 
@@ -241,7 +241,7 @@ def hardcoded_m_paths(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "from it, for example File.Contents(DataFolder & \"\\sales.csv\"). For shared "
                            "models, prefer a shared location such as SharePoint or a database and plan "
                            "the gateway. A single-user file may accept the path, but record the decision.",
-            source_file=query.source_file, line=paths[0][1],
+            source_file=query.source_file, line=paths[0][1], object_ref=_query_ref(query),
         ))
     return findings
 
@@ -280,9 +280,14 @@ def local_servers(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "parameter (Manage Parameters) so it can be switched between environments. "
                            "Plan an on-premises data gateway for scheduled refresh. Keep localhost "
                            "only for a strictly personal model, and record that decision.",
-            source_file=query.source_file, line=servers[0][1],
+            source_file=query.source_file, line=servers[0][1], object_ref=_query_ref(query),
         ))
     return findings
+
+
+def _query_ref(query: MQuery) -> ObjectRef | None:
+    """Loaded queries are graph objects; load-disabled (shared) queries are not."""
+    return ObjectRef(ObjectType.QUERY, query.name) if query.kind == MQueryKind.PARTITION else None
 
 
 def _appends(queries: tuple[MQuery, ...]) -> list[tuple[MQuery, MQuery, int]]:
@@ -326,7 +331,7 @@ def loaded_append_inputs(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "report), clear Enable load for the query in the Power Query editor; the "
                            "append keeps working and the query becomes a shared expression. If reports "
                            "use it, consider pointing them at the appended table instead.",
-            source_file=query.source_file, line=query.line,
+            source_file=query.source_file, line=query.line, object_ref=_query_ref(query),
         ))
     return findings
 
@@ -360,6 +365,7 @@ def unfiltered_folder_sources(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "duplicates now. If the folder is controlled and all files belong, "
                            "record that decision.",
             source_file=query.source_file, line=query.file_line(listing.calls[0][0]),
+            object_ref=_query_ref(query),
         ))
     return findings
 
@@ -395,6 +401,6 @@ def annual_appends(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "date filter, or a custom function invoked per file. Consider incremental "
                            "refresh for large history. Keep separate queries if the years genuinely "
                            "differ in structure, and record that decision.",
-            source_file=owner.source_file, line=appended[0][1],
+            source_file=owner.source_file, line=appended[0][1], object_ref=_query_ref(owner),
         ))
     return findings

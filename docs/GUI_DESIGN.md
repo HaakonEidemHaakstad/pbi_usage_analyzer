@@ -1,8 +1,12 @@
 # GUI design — Power BI Model Health Analyzer
 
-Status: design proposal, 2026-10-01. No GUI code exists yet. This document fixes the
-architecture and scope before implementation starts (AGENTS.md, "Future GUI
-requirement"; ROADMAP Phase 4). Decisions marked **Open** need the project owner.
+Status: accepted 2026-10-01. Phase G0 (core preparation) is implemented; no GUI code
+exists yet. This document fixes the architecture and scope (AGENTS.md, "Future GUI
+requirement"; ROADMAP Phase 4).
+
+Owner decisions (2026-10-01): toolkit chosen by the developer (PySide6, section 7);
+a standalone Windows app is wanted (G3); the interface language is English; G0
+started immediately.
 
 ## 1. Goal
 
@@ -174,10 +178,10 @@ well under a second), and JSON import.
 | Local web UI (HTTP server plus browser, or pywebview 6.2.1, BSD) | Modern look; skills transfer to a possible hosted version. | Second language and toolchain (HTML/JS); a local server to secure; pywebview relies on the system web view (WebView2 on Windows). More moving parts for a single-user desktop tool. |
 | Textual (terminal UI) | Pure Python, small. | Not the "intuitive GUI" the roadmap asks for; poor fit for nontechnical users. |
 
-Recommendation: PySide6, as an optional extra, using only Qt Widgets (no QML) to
-keep one language and a small surface. **Open:** confirm PySide6, and whether a
-redistributable Windows build is wanted (it affects licensing notes and packaging
-effort).
+Decision: PySide6, as an optional extra, using only Qt Widgets (no QML) to keep one
+language and a small surface. A redistributable Windows build is wanted, so G3
+must ship the LGPL notices and keep Qt as separately replaceable libraries (the
+one-folder build does this).
 
 ## 8. Testing
 
@@ -197,8 +201,8 @@ effort).
 
 - First: `python -m pbi_usage_analyzer_gui [project]` from the project `.venv`, plus a
   `scripts/gui.ps1` convenience launcher on Windows.
-- Later (**Open**): a one-folder PyInstaller build for Windows. No installer,
-  auto-update or code signing in this design.
+- G3: a one-folder PyInstaller build for Windows (decided 2026-10-01), with the Qt
+  LGPL notices included. No installer, auto-update or code signing in this design.
 
 ## 10. Phases
 
@@ -230,10 +234,23 @@ read the same `views/` rows and appear as a separate, clearly labelled panel.
 | Display text used as identity | Rows carry `ObjectRef`, `Status`, `rule_id`; text comes from the catalog only. |
 | Results shown after the project changed on disk | Header shows analysis time; Re-run is one key; file watching only if users ask for it. |
 
-## 13. Open decisions
+## 13. Decisions and G0 result
 
-1. Framework: PySide6 as recommended, or another option from section 7.
-2. Distribution: run from the `.venv` only, or also a Windows build (G3)?
-3. UI language: English to match the code and reports (recommended; the catalog
-   keeps translation possible later), or Norwegian?
-4. Start G0 now? It is useful without the GUI (clearer evidence in the reports).
+Decided 2026-10-01: PySide6; Windows app (G3); English; G0 now.
+
+G0 as implemented (all core, no Qt; no status or evidence changed anywhere):
+
+| # | Where | Notes |
+| --- | --- | --- |
+| C1 | `views/explain.py`: `Explainer(graph, findings).explain(ref)` returns an `Explanation` (`use_path`, `review_path`, `evidence`); `format_path` | Shortest path by breadth-first search over propagating edges whose source is used; report evidence preferred over field parameter, RLS and relationship as the start. `review_path` covers manual review received through Power Query lineage. All 3,200 objects of the large model explain in 0.01 s. |
+| C2 | `views/catalog.py` (`STATUS_INFO`, `EVIDENCE_LABELS`, `CATEGORY_LABELS`, `SEVERITY_LABELS`, `LIKELY_UNUSED_CAVEAT`); `health/engine.py` `RULE_INFO` | Tests require text for every status, evidence type and registered rule, and that emitted findings match their rule's category and severity. |
+| C3 | `HealthFinding.object_ref` | Measures/columns for DAX and metadata rules, loaded queries for Power Query rules, none for relationships and load-disabled queries. Excluded from JSON schema v1. |
+| C4 | `views.rows.object_key`, `health_key` | `Column`, table and name joined by `|`; rule ID, scope and the source path relative to the project root. |
+| C5 | `reporting/files.py` `write_reports(result, folder=None, *, json=False)` | The CLI uses it. |
+| C6 | `views/rows.py` row types, `filter_objects`, `filter_health`, `unused_by_table`, `query_dependency_rows` | Filters follow the health-filter semantics; parity with `filter_health_findings` is tested. |
+
+Report changes: the Excel column/measure sheets gained an "Evidence path" column,
+and Power Query dependencies show the path through load-disabled queries (Excel
+column and text report). The classifier now exposes `ROOT_EVIDENCE`,
+`PROPAGATING_EVIDENCE` and `OWNER_DEPENDENCY` so classification and explanations
+share one definition. Next: G1.

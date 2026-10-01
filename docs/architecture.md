@@ -292,6 +292,17 @@ Converted fields remain required through earlier renames and later projections.
 Conversions targeting the tracked nested column return unknown provenance; no
 converted table contents or runtime conversion success are assumed.
 
+### Presentation layer (`views`)
+
+`pbi_usage_analyzer.views` is UI-agnostic and reads only an `AnalysisResult` (or a
+graph plus findings): `catalog` (status/evidence/category labels; rule metadata in
+`health.engine.RULE_INFO`), `explain` (evidence paths from the classifier's
+`ROOT_EVIDENCE`/`PROPAGATING_EVIDENCE`/`OWNER_DEPENDENCY` sets, so explanations
+cannot disagree with classification), and `rows` (frozen rows, stable keys,
+filters). Reports may use it; it never imports reporting or a GUI toolkit (tested).
+`reporting.files.write_reports` writes the standard files for the CLI and the GUI.
+Design and phases: [GUI_DESIGN.md](GUI_DESIGN.md).
+
 ### Public application API
 
 `pbi_usage_analyzer.analyze_project(path)` owns discovery, graph construction,

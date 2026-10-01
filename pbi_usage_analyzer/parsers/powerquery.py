@@ -244,7 +244,8 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str],
                 if len(sources) == 1 and selected is not None:
                     result.projected_columns[(owner, dependency)] = selected
                 result.evidence.append(ev)
-                result.dependencies.append({"Query": owner, "Depends on query": dependency, "Source file": str(path)})
+                result.dependencies.append({"Query": owner, "Depends on query": dependency, "Via": via,
+                                            "Source file": str(path)})
                 if complete:
                     key = (owner, dependency)
                     demand = demands[dependency]
