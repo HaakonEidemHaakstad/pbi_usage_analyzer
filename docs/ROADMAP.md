@@ -181,5 +181,8 @@ rows with stable keys and filters), `HealthFinding.object_ref`, and shared
 G1 is done: the read-only PySide6 viewer `pbi_usage_analyzer_gui` (Overview,
 Cleanup, Health, Diagnostics, Queries, detail panel with evidence paths, re-run,
 export), started with `scripts/gui.ps1`, tested offscreen in the Windows CI job.
-Next: G3 Windows build (owner goal), G2 workflow aids; more real projects when
+G3 is done: `scripts/build_windows.ps1` builds a standalone one-folder Windows app
+(about 50 MB zipped) with license notices and a headless smoke test; CI builds it on
+every push and keeps the zip as an artifact.
+Next: G2 workflow aids (run comparison, acknowledgements); more real projects when
 available.

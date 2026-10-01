@@ -5,19 +5,26 @@ from html import escape
 from pathlib import Path
 
 from PySide6.QtCore import QUrl, Signal
-from PySide6.QtWidgets import QTextBrowser
+from PySide6.QtGui import QPalette
+from PySide6.QtWidgets import QApplication, QTextBrowser
 
 from pbi_usage_analyzer.model import ObjectRef, Status
 from pbi_usage_analyzer.views import (EVIDENCE_LABELS, SEVERITY_LABELS, STATUS_INFO, DiagnosticRow,
                                       Explanation, HealthRow, ObjectRow, QueryDependencyRow, format_path)
 
-# Status colours are a hint only; the label always carries the meaning.
+# Status colours are a hint only; the label always carries the meaning. Qt follows
+# the Windows light/dark setting, so each status has a shade for either background.
 STATUS_COLOURS = {
-    Status.USED: "#2e7d32",
-    Status.MANUAL_REVIEW: "#b26a00",
-    Status.LIKELY_UNUSED: "#c62828",
-    Status.INTERNAL: "#616161",
+    Status.USED: ("#2e7d32", "#81c784"),
+    Status.MANUAL_REVIEW: ("#b26a00", "#ffb74d"),
+    Status.LIKELY_UNUSED: ("#c62828", "#ef9a9a"),
+    Status.INTERNAL: ("#616161", "#bdbdbd"),
 }
+
+
+def status_colour(status: Status) -> str:
+    dark = QApplication.palette().color(QPalette.ColorRole.Base).lightness() < 128
+    return STATUS_COLOURS[status][1 if dark else 0]
 
 
 class _Html:
@@ -59,7 +66,7 @@ def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: 
     extra = ", ".join(x for x in (row.data_type, "calculated" if row.calculated else "",
                                   "hidden" if row.hidden else "") if x)
     out.add(f"<p style='color:gray'>{escape(row.object_type.value)}{escape(' · ' + extra) if extra else ''}</p>")
-    out.add(f"<p><b style='color:{STATUS_COLOURS[row.status]}'>{escape(info.label)}</b> — "
+    out.add(f"<p><b style='color:{status_colour(row.status)}'>{escape(info.label)}</b> — "
             f"{escape(info.summary)}</p>")
     out.paragraph(info.explanation)
     if explanation.use_path:
@@ -80,7 +87,7 @@ def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: 
             owner = status_of(ev.source) if ev.source is not None else None
             owner_note = ""
             if owner is not None and owner != Status.USED:
-                owner_note = (f" — <span style='color:{STATUS_COLOURS[owner]}'>"
+                owner_note = (f" — <span style='color:{status_colour(owner)}'>"
                               f"{escape(ev.source.label)} is {escape(STATUS_INFO[owner].label)}</span>")
             items.append(f"<li><b>{escape(EVIDENCE_LABELS[ev.evidence_type])}</b> "
                          f"<span style='color:gray'>[{escape(ev.confidence)}]</span>: "

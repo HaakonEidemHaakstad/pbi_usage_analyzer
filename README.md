@@ -102,8 +102,24 @@ The GUI never changes the project. Tabs: Overview (counts that open filtered
 lists), Cleanup, Health, Diagnostics and Queries; the detail panel explains each
 status with its evidence path and links to source files. F5 re-runs the analysis
 and keeps the selection; File > Export writes the text/Excel (and optionally JSON)
-reports to a chosen folder. A standalone Windows build is planned
-([GUI design](docs/GUI_DESIGN.md), phase G3).
+reports to a chosen folder.
+
+**Standalone Windows app** (no Python needed): every push builds
+`PBI-Model-Health-<version>-win64.zip` as the `pbi-model-health-windows` artifact of
+the "Analyzer checks" workflow (kept 14 days). Unzip it anywhere and start
+`PBI Model Health.exe`. To build it yourself:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 [-OutDir C:\path\outside\OneDrive]
+```
+
+The script runs PyInstaller (`packaging/pbi_model_health.spec`, one folder so the
+Qt libraries stay replaceable under the LGPL), writes `README.txt`,
+`THIRD_PARTY_NOTICES.txt` and `LICENSES\` into the folder, smoke-tests the frozen
+app headlessly on a synthetic project (analysis, main window, all three reports)
+and zips it (about 50 MB; 120 MB unpacked). The app follows the Windows light/dark
+setting.
 
 The expected project structure is typically:
 
@@ -526,7 +542,8 @@ then resolved all 37 append-input manual reviews in the mess case. A thin deskto
 GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md)
 (PySide6, Windows app, English). Phases G0 (core presentation layer,
 `pbi_usage_analyzer.views`) and G1 (read-only viewer, `pbi_usage_analyzer_gui`)
-are done; next is G2 (run comparison, acknowledgements) or G3 (Windows build).
+and G3 (standalone Windows build) are done; G2 (run comparison, acknowledgements)
+remains.
 
 ## Case studies: AdventureWorks, mess and good twin
 

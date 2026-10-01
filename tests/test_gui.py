@@ -133,6 +133,21 @@ class GuiSmokeTests(unittest.TestCase):
             QFileDialog.getExistingDirectory = original
         self.assertEqual(sorted(p.suffix for p in out.iterdir()), ['.txt', '.xlsx'])
 
+    def test_smoke_test_mode_used_by_the_windows_build(self):
+        import json
+        from pbi_usage_analyzer_gui.app import smoke_test
+        out = Path(self.tmp.name) / 'smoke'
+        pbip = next((SUITE / '41_m_usage_aware_lineage').glob('*.pbip'))
+        self.assertEqual(smoke_test(pbip, out), 0, (out / 'smoke-test-error.txt').read_text(encoding='utf-8')
+                         if (out / 'smoke-test-error.txt').exists() else '')
+        summary = json.loads((out / 'smoke-test.json').read_text(encoding='utf-8'))
+        self.assertEqual(summary['cleanup_rows'], 24)
+        self.assertFalse(summary['frozen'])
+        self.assertTrue((out / 'smoke-test.png').stat().st_size > 0)
+        self.assertEqual(len(summary['reports']), 3)
+        self.assertEqual(smoke_test(Path(self.tmp.name) / 'missing', out), 1)
+        self.assertIn('NotADirectoryError', (out / 'smoke-test-error.txt').read_text(encoding='utf-8'))
+
     def test_pbip_file_stands_for_its_folder(self):
         pbip = next((SUITE / '02_dax_transitive').glob('*.pbip'))
         self.assertEqual(project_folder(pbip), SUITE / '02_dax_transitive')

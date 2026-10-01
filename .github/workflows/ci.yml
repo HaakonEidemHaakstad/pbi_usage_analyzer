@@ -84,3 +84,39 @@ jobs:
         run: .\.venv\Scripts\python.exe tools\validation\validate_analyzer.py . tools\validation\validation_suite
       - name: Smoke-test runtime-only dependencies
         run: .\.venv\Scripts\python.exe tools\validation\check_runtime.py
+
+  build-windows-app:
+    name: Windows application build
+    needs: validate-windows
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-gui.txt
+            requirements-build.txt
+      - name: Install build dependencies
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+      - name: Build, smoke-test and zip the application
+        run: .\scripts\build_windows.ps1 -OutDir dist
+      - name: Upload the application zip
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pbi-model-health-windows
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

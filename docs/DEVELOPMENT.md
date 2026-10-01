@@ -40,6 +40,7 @@ Windows has no `make` by default. Equivalents, from the repository root in Power
 | `make benchmark` | `.\.venv\Scripts\python.exe tools\validation\large_model.py` |
 | `make analyze PROJECT=...` | `.\.venv\Scripts\python.exe run_analyzer.py "C:\path\to\project"` |
 | (GUI) | `powershell -ExecutionPolicy Bypass -File .\scripts\gui.ps1 ["C:\path\to\project"]` |
+| (Windows app) | `powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 [-OutDir <folder>]` |
 
 GUI development: install the optional dependencies with `scripts\bootstrap.ps1 -Gui`
 (or `pip install -r requirements-gui.txt`). `tests/test_gui.py` runs the viewer
@@ -47,6 +48,15 @@ offscreen and is skipped when PySide6 is missing; the Windows CI job installs it
 For screenshots under the offscreen platform set `QT_QPA_FONTDIR=C:\Windows\Fonts`
 (Qt ships no fonts). GUI code may only display `pbi_usage_analyzer.views` rows and
 call the API; `tests/test_views.py` fails if the core imports a GUI toolkit.
+
+Windows build: `requirements-build.txt` (PyInstaller, packaging, plus the GUI and
+runtime requirements). `scripts\build_windows.ps1` builds into `dist\` by default;
+in a OneDrive-synced clone pass `-OutDir` outside OneDrive (the build is 120 MB).
+The frozen app accepts `--smoke-test PROJECT OUTPUT_FOLDER` (writes
+`smoke-test.json`, `smoke-test.png` and the reports, then exits); without
+`QT_QPA_PLATFORM=offscreen` the PNG shows the real Windows rendering, useful for
+reviewing the UI without opening a window. CI job "Windows application build"
+runs the same script after the Windows checks and uploads the zip.
 
 `.gitattributes` keeps text files LF and the fixture corpus byte-exact on Windows;
 the fixture generator writes LF on every OS. Always pass `encoding="utf-8"` for

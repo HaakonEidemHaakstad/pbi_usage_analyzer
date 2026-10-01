@@ -1,7 +1,7 @@
 # GUI design — Power BI Model Health Analyzer
 
-Status: accepted 2026-10-01. Phases G0 (core preparation) and G1 (read-only viewer)
-are implemented (section 14). This document fixes the architecture and scope (AGENTS.md, "Future GUI
+Status: accepted 2026-10-01. Phases G0 (core preparation), G1 (read-only viewer)
+and G3 (Windows build) are implemented (sections 13–15). G2 remains. This document fixes the architecture and scope (AGENTS.md, "Future GUI
 requirement"; ROADMAP Phase 4).
 
 Owner decisions (2026-10-01): toolkit chosen by the developer (PySide6, section 7);
@@ -280,5 +280,27 @@ analysis, export, `.pbip` path). Screens reviewed as offscreen screenshots of AW
 Not done in G1 (as planned): opening a file at a line in an editor, run comparison,
 acknowledgements, graph drawing, Windows build.
 
-Next: G3 (Windows build) is the owner's stated goal; G2 (run comparison,
-acknowledgements) can follow or precede it.
+## 15. G3 result
+
+| Item | Content |
+| --- | --- |
+| `packaging/pbi_model_health.spec` | PyInstaller one-folder, windowed (`console=False`) build named `PBI Model Health`; hidden import `openpyxl` (pandas loads the Excel engine by name); excludes tkinter/jsonschema/other toolkits; drops `opengl32sw.dll` (Mesa software OpenGL, 20 MB, unused by Qt Widgets, own license) and Qt translations (6 MB; English UI, no translator). |
+| `packaging/write_notices.py` | `README.txt` (use, the Likely unused caveat, settings location, the Qt LGPL statement with replaceable-library note and source links), `THIRD_PARTY_NOTICES.txt` (Python plus the transitive runtime distributions of pandas, openpyxl and PySide6-Essentials with license expressions and copied license files) and `LICENSES\`. |
+| `packaging/licenses/` | Official LGPL-3.0 and GPL-3.0 texts from gnu.org (SHA-256 e3a994d8… and 3972dc97…, the published values). The PySide6 wheels only carry a commercial-license reference. |
+| `scripts/build_windows.ps1` | Checks the build dependencies, runs PyInstaller, writes the notices, runs `--smoke-test` on scenario 41 with `QT_QPA_PLATFORM=offscreen`, zips `PBI-Model-Health-<version>-win64.zip`. `-OutDir` for builds outside OneDrive. |
+| `--smoke-test PROJECT OUT` | In `pbi_usage_analyzer_gui/app.py`: analysis, main window, `smoke-test.png`, all reports, `smoke-test.json`; exit code 1 with a traceback file on failure. |
+| CI | Job "Windows application build" (after the Windows checks): same script, zip uploaded as artifact `pbi-model-health-windows` for 14 days. |
+
+Verified 2026-10-01 on this machine (Python 3.14.7, PyInstaller 6.22.3, PySide6
+6.11.2): zip 50.1 MB, folder 118.6 MB; the frozen app's smoke test on AW Mess
+(opened through `AW Mess.pbip`, a OneDrive path with spaces) gives 178 cleanup and
+45 health rows, the same as the library, and writes all three reports. Rendered
+with the native platform, Qt follows the Windows dark mode; status colours now
+have a light and a dark shade.
+
+Not done: an application icon and a Windows version resource, code signing (Windows
+SmartScreen may warn on first start of an unsigned download), an installer. The
+project itself has no license file yet; decide one before distributing the app to
+others.
+
+Next: G2 (run comparison, acknowledgements).
