@@ -459,7 +459,13 @@ For nontrivial work:
 
 Do not overwrite unrelated user changes.
 
-Do not commit or push unless the user explicitly asks.
+Commits are allowed without asking (user decision, 2026-10-01). Commit completed,
+verified work on `main` in coherent units, after the validation workflow passes,
+with a message that explains the change and its evidence. Pushing to the
+project's own GitHub remote (`origin`) is allowed on the same terms; check the CI
+run afterwards. Never commit failing work, real organizational data, credentials,
+or generated reports. Do not rewrite published history (force-push, rebase or
+reset of pushed commits) without explicit user instruction.
 
 ## Subagents
 
