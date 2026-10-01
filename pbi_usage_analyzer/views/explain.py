@@ -46,6 +46,10 @@ class Explainer:
         self._status = {finding.ref: finding.status for finding in findings}
         self._used = propagate_used(graph)
 
+    def status_of(self, ref: ObjectRef) -> Status | None:
+        """Cleanup status of a column or measure; None for other objects."""
+        return self._status.get(ref)
+
     def explain(self, ref: ObjectRef) -> Explanation:
         status = self._status.get(ref)
         return Explanation(

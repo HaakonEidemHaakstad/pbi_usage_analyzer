@@ -65,7 +65,10 @@ class HealthRow:
     category_label: str
     severity: HealthSeverity
     confidence: str
-    scope: str
+    scope: str  # identity, part of the key
+    # What to show for the scope: relationship endpoints instead of the
+    # relationship's (usually GUID) name; otherwise the scope itself.
+    scope_label: str
     object_ref: ObjectRef | None
     title: str
     explanation: str
@@ -113,12 +116,29 @@ def object_rows(result: AnalysisResult) -> tuple[ObjectRow, ...]:
     return tuple(rows)
 
 
+def _relationship_labels(result: AnalysisResult) -> dict[str, str]:
+    labels = {}
+    for relationship in result.context.relationships:
+        if relationship.from_column and relationship.to_column:
+            (from_table, from_column), (to_table, to_column) = relationship.from_column, relationship.to_column
+            labels[relationship.name] = f"{from_table}[{from_column}] → {to_table}[{to_column}]"
+    return labels
+
+
 def health_rows(result: AnalysisResult) -> tuple[HealthRow, ...]:
     root = result.project.root
+    relationships = _relationship_labels(result)
+
+    def scope_label(finding: HealthFinding) -> str:
+        if finding.category == "relationships":
+            return relationships.get(finding.scope, finding.scope)
+        return finding.scope
+
     return tuple(HealthRow(
         key=health_key(f, root), rule_id=f.rule_id, rule_name=rule_info(f.rule_id).name,
         category=f.category, category_label=category_label(f.category), severity=f.severity,
-        confidence=f.confidence, scope=f.scope, object_ref=f.object_ref, title=f.title,
+        confidence=f.confidence, scope=f.scope, scope_label=scope_label(f), object_ref=f.object_ref,
+        title=f.title,
         explanation=f.explanation, evidence=tuple(f.evidence), recommendation=f.recommendation,
         source_file=f.source_file, line=f.line,
     ) for f in result.health_findings)
@@ -164,7 +184,8 @@ def filter_health(rows: Iterable[HealthRow], *, rule_ids: Iterable[str] | None =
                  if _selected(row.rule_id, rule_ids) and _selected(row.severity, severities)
                  and _selected(row.category, categories)
                  and (not needle or any(needle in value.casefold()
-                                        for value in (row.rule_id, row.rule_name, row.scope, row.title))))
+                                        for value in (row.rule_id, row.rule_name, row.scope,
+                                                      row.scope_label, row.title))))
 
 
 def unused_by_table(rows: Iterable[ObjectRow], object_type: ObjectType = ObjectType.COLUMN

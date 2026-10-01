@@ -5,5 +5,11 @@ description = "Conservative static dependency analyzer for Power BI PBIP/PBIR pr
 requires-python = ">=3.10"
 dependencies = ["pandas>=2.0", "openpyxl>=3.1"]
 
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.8,<7"]
+
+[project.gui-scripts]
+pbi-model-health = "pbi_usage_analyzer_gui.app:main"
+
 [tool.setuptools.packages.find]
 include = ["pbi_usage_analyzer*"]

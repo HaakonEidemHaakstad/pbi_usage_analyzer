@@ -1,7 +1,7 @@
 # GUI design — Power BI Model Health Analyzer
 
-Status: accepted 2026-10-01. Phase G0 (core preparation) is implemented; no GUI code
-exists yet. This document fixes the architecture and scope (AGENTS.md, "Future GUI
+Status: accepted 2026-10-01. Phases G0 (core preparation) and G1 (read-only viewer)
+are implemented (section 14). This document fixes the architecture and scope (AGENTS.md, "Future GUI
 requirement"; ROADMAP Phase 4).
 
 Owner decisions (2026-10-01): toolkit chosen by the developer (PySide6, section 7);
@@ -253,4 +253,32 @@ Report changes: the Excel column/measure sheets gained an "Evidence path" column
 and Power Query dependencies show the path through load-disabled queries (Excel
 column and text report). The classifier now exposes `ROOT_EVIDENCE`,
 `PROPAGATING_EVIDENCE` and `OWNER_DEPENDENCY` so classification and explanations
-share one definition. Next: G1.
+share one definition.
+
+## 14. G1 result
+
+Package `pbi_usage_analyzer_gui` (Qt Widgets only; dependency `PySide6-Essentials`,
+which has QtCore/QtGui/QtWidgets without the large add-ons package):
+
+| Module | Content |
+| --- | --- |
+| `app.py`, `__main__.py` | `python -m pbi_usage_analyzer_gui [folder or .pbip]`; a clear message when PySide6 is missing. `pbi-model-health` gui-script in `pyproject.toml`. |
+| `worker.py` | `AnalysisThread` (QThread) runs `analyze_project`; errors become a message box, the start page stays. |
+| `models.py` | `RowTableModel` over frozen rows plus a sort proxy (numeric/case-insensitive sort keys). Filtering is done by `views.filter_objects`/`filter_health`, not by Qt. |
+| `tabs.py` | Overview (count buttons open filtered lists; Likely unused by table; the status guide and caveat), Cleanup, Health, Diagnostics, Queries. |
+| `detail.py` | HTML detail for objects (status text, evidence path, every evidence row with the status of its source when not Used), findings (relationship scopes shown as endpoints), diagnostics, query dependencies. Links resolve through an index, never through URLs built from paths. |
+| `main_window.py` | Start page with recent projects (`QSettings`, per user), menus, F5 re-run keeping the selection by stable key, export via `write_reports` (JSON after a privacy prompt), diagnostics banner, About with the LGPL note. |
+
+Core additions found necessary while building it: `HealthRow.scope_label`
+(relationship endpoints instead of GUID names; the key keeps the scope) and
+`Explainer.status_of`.
+
+Verification: `tests/test_gui.py` (8 offscreen tests: worker run vs API counts,
+filters and evidence path in the detail, health link to object and re-run keeping
+the selection, internal toggle and diagnostics banner, query links, failed
+analysis, export, `.pbip` path). Screens reviewed as offscreen screenshots of AW Mess.
+Not done in G1 (as planned): opening a file at a line in an editor, run comparison,
+acknowledgements, graph drawing, Windows build.
+
+Next: G3 (Windows build) is the owner's stated goal; G2 (run comparison,
+acknowledgements) can follow or precede it.

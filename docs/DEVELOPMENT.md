@@ -32,13 +32,21 @@ Windows has no `make` by default. Equivalents, from the repository root in Power
 
 | Make target | PowerShell |
 | --- | --- |
-| `make compile` | `.\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer tests tools` |
+| `make compile` | `.\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer pbi_usage_analyzer_gui tests tools` |
 | `make test` | `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` |
 | `make validate` | `.\.venv\Scripts\python.exe tools\validation\validate_analyzer.py . tools\validation\validation_suite` |
 | `make check-fixtures` | `.\.venv\Scripts\python.exe tools\validation\check_fixture_drift.py` |
 | `make check-runtime` | `.\.venv\Scripts\python.exe tools\validation\check_runtime.py` |
 | `make benchmark` | `.\.venv\Scripts\python.exe tools\validation\large_model.py` |
 | `make analyze PROJECT=...` | `.\.venv\Scripts\python.exe run_analyzer.py "C:\path\to\project"` |
+| (GUI) | `powershell -ExecutionPolicy Bypass -File .\scripts\gui.ps1 ["C:\path\to\project"]` |
+
+GUI development: install the optional dependencies with `scripts\bootstrap.ps1 -Gui`
+(or `pip install -r requirements-gui.txt`). `tests/test_gui.py` runs the viewer
+offscreen and is skipped when PySide6 is missing; the Windows CI job installs it.
+For screenshots under the offscreen platform set `QT_QPA_FONTDIR=C:\Windows\Fonts`
+(Qt ships no fonts). GUI code may only display `pbi_usage_analyzer.views` rows and
+call the API; `tests/test_views.py` fails if the core imports a GUI toolkit.
 
 `.gitattributes` keeps text files LF and the fixture corpus byte-exact on Windows;
 the fixture generator writes LF on every OS. Always pass `encoding="utf-8"` for

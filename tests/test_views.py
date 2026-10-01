@@ -144,6 +144,17 @@ class RowTests(unittest.TestCase):
             actual = filter_health(rows, rule_ids=rule_ids, severities=severities)
             self.assertEqual([row.title for row in actual], [f.title for f in expected])
 
+    def test_relationship_scope_label_shows_endpoints(self):
+        rows = health_rows(analysis('18_relationship_health'))
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertIn('→', row.scope_label)
+            self.assertNotEqual(row.scope_label, row.scope)
+            self.assertIn(row.scope, row.key)  # identity stays the relationship name
+        others = health_rows(analysis('37_duplicate_measures'))
+        self.assertTrue(all(row.scope_label == row.scope for row in others))
+        self.assertEqual(len(filter_health(rows, text='→')), len(rows))
+
     def test_health_key_is_relative_to_the_project(self):
         for row in health_rows(analysis('37_duplicate_measures')):
             self.assertNotIn(str(SUITE), row.key)

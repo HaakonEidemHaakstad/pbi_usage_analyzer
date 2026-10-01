@@ -86,6 +86,25 @@ Alternatively, use the project's Python virtual environment:
 .venv/bin/python run_analyzer.py "/path/to/PBIP-project"
 ```
 
+### Desktop GUI (Windows)
+
+A read-only desktop viewer shows the same results with filters, evidence paths and
+links between findings and objects. It needs the optional GUI dependencies
+(PySide6), installed into the project `.venv`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Gui
+powershell -ExecutionPolicy Bypass -File .\scripts\gui.ps1 "C:\path\to\project"
+```
+
+or `.venv\Scripts\python.exe -m pbi_usage_analyzer_gui [project folder or .pbip]`.
+The GUI never changes the project. Tabs: Overview (counts that open filtered
+lists), Cleanup, Health, Diagnostics and Queries; the detail panel explains each
+status with its evidence path and links to source files. F5 re-runs the analysis
+and keeps the selection; File > Export writes the text/Excel (and optionally JSON)
+reports to a chosen folder. A standalone Windows build is planned
+([GUI design](docs/GUI_DESIGN.md), phase G3).
+
 The expected project structure is typically:
 
 ```text
@@ -505,8 +524,9 @@ Both AdventureWorks case studies are built and scored (no object the report need
 is Likely unused in either; the good twin produces no findings). Usage-aware M lineage
 then resolved all 37 append-input manual reviews in the mess case. A thin desktop
 GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md)
-(PySide6, Windows app, English). Phase G0, the core presentation layer
-(`pbi_usage_analyzer.views`), is done; next is G1, the read-only viewer.
+(PySide6, Windows app, English). Phases G0 (core presentation layer,
+`pbi_usage_analyzer.views`) and G1 (read-only viewer, `pbi_usage_analyzer_gui`)
+are done; next is G2 (run comparison, acknowledgements) or G3 (Windows build).
 
 ## Case studies: AdventureWorks, mess and good twin
 

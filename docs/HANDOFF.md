@@ -137,7 +137,8 @@ match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1
 (usage-aware M lineage, done), then "proceed" (references through load-disabled
 queries, done), then option 4 because no other real project is available (GUI
 design document, done; no code), then "go with the toolkit you think is best. build
-windows app. interface language english, start G0 now" (G0 done).
+windows app. interface language english, start G0 now" (G0 done), then "proceed"
+(G1 read-only viewer, done).
 
 ## Implemented work in the current tree
 
@@ -157,7 +158,8 @@ windows app. interface language english, start G0 now" (G0 done).
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| GUI phase G0 | Latest change: `pbi_usage_analyzer.views` (catalog, explain, rows), `RULE_INFO`, `HealthFinding.object_ref`, `reporting.files.write_reports`, Excel evidence paths. Details below. |
+| GUI phase G1 | Latest change: `pbi_usage_analyzer_gui` read-only viewer; `requirements-gui.txt`, `scripts/gui.ps1`, `bootstrap.ps1 -Gui`; Windows CI runs offscreen GUI tests. Details below. |
+| GUI phase G0 | Previous change: `pbi_usage_analyzer.views` (catalog, explain, rows), `RULE_INFO`, `HealthFinding.object_ref`, `reporting.files.write_reports`, Excel evidence paths. Details below. |
 | GUI design | Previous change: docs/GUI_DESIGN.md (design only; no code). Facts checked 2026-10-01: analysis 0.04–0.09 s on the real projects; PySide6 6.11.2 supports Python 3.10–3.14 with Windows wheels; Tk 9.0 present in this Python. |
 | Shared-query references | Previous change: references through load-disabled queries are followed (exact lineage and fallback); comment `#"..."` fix. Details below. |
 | Usage-aware lineage | Previous change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
@@ -182,7 +184,28 @@ windows app. interface language english, start G0 now" (G0 done).
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: GUI phase G0, core presentation layer (2026-10-01)
+## Latest change: GUI phase G1, read-only viewer (2026-10-01)
+
+- Package `pbi_usage_analyzer_gui` (modules in GUI_DESIGN.md section 14). Dependency
+  `PySide6-Essentials>=6.8,<7` (6.11.2 installed in this machine's `.venv`), as
+  `requirements-gui.txt` and the `gui` extra in `pyproject.toml` (also a
+  `pbi-model-health` gui-script). The core never imports it (import guard test).
+- Start: `scripts\gui.ps1 [project]` (pythonw, no console) or
+  `python -m pbi_usage_analyzer_gui [project]`; `scripts\bootstrap.ps1 -Gui` installs
+  the dependency.
+- Core additions: `HealthRow.scope_label` (relationship endpoints for GUID names;
+  key unchanged), `Explainer.status_of` (detail shows "customers[Age] is Likely
+  unused" next to DAX evidence).
+- CI: the Windows job installs `requirements-gui.txt`, compiles the GUI package and
+  runs all tests with `QT_QPA_PLATFORM=offscreen`; Ubuntu skips `tests/test_gui.py`.
+- Visual review: offscreen screenshots of AW Mess with `QT_QPA_FONTDIR=C:\Windows\Fonts`
+  (helper script not in the repo). Fixed from review: detail panel width, internal
+  objects in the Cleanup count, Hidden column position, GUID relationship scopes,
+  owner status in evidence, empty recent list placeholder.
+- No analysis change: statuses and evidence unchanged (only presentation code and
+  rows).
+
+## Previous change: GUI phase G0, core presentation layer (2026-10-01)
 
 - Decisions recorded in docs/GUI_DESIGN.md (status: accepted). G0 table there.
 - `analysis/classify.py` exposes `ROOT_EVIDENCE`, `PROPAGATING_EVIDENCE`,
@@ -767,17 +790,17 @@ Both case studies are built and scored, usage-aware lineage and shared-query
 references are done, and the GUI design exists (docs/GUI_DESIGN.md, 2026-10-01).
 Owner decisions (2026-10-01): toolkit left to the agent (PySide6 chosen), a
 standalone Windows app (G3), English UI, start G0 immediately. **G0 is done**
-(GUI_DESIGN.md section 13 lists where each change lives). **Next: G1**, the read-only
-PySide6 viewer in a separate `pbi_usage_analyzer_gui` package with a `gui` optional
-extra (PySide6 6.11.2 supports Python 3.14 on this machine); it renders only
-`pbi_usage_analyzer.views` rows. Other candidates:
+(GUI_DESIGN.md section 13 lists where each change lives). **G1 is done** (section 14).
+**Next: G3**, the standalone Windows build (one-folder PyInstaller, Qt LGPL notices),
+which the owner asked for; G2 (run comparison, acknowledgements) is the other GUI
+phase. Other candidates:
 1. Lineage through currently unsupported steps seen in real exports (e.g. the folder
    combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`; matters only
    when such a step sits between two model queries).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
-4. GUI: G0 done; G1 next (see above).
+4. GUI: G0 and G1 done; G3 next (see above).
 Remaining answer-key gaps need data access (encoding, totals rows, folder
 duplicates) or name heuristics (`stg_*` staging).
 
@@ -803,6 +826,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
+- Windows, Python 3.14, 2026-10-01 after GUI phase G1 (PySide6 6.11.2 installed):
+  268 tests OK incl. 8 offscreen GUI tests, all three real-project variables set
+  (2 skipped); 359 synthetic checks; compilation, fixture drift, `git diff --check` pass.
 - Windows, Python 3.14, 2026-10-01 after GUI phase G0: 259 tests OK with all three
   real-project variables set (2 skipped); 359 synthetic checks across 42 scenarios;
   compilation, fixture drift, `git diff --check` pass; benchmark 0.32 s.

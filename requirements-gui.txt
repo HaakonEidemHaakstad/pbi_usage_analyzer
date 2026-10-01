@@ -1,0 +1,3 @@
+-r requirements.txt
+# Optional desktop GUI (pbi_usage_analyzer_gui). QtCore, QtGui and QtWidgets only.
+PySide6-Essentials>=6.8,<7

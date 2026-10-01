@@ -178,4 +178,8 @@ Owner decisions (2026-10-01): PySide6, Windows app, English. Phase G0 is done: t
 `pbi_usage_analyzer.views` presentation layer (evidence paths, label/rule catalog,
 rows with stable keys and filters), `HealthFinding.object_ref`, and shared
 `write_reports`; Excel shows evidence paths.
-Next: G1 read-only viewer; more real projects when available.
+G1 is done: the read-only PySide6 viewer `pbi_usage_analyzer_gui` (Overview,
+Cleanup, Health, Diagnostics, Queries, detail panel with evidence paths, re-run,
+export), started with `scripts/gui.ps1`, tested offscreen in the Windows CI job.
+Next: G3 Windows build (owner goal), G2 workflow aids; more real projects when
+available.

@@ -67,15 +67,18 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - name: Install development dependencies
+            requirements-gui.txt
+      - name: Install development and GUI dependencies
         run: |
           python -m venv .venv
-          .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+          .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt -r requirements-gui.txt
       - name: Compile sources
-        run: .\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer tests tools
+        run: .\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer pbi_usage_analyzer_gui tests tools
       - name: Check fixture reproducibility
         run: .\.venv\Scripts\python.exe tools\validation\check_fixture_drift.py
-      - name: Run unit and regression tests
+      - name: Run unit, regression and offscreen GUI tests
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: .\.venv\Scripts\python.exe -m unittest discover -s tests -v
       - name: Validate synthetic scenarios and JSON exports
         run: .\.venv\Scripts\python.exe tools\validation\validate_analyzer.py . tools\validation\validation_suite

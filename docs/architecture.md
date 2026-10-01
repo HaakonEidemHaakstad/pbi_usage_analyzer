@@ -301,7 +301,9 @@ graph plus findings): `catalog` (status/evidence/category labels; rule metadata 
 cannot disagree with classification), and `rows` (frozen rows, stable keys,
 filters). Reports may use it; it never imports reporting or a GUI toolkit (tested).
 `reporting.files.write_reports` writes the standard files for the CLI and the GUI.
-Design and phases: [GUI_DESIGN.md](GUI_DESIGN.md).
+Design and phases: [GUI_DESIGN.md](GUI_DESIGN.md). The desktop viewer lives in the
+separate package `pbi_usage_analyzer_gui` (optional PySide6 dependency); it renders
+`views` rows and calls the API and `write_reports`, nothing else.
 
 ### Public application API
 

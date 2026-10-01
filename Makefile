@@ -30,7 +30,7 @@ setup:
 	./scripts/setup.sh
 
 compile:
-	$(PY) -m compileall -q pbi_usage_analyzer tests tools
+	$(PY) -m compileall -q pbi_usage_analyzer pbi_usage_analyzer_gui tests tools
 
 test:
 	$(PY) -m unittest discover -s tests -v
