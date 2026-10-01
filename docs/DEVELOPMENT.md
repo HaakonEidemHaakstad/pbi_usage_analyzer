@@ -49,8 +49,16 @@ For screenshots under the offscreen platform set `QT_QPA_FONTDIR=C:\Windows\Font
 (Qt ships no fonts). GUI code may only display `pbi_usage_analyzer.views` rows and
 call the API; `tests/test_views.py` fails if the core imports a GUI toolkit.
 
-Windows build: `requirements-build.txt` (PyInstaller, packaging, plus the GUI and
-runtime requirements). `scripts\build_windows.ps1` builds into `dist\` by default;
+Windows build: `requirements-build.txt` lists the direct build requirements;
+`requirements-build.lock` pins every package with SHA-256 hashes and is what CI
+installs (`pip install --require-hashes -r requirements-build.lock`). After changing
+requirements, regenerate it on Windows:
+`python -m piptools compile --generate-hashes --allow-unsafe --strip-extras --no-emit-index-url --output-file requirements-build.lock requirements-build.txt`
+(pip-tools in the build venv) and check that every pin still supports the CI Python
+version. The build leaves out Qt's network module and plugins and Python's TLS
+support (`packaging/pbi_model_health.spec`) and runs `packaging/check_bundle.py`,
+which fails on network components or missing DLL imports; `write_notices.py`
+writes the SBOM and the file manifest, and the script writes `SHA256SUMS.txt`. `scripts\build_windows.ps1` builds into `dist\` by default;
 in a OneDrive-synced clone pass `-OutDir` outside OneDrive (the build is 120 MB).
 The frozen app accepts `--smoke-test PROJECT OUTPUT_FOLDER` (writes
 `smoke-test.json`, `smoke-test.png` and the reports, then exits); without

@@ -1,6 +1,6 @@
-"""Render docs/manual/USER_MANUAL.md as one self-contained HTML file.
+"""Render a Markdown document (default: docs/manual/USER_MANUAL.md) as one self-contained HTML file.
 
-Usage: python packaging/build_manual.py OUTPUT.html
+Usage: python packaging/build_manual.py OUTPUT.html [SOURCE.md]
 
 Images are embedded, so the file can be opened, printed or saved as PDF from any
 browser without the docs folder. Needs the `markdown` package (requirements-build.txt).
@@ -43,10 +43,10 @@ def embed_images(html: str, base: Path) -> str:
     return re.sub(r'(<img[^>]*?src=)"([^"]+\.png)"', data_uri, html)
 
 
-def build(output: Path) -> None:
-    text = MANUAL.read_text(encoding="utf-8")
+def build(output: Path, source: Path = MANUAL) -> None:
+    text = source.read_text(encoding="utf-8")
     body = markdown.markdown(text, extensions=["tables", "fenced_code", "toc"], output_format="html")
-    body = embed_images(body, MANUAL.parent)
+    body = embed_images(body, source.parent)
     title = text.splitlines()[0].lstrip("# ").strip()
     output.write_text(f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -59,6 +59,6 @@ def build(output: Path) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.exit("usage: python packaging/build_manual.py OUTPUT.html")
-    build(Path(sys.argv[1]))
+    if len(sys.argv) not in (2, 3):
+        sys.exit("usage: python packaging/build_manual.py OUTPUT.html [SOURCE.md]")
+    build(Path(sys.argv[1]), *(Path(arg) for arg in sys.argv[2:]))

@@ -298,6 +298,13 @@ Verified 2026-10-01 on this machine (Python 3.14.7, PyInstaller 6.22.3, PySide6
 with the native platform, Qt follows the Windows dark mode; status colours now
 have a light and a dark shade.
 
+Hardening for IT review (2026-10-01): no Qt network module, TLS or
+network-information plugins, TUIO touch plugin or Python TLS in the bundle
+(checked by `packaging/check_bundle.py`, which also fails on missing DLL imports);
+hash-pinned build lock used by CI; `sbom.cdx.json`, `MANIFEST-SHA256.txt` and
+`IT security fact sheet.html` in the folder; `SHA256SUMS.txt` next to the zip.
+See docs/IT_SECURITY_FACT_SHEET.md.
+
 Not done: an application icon and a Windows version resource, code signing (Windows
 SmartScreen may warn on first start of an unsigned download), an installer. The
 project itself has no license file yet; decide one before distributing the app to

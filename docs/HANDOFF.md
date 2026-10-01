@@ -159,7 +159,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| User manual | Latest change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
+| IT review hardening | Latest change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
+| User manual | Previous change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
 | GUI phase G2 | Previous change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
 | GUI phase G3 | Previous change: standalone Windows app (`packaging/`, `scripts/build_windows.ps1`, `requirements-build.txt`, CI job "Windows application build"). Details below. |
 | GUI phase G1 | Previous change: `pbi_usage_analyzer_gui` read-only viewer; `requirements-gui.txt`, `scripts/gui.ps1`, `bootstrap.ps1 -Gui`; Windows CI runs offscreen GUI tests. Details below. |
@@ -188,7 +189,33 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: user manual and legacy report format (2026-10-01)
+## Latest change: IT review hardening (2026-10-01)
+
+- User asked what to consider when convincing IT, then "yes please" to: an IT fact
+  sheet, an exact dependency lock and SBOM, and removing the unused network library.
+- `docs/IT_SECURITY_FACT_SHEET.md` (also `IT security fact sheet.html` in the app):
+  behaviour on the PC, data handled, build and supply chain, known gaps (unsigned,
+  antivirus heuristics, AI-written without independent review, no licence/personal
+  repo, maintenance), recommended internal build-and-sign path, where to check each
+  claim. Claims were checked against the code and the built folder (no network,
+  process or eval calls; writes only exports, the AppData state file and the HKCU
+  registry key; `_socket.pyd` remains in the runtime, unused).
+- Network removal: `pefile` import tables showed that only `QtNetwork.pyd`, the TLS
+  and network-information plugins and `qtuiotouchplugin.dll` import `Qt6Network.dll`;
+  those, `_ssl.pyd` and `libssl-3.dll` are excluded in the spec. `libcrypto-3.dll`
+  stays (hashlib). `packaging/check_bundle.py` (run by the build) fails on any of them
+  or on a bundled binary importing a DLL that is neither bundled nor in System32;
+  it found the nine components in the previous build and none now. Frozen smoke
+  tests (scenario 41, AW Mess 178/45) pass; folder 118.7 -> 114.5 MB, zip 48.7 MB.
+- `requirements-build.lock` (pip-tools 7.6.1, `--generate-hashes --allow-unsafe`),
+  17 pins, all checked to support Python 3.12 on win_amd64; CI's build job installs
+  it with `--require-hashes` and uploads `SHA256SUMS.txt` with the zip.
+- `write_notices.py` writes `sbom.cdx.json` (CycloneDX 1.5: Python plus the bundled
+  distributions, purls, licences) and `MANIFEST-SHA256.txt` (last, every file; all
+  839 verified). `build_manual.build(output, source)` renders any Markdown.
+- Tests: `tests/test_packaging.py` (skipped without pefile/packaging/markdown).
+
+## Previous change: user manual and legacy report format (2026-10-01)
 
 - User request: a user manual for a non-technical audience with Power BI
   experience. `docs/manual/USER_MANUAL.md` (18 sections, nine light-mode

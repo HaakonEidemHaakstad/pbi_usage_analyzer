@@ -90,7 +90,9 @@ Alternatively, use the project's Python virtual environment:
 
 The [user manual](docs/manual/USER_MANUAL.md) explains the app for Power BI users
 without a technical background (also shipped as `User manual.html` in the Windows
-app and opened with Help > User manual, F1).
+app and opened with Help > User manual, F1). The
+[IT security fact sheet](docs/IT_SECURITY_FACT_SHEET.md) is for IT departments
+deciding whether the app may be used (also shipped in the app folder).
 
 A read-only desktop viewer shows the same results with filters, evidence paths and
 links between findings and objects. It needs the optional GUI dependencies
@@ -121,7 +123,7 @@ the "Analyzer checks" workflow (kept 14 days). Unzip it anywhere and start
 `PBI Model Health.exe`. To build it yourself:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-build.lock
 powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 [-OutDir C:\path\outside\OneDrive]
 ```
 
@@ -129,7 +131,9 @@ The script runs PyInstaller (`packaging/pbi_model_health.spec`, one folder so th
 Qt libraries stay replaceable under the LGPL), writes `README.txt`,
 `THIRD_PARTY_NOTICES.txt` and `LICENSES\` into the folder, smoke-tests the frozen
 app headlessly on a synthetic project (analysis, main window, all three reports)
-and zips it (about 50 MB; 120 MB unpacked). The app follows the Windows light/dark
+checks that no network component and no missing DLL dependency is in the bundle,
+and zips it (about 49 MB; 115 MB unpacked) with `SHA256SUMS.txt`. The folder also
+contains `sbom.cdx.json` (CycloneDX SBOM) and `MANIFEST-SHA256.txt`. The app follows the Windows light/dark
 setting.
 
 The expected project structure is typically:

@@ -1,4 +1,5 @@
-"""Write README.txt, User manual.html, THIRD_PARTY_NOTICES.txt and LICENSES/ into a built app folder.
+"""Write README.txt, the HTML documents, THIRD_PARTY_NOTICES.txt, LICENSES/, an SBOM
+(sbom.cdx.json) and a SHA-256 manifest of every file into a built app folder.
 
 Usage: python packaging/write_notices.py "dist/PBI Model Health"
 
@@ -7,9 +8,13 @@ the transitive runtime requirements of pandas, openpyxl and PySide6-Essentials.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import shutil
 import sys
+import uuid
+from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
 
@@ -50,6 +55,36 @@ def license_text(dist: metadata.Distribution) -> str:
         return declared
     classifiers = [c.split(" :: ")[-1] for c in meta.get_all("Classifier") or () if c.startswith("License ::")]
     return ", ".join(classifiers) or "see the license files"
+
+
+def sbom(version: str, dists: list[metadata.Distribution]) -> dict:
+    """CycloneDX 1.5 SBOM of the bundled runtime: Python and its distributions."""
+    def licenses(dist: metadata.Distribution) -> list[dict]:
+        expression = dist.metadata.get("License-Expression")
+        return [{"expression": expression}] if expression else [{"license": {"name": license_text(dist)}}]
+
+    python = sys.version.split()[0]
+    components = [{"type": "platform", "name": "python", "version": python,
+                   "purl": f"pkg:generic/python@{python}", "licenses": [{"license": {"id": "PSF-2.0"}}]}]
+    for dist in dists:
+        name = dist.metadata["Name"]
+        components.append({"type": "library", "name": name, "version": dist.version,
+                           "purl": f"pkg:pypi/{canonical(name)}@{dist.version}", "licenses": licenses(dist)})
+    return {
+        "bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
+        "serialNumber": f"urn:uuid:{uuid.uuid4()}",
+        "metadata": {"timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                     "component": {"type": "application", "name": "PBI Model Health", "version": version}},
+        "components": components,
+    }
+
+
+def write_manifest(app_folder: Path) -> None:
+    """SHA-256 of every file in the folder (for allowlisting and integrity checks)."""
+    name = "MANIFEST-SHA256.txt"
+    lines = [f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(app_folder).as_posix()}"
+             for path in sorted(p for p in app_folder.rglob("*") if p.is_file() and p.name != name)]
+    (app_folder / name).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\r\n")
 
 
 def readme(version: str) -> str:
@@ -129,6 +164,10 @@ def main(app_folder: Path) -> None:
     from build_manual import build as build_manual  # packaging/build_manual.py
 
     build_manual(app_folder / "User manual.html")
+    build_manual(app_folder / "IT security fact sheet.html", HERE.parent / "docs" / "IT_SECURITY_FACT_SHEET.md")
+    (app_folder / "sbom.cdx.json").write_text(
+        json.dumps(sbom(__version__, runtime_distributions()), indent=2), encoding="utf-8")
+    write_manifest(app_folder)  # last: covers every file written above
 
 
 if __name__ == "__main__":

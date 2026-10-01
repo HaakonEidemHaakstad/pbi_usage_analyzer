@@ -30,6 +30,9 @@ try {
     $app = Join-Path $OutDir "PBI Model Health"
     & $python packaging\write_notices.py $app
     if ($LASTEXITCODE -ne 0) { throw "Writing license notices failed." }
+    # No network components, no missing DLL dependencies.
+    & $python packaging\check_bundle.py $app
+    if ($LASTEXITCODE -ne 0) { throw "Bundle check failed." }
 
     if (-not $SkipSmokeTest) {
         # Run the frozen app headless on a synthetic project: analysis, main window, export.
@@ -60,8 +63,15 @@ try {
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Compress-Archive -Path $app -DestinationPath $zip
     $size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+    # Checksums for verifying a download (sha256sum format).
+    $sums = Join-Path $OutDir "SHA256SUMS.txt"
+    $lines = foreach ($file in @($zip, (Join-Path $app "PBI Model Health.exe"))) {
+        "{0}  {1}" -f (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant(), (Split-Path -Leaf $file)
+    }
+    Set-Content -Path $sums -Value $lines -Encoding ascii
     Write-Host "Application folder: $app"
     Write-Host "Zip ($size MB): $zip"
+    Get-Content $sums | Write-Host
 } finally {
     Pop-Location
 }

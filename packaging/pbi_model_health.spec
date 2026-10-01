@@ -12,12 +12,23 @@ a = Analysis(  # noqa: F821
     # pandas loads the Excel writer engine by name at run time.
     hiddenimports=["openpyxl"],
     # Not used at run time: development/validation tools and other GUI toolkits.
-    excludes=["tkinter", "jsonschema", "PyQt5", "PyQt6", "IPython", "matplotlib", "pytest"],
+    # No network stack either: the app makes no connections, so Qt's network module
+    # and Python's TLS support are left out (see the binary filter below).
+    excludes=["tkinter", "jsonschema", "PyQt5", "PyQt6", "IPython", "matplotlib", "pytest",
+              "PySide6.QtNetwork", "ssl", "_ssl"],
     noarchive=False,
 )
 # A Qt Widgets app needs neither Mesa's software OpenGL renderer (20 MB, own
 # license) nor Qt's translations (the interface is English, no translator is loaded).
 a.binaries = [entry for entry in a.binaries if Path(entry[0]).name.lower() != "opengl32sw.dll"]
+# Network-only Qt parts: the network library and its Python binding, the TLS and
+# network-information plugins, and the TUIO touch plugin (which listens on UDP).
+# Only these import Qt6Network.dll; the build verifies that nothing
+# left in the app depends on a removed file (packaging/check_bundle.py).
+NETWORK_FILES = {"qt6network.dll", "qtnetwork.pyd", "qtuiotouchplugin.dll", "libssl-3.dll", "_ssl.pyd"}
+a.binaries = [entry for entry in a.binaries
+              if Path(entry[0]).name.lower() not in NETWORK_FILES
+              and not any(part in entry[0].replace("\\", "/") for part in ("/plugins/tls/", "/plugins/networkinformation/"))]
 a.datas = [entry for entry in a.datas if "PySide6/translations/" not in entry[0].replace("\\", "/")]
 
 pyz = PYZ(a.pure)  # noqa: F821
