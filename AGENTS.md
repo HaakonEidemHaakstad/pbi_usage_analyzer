@@ -567,7 +567,10 @@ to specific reviewed commands and documented as an explicit security tradeoff.
 ## Primary host environment: Ubuntu
 
 Assume Ubuntu/Linux is the primary development host unless the user explicitly
-states otherwise.
+states otherwise. Windows is also supported and tested in CI: use
+`scripts/bootstrap.ps1` and the PowerShell command equivalents in
+docs/DEVELOPMENT.md ("Windows commands") instead of `make`. The user continues
+development on a Windows computer from 2026-10-01; see docs/HANDOFF.md.
 
 Preferred project commands:
 

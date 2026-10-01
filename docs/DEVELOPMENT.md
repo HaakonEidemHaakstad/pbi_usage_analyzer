@@ -26,6 +26,24 @@ If `py` is unavailable but `python` works:
 
 Select `.venv` as the Python interpreter in VS Code.
 
+### Windows commands
+
+Windows has no `make` by default. Equivalents, from the repository root in PowerShell:
+
+| Make target | PowerShell |
+| --- | --- |
+| `make compile` | `.\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer tests tools` |
+| `make test` | `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` |
+| `make validate` | `.\.venv\Scripts\python.exe tools\validation\validate_analyzer.py . tools\validation\validation_suite` |
+| `make check-fixtures` | `.\.venv\Scripts\python.exe tools\validation\check_fixture_drift.py` |
+| `make check-runtime` | `.\.venv\Scripts\python.exe tools\validation\check_runtime.py` |
+| `make benchmark` | `.\.venv\Scripts\python.exe tools\validation\large_model.py` |
+| `make analyze PROJECT=...` | `.\.venv\Scripts\python.exe run_analyzer.py "C:\path\to\project"` |
+
+`.gitattributes` keeps text files LF and the fixture corpus byte-exact on Windows;
+the fixture generator writes LF on every OS. Always pass `encoding="utf-8"` for
+text I/O (Windows defaults to cp1252). CI runs the same checks on Windows.
+
 ## Baseline checks
 
     python -m compileall -q pbi_usage_analyzer tests
@@ -115,9 +133,10 @@ cross-platform need is explicit.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs compilation, unit/regression tests, and synthetic
-validation on Ubuntu 24.04 / Python 3.12. It uses the same Make targets as local
-development and installs `requirements-dev.txt` into `.venv`. No Docker service
+`.github/workflows/ci.yml` runs compilation, fixture drift, unit/regression tests,
+synthetic validation and the runtime smoke test on Ubuntu 24.04 (Make targets,
+plus the informational benchmark) and on Windows Server 2025 (the PowerShell
+commands above), both with Python 3.12 and `requirements-dev.txt` in `.venv`. No Docker service
 or organizational credentials are needed. Pip packages are downloaded from the
 configured package index; requirements remain version ranges rather than a lockfile.
 

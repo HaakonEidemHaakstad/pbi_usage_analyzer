@@ -23,31 +23,49 @@ service is implemented. Correctness and evidence-based conservatism take priorit
 
 ## Repository and publication state
 
-- Working location: `/home/haakon/Desktop/pbi_usage_analyzer_ubuntu_agentic`.
-- Origin: `https://github.com/HaakonEidemHaakstad/pbi_usage_analyzer.git` (private).
-  Plain HTTPS git has no stored credentials; SSH works
-  (`git@github.com:HaakonEidemHaakstad/pbi_usage_analyzer.git`). The `gh` CLI is
-  installed and authenticated (keyring, git protocol SSH) as of 2026-09-30, so
-  `gh run list` / `gh run view --log` can check CI.
-- 2026-09-30: local and remote histories had identical trees but different commit
-  IDs (no merge base; earlier connector-based publication). Local `main` was moved
-  onto remote `main` (`5a4e5f9`) with `git reset --soft`, keeping all work, and the
-  former local history was kept as branch `local-history-backup` (at `f1e2876`,
-  not pushed). All work described here was then committed as one commit on top of
-  `5a4e5f9` and pushed as a fast-forward. Check `git log -1` / `git status` for the
-  current state.
-- Hosted CI ("Analyzer checks", Python 3.12 / Ubuntu) passed on `75d5132`
-  (run 36768770213): fixtures reproducible, 142 tests, 195 synthetic checks,
-  runtime smoke test. Check `gh run list` for later commits.
+- GitHub: `HaakonEidemHaakstad/pbi_usage_analyzer` (private), branch `main`. As of
+  2026-10-01 everything is committed and pushed; local `main` equals `origin/main`.
+  Run `git log -1` and `gh run list --limit 3` to see the current state.
+- CI ("Analyzer checks") has two jobs: Python 3.12 / Ubuntu and Python 3.12 /
+  Windows. Both passed on `ee82b5b` (run 36826537862).
+- History note: on 2026-09-30 the local history was rebased onto the remote by
+  `git reset --soft` (identical trees, different commit IDs from earlier
+  connector-based publication). The old local history exists only as the unpushed
+  branch `local-history-backup` on the Ubuntu machine; nothing needs it.
 - Follow AGENTS.md: do not commit or push without explicit user instructions. The
   user authorized committing/pushing on 2026-09-30 ("feel free to commit and push
   at your leisure"); treat that as covering routine completed work in this sequence.
 
-The user's latest request was to continue work from this handoff; the previous
-agent was interrupted while documenting. Its claims were re-verified on 2026-09-30
-(all counts matched; runtime smoke test rerun and passing). The planned DAX
-masking task, the TMDL expression-boundary fix and damaged-source handling were
-then implemented. When asked to proceed, use the next-work section.
+## Continuing on Windows (from 2026-10-01)
+
+The user continues on a Windows computer. Ubuntu was the original development
+host (`/home/haakon/Desktop/pbi_usage_analyzer_ubuntu_agentic`).
+
+1. Clone fresh: `git clone https://github.com/HaakonEidemHaakstad/pbi_usage_analyzer.git`
+   (the Windows machine needs its own GitHub authentication: Git Credential
+   Manager, an SSH key, or `gh auth login`). `.gitattributes` keeps line endings
+   correct regardless of `core.autocrlf`.
+2. Python 3.12, then `powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1`.
+3. Verify with the PowerShell commands in docs/DEVELOPMENT.md ("Windows commands"):
+   compile, `check_fixture_drift.py`, unit tests, `validate_analyzer.py`. CI already
+   runs exactly these on Windows.
+
+Not on GitHub (local to the Ubuntu machine, by design):
+
+- The AdventureWorks PBIP and raw data (`~/Desktop/AW`): course material. The
+  author's original Windows copy is likely under their OneDrive folder (paths in
+  its M). Run the optional integration test with
+  `$env:PBI_AW_PROJECT = "C:\path\to\AW"` before `unittest`.
+- The generated case-study package (`~/Desktop/AW_case_sources`): regenerate on
+  Windows with `.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py "<AdventureWorks Raw Data folder>"`.
+  Power BI Desktop and MariaDB for the case study run on Windows anyway.
+- The optional MariaDB/Docker integration environment was never started (Docker
+  is not installed on the Ubuntu machine).
+
+Latest user request (2026-10-01): confirm the project is up to date on GitHub and
+ready for handoff, because work continues on a Windows computer. Windows support
+was then verified in CI (see "Latest change"). When asked to proceed, use the
+next-work section.
 
 ## Implemented work in the current tree
 
@@ -67,7 +85,8 @@ then implemented. When asked to proceed, use the next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| M path rule | Latest change: `parsers/m_queries.py` and `POWERQUERY_HARDCODED_PATH`. Details below. |
+| Windows readiness | Latest change: `.gitattributes`, LF fixture generation, explicit UTF-8, Windows CI job. Details below. |
+| M path rule | Previous change: `parsers/m_queries.py` and `POWERQUERY_HARDCODED_PATH`. Details below. |
 | DAX health rule | Previous change: `DAX_REFERENCE_UNRESOLVED`. Details below. |
 | Case study | Previous change: multi-source bad-practice package generator and build guide. Details below. |
 | Real project | Previous change: AdventureWorks validation; PBIR `SourceRef.Entity`/hierarchy-level fix; M case-sensitivity fix. Details below. |
@@ -79,7 +98,20 @@ then implemented. When asked to proceed, use the next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: hard-coded path rule and shared-query collection
+## Latest change: Windows readiness
+
+- `.gitattributes`: `* text=auto eol=lf`; `tools/validation/validation_suite/** -text`
+  (byte-compared by `check_fixture_drift.py`; scenario 34 contains a deliberate CRLF
+  file). Renormalization changed nothing (the repo was already LF).
+- The fixture generator writes `newline="\n"`; all text I/O in tests and tools has
+  explicit `encoding="utf-8"` (verified with an AST scan: no `read_text`,
+  `write_text` or text-mode `open` without an encoding).
+- CI job `validate-windows` (windows-2025, PowerShell): compile, fixture drift,
+  tests, synthetic validation, runtime smoke test. Its first run found one
+  test-only issue (8.3 short temp paths vs resolved project root in `test_api`),
+  fixed by comparing resolved paths. No product code needed changes for Windows.
+
+## Previous change: hard-coded path rule and shared-query collection
 
 - `parsers/m_queries.py`: `collect_m_queries(model_folder)` returns `MQuery`
   records for table partitions and `expressions.tmdl` shared queries (kind
