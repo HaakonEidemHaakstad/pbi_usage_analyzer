@@ -87,8 +87,25 @@ Windows machine state (verified 2026-10-01):
   with WinError 5 (found when regenerating after the move), so `replace_output`
   clears the read-only flag per failing path and retries briefly. Mess-model path
   findings will therefore also carry the user-profile/OneDrive evidence note.
-  MariaDB is not installed yet; the user builds both PBIPs from
-  docs/CASE_STUDY_BUILD_GUIDE.md.
+  The user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md.
+- Database environment (2026-10-01): MariaDB 12.2 (service `MariaDB`, client
+  `C:\Program Files\MariaDB 12.2\bin\mysql.exe`, not on PATH); MariaDB
+  Connector/ODBC 3.1.23 64-bit installed (registers "MariaDB ODBC 3.1 Driver";
+  3.1.23's MSI is on dlm.mariadb.com, signed by MariaDB USA, Inc.; the community
+  REST API lists sources only). `aw_ops` and `aw_dw` are loaded by
+  `tools/casestudy/setup_mariadb.ps1`, which the user runs in their own window: it
+  prompts for the root and `pbi_reader` passwords (SecureString, passed via the
+  process-local `MYSQL_PWD`; never seen by the agent), loads all SQL with
+  `--abort-source-on-error`, and checks every table's row count against both
+  `manifest.json` files, logging counts only to `%TEMP%\aw_mariadb_setup.log`.
+- Lesson from the first load: `source` skips failing statements and exits 0, and
+  SQLite-based tests ignore column lengths. Raw customers have `Gender = 'NA'`
+  (130 rows) and the staging footer text exceeded `VARCHAR(20)`, so strict-mode
+  MariaDB rejected whole 500-row batches (`dim_customer` held 1000 of 18148 rows).
+  Fixed: mess `gender VARCHAR(2)`, staging `CUSTOMERKEY VARCHAR(40)`, good
+  warehouse stores unknown gender as NULL; `check_rows` (shared by both
+  generators) rejects any value strict mode would reject, and any row whose width
+  differs from its column list, before writing SQL.
 - Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
 

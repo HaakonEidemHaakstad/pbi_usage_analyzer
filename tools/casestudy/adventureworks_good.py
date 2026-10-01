@@ -25,7 +25,7 @@ import sys
 from openpyxl import Workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from adventureworks_mess import RAW_FILES, load_raw, replace_output, sql_literal
+from adventureworks_mess import RAW_FILES, check_rows, load_raw, replace_output, sql_literal
 
 DATABASE = "aw_dw"
 BATCH = 500
@@ -58,8 +58,10 @@ def table_rows(raw: dict[str, list[dict[str, str]]]) -> dict[str, list[list[str 
     if len(set(keys)) != len(keys):
         raise ValueError("OrderNumber + OrderLineItem is not unique in the sales files")
     # The customer export ends with junk/footer rows; a warehouse keeps valid keys only.
+    # The export writes 'NA' for an unknown gender; the warehouse stores NULL.
     customers = [[r["CustomerKey"], r["Prefix"].title(), r["FirstName"].title(), r["LastName"].title(),
-                  r["BirthDate"] or None, r["Gender"], r["EmailAddress"].lower(), r["AnnualIncome"] or None,
+                  r["BirthDate"] or None, r["Gender"] if r["Gender"] in ("M", "F") else None,
+                  r["EmailAddress"].lower(), r["AnnualIncome"] or None,
                   r["Occupation"]]
                  for r in raw["customers"] if r["CustomerKey"].isdigit()]
     territories = [[r["SalesTerritoryKey"], r["Region"], r["Country"], r["Continent"]] for r in raw["territories"]]
@@ -161,6 +163,7 @@ Build steps: docs/CASE_STUDY_BUILD_GUIDE.md in the analyzer repository.
 
 def build(raw_dir: Path, out: Path) -> dict:
     raw = load_raw(raw_dir)
+    check_rows({table: columns for table, (columns, _) in TABLES.items()}, table_rows(raw))
     for folder in ("mariadb", "excel", "csv", "json"):
         (out / folder).mkdir(parents=True)
     (out / "mariadb" / "01_schema.sql").write_text(schema_sql(), encoding="utf-8")

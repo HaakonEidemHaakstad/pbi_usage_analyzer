@@ -3,6 +3,7 @@ import filecmp
 import io
 import json
 import os
+import re
 import sqlite3
 import stat
 import sys
@@ -127,6 +128,25 @@ class CaseStudySourceTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(case.main([str(self.raw_dir), '--out', str(self.out)]), 2)
         self.assertIn('--force', err.getvalue())
+
+    def test_rows_fit_mariadb_strict_mode(self):
+        case.check_rows(case.TABLES, case.table_rows(self.raw))
+        columns = {'t': [('code', 'CHAR(1)', False), ('day', 'DATE', False), ('n', 'INT', True)]}
+        case.check_rows(columns, {'t': [['M', '2020-01-31', '3'], [None, '', None]]})
+        for row, message in ((['NA', '2020-01-31', '3'], 'longer than CHAR(1)'),  # real export value
+                             (['M', '1/31/2020', '3'], 'not an ISO date'),
+                             (['M', '2020-01-31', 'x'], 'not numeric'),
+                             (['M', '2020-01-31'], '2 values for 3 columns')):
+            with self.subTest(row=row), self.assertRaisesRegex(ValueError, re.escape(message)):
+                case.check_rows(columns, {'t': [row]})
+
+    def test_unknown_gender_and_footer_rows_fit(self):
+        raw = {**self.raw, 'customers': self.raw['customers'] + [
+            {**self.raw['customers'][0], 'CustomerKey': '11002', 'Gender': 'NA'}]}
+        rows = case.table_rows(raw)
+        case.check_rows(case.TABLES, rows)
+        self.assertIn('NA', [r[6] for r in rows['customers']])
+        self.assertIn('Export date 20230101 14:59:17', [r[0] for r in rows['stg_customers_raw']])
 
     def test_force_removes_read_only_folders(self):
         # OneDrive marks synced folders read-only; Windows then refuses to delete them.

@@ -69,6 +69,13 @@ class GoodTwinSourceTests(unittest.TestCase):
         self.assertTrue((self.out / 'csv' / 'calendar.csv').is_file())
         self.assertIn('returns/README.txt', self.manifest['csv'])
 
+    def test_unknown_gender_becomes_null(self):
+        raw = {**self.raw, 'customers': self.raw['customers'] + [
+            {**self.raw['customers'][0], 'CustomerKey': '11002', 'Gender': 'NA'}]}
+        rows = good.table_rows(raw)
+        good.check_rows({t: c for t, (c, _) in good.TABLES.items()}, rows)
+        self.assertEqual({r[0]: r[5] for r in rows['dim_customer']}['11002'], None)
+
     def test_duplicate_order_lines_are_rejected(self):
         raw = {**self.raw, 'sales_2021': self.raw['sales_2021'] + [self.raw['sales_2020'][0]]}
         with self.assertRaises(ValueError):

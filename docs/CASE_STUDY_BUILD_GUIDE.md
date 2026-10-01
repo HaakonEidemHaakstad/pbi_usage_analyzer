@@ -77,12 +77,28 @@ $raw = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW\AdventureWorks+Raw+Data\Adventur
      set* if offered.
 3. Finish the installation.
 
-- [ ] Start menu shows a **MariaDB 12.3 (x64)** folder with *Command Prompt
+- [ ] Start menu shows a **MariaDB 12.x (x64)** folder (12.2 also works) with *Command Prompt
       (MariaDB …)* and *MySQL Client*.
 
 ### A3. Load both databases
 
-1. Start menu → **MariaDB 12.3 (x64) → Command Prompt (MariaDB 12.3 (x64))**.
+**Shortcut for A3 and A4 together:** download the ODBC installer (A4 step 1),
+then run this from the repository folder in PowerShell. It prompts for the root
+password and for a new `pbi_reader` password (both stay inside the script),
+loads all five SQL files, creates the login, prints the row counts read as
+`pbi_reader`, and installs the driver after an administrator prompt. Re-running
+it is safe.
+
+```powershell
+$u = "C:\Users\hehaa\OneDrive\Desktop\USBL"
+powershell -ExecutionPolicy Bypass -File tools\casestudy\setup_mariadb.ps1 `
+    -MessFolder "$u\AWCase" -GoodFolder "$u\AWGood" -OdbcMsi "<path to the downloaded .msi>"
+```
+
+Manual steps, if you prefer:
+
+1. Start menu → **MariaDB 12.x (x64) → Command Prompt (MariaDB 12.x (x64))**
+   (12.2 or 12.3, whichever you installed).
    This is a classic command prompt with the MariaDB tools on the path. (Do not
    use PowerShell for the next commands: it does not support `<`.)
 2. Load the Mess database (enter the root password after each command; the
@@ -121,9 +137,11 @@ $raw = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW\AdventureWorks+Raw+Data\Adventur
 
 1. Download **MariaDB Connector/ODBC 3.1.x, 64-bit MSI** (3.1.10 or later) from
    <https://mariadb.com/downloads/connectors/> (choose *ODBC connector*, version
-   3.1, Windows 64-bit). Power BI's connector looks for the driver named
-   *MariaDB ODBC 3.1 Driver*, so a newer major version may not be found.
-2. Install with defaults. You do not need to create a DSN.
+   3.1, Windows 64-bit; the file is `mariadb-connector-odbc-3.1.x-win64.msi`,
+   signed by *MariaDB USA, Inc.*). Power BI's connector looks for the driver
+   named *MariaDB ODBC 3.1 Driver*, so a newer major version may not be found.
+2. Install with defaults (or let the A3 shortcut script do it). You do not need
+   to create a DSN.
 
 ### A5. Power BI Desktop
 

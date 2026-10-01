@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+from datetime import date
 import json
 from pathlib import Path
 import os
+import re
 import shutil
 import stat
 import sys
@@ -85,13 +87,15 @@ TABLES = {
     "customers": [
         ("customer_key", "INT", True), ("prefix", "VARCHAR(10)", False), ("first_name", "VARCHAR(50)", False),
         ("last_name", "VARCHAR(50)", False), ("birth_date", "DATE", False), ("marital_status", "CHAR(1)", False),
-        ("gender", "CHAR(1)", False), ("email_address", "VARCHAR(100)", False), ("annual_income", "INT", True),
+        # gender: the export writes 'NA' for unknown, so CHAR(1) is too short.
+        ("gender", "VARCHAR(2)", False), ("email_address", "VARCHAR(100)", False), ("annual_income", "INT", True),
         ("total_children", "INT", True), ("education_level", "VARCHAR(40)", False),
         ("occupation", "VARCHAR(40)", False), ("home_owner", "CHAR(1)", False),
     ],
     # Staging copy: every column is text, dates in US format, as landed by an "ETL".
     "stg_customers_raw": [
-        ("CUSTOMERKEY", "VARCHAR(20)", False), ("FULL_NAME_RAW", "VARCHAR(120)", False),
+        # CUSTOMERKEY also holds the export's footer text ("Export date ...").
+        ("CUSTOMERKEY", "VARCHAR(40)", False), ("FULL_NAME_RAW", "VARCHAR(120)", False),
         ("BIRTHDATE_TXT", "VARCHAR(20)", False), ("INCOME_TXT", "VARCHAR(20)", False),
         ("EMAIL", "VARCHAR(100)", False), ("LOADED_BY", "VARCHAR(40)", False),
     ],
@@ -176,6 +180,45 @@ def insert_statements(table: str, rows: list[list[str | None]], dialect: str) ->
             for row in rows[start:start + BATCH])
         statements.append(f"INSERT INTO {table} ({names}) VALUES\n{values};")
     return statements
+
+
+_LENGTH = re.compile(r"(?:VAR)?CHAR\((\d+)\)")
+_DATETIME = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+
+
+def check_rows(columns_by_table: dict[str, list[tuple[str, str, bool]]],
+               rows_by_table: dict[str, list[list[str | None]]]) -> None:
+    """Raise ValueError for any value MariaDB's strict mode would reject.
+
+    SQLite (used by the tests to execute the SQL) ignores declared lengths and
+    types, so this check is the only guard against a batch failing on MariaDB.
+    """
+    for table, rows in rows_by_table.items():
+        columns = columns_by_table[table]
+        for number, row in enumerate(rows, start=1):
+            if len(row) != len(columns):
+                raise ValueError(f"{table} row {number} has {len(row)} values for {len(columns)} columns")
+            for value, (name, kind, numeric) in zip(row, columns):
+                if value is None or value == "":
+                    continue
+                length = _LENGTH.fullmatch(kind)
+                problem = None
+                if length and len(value) > int(length.group(1)):
+                    problem = f"longer than {kind}"
+                elif kind == "DATE":
+                    try:
+                        date.fromisoformat(value)
+                    except ValueError:
+                        problem = "not an ISO date"
+                elif kind == "DATETIME" and not _DATETIME.fullmatch(value):
+                    problem = "not a DATETIME"
+                elif numeric:
+                    try:
+                        float(value)
+                    except ValueError:
+                        problem = "not numeric"
+                if problem:
+                    raise ValueError(f"{table} row {number}, column {name}: {value!r} is {problem}")
 
 
 def _is_int(value: str) -> bool:
@@ -343,6 +386,7 @@ the analyzer repository.
 
 def build(raw_dir: Path, out: Path) -> dict:
     raw = load_raw(raw_dir)
+    check_rows(TABLES, table_rows(raw))
     (out / "mariadb").mkdir(parents=True)
     (out / "excel").mkdir()
     (out / "json").mkdir()
