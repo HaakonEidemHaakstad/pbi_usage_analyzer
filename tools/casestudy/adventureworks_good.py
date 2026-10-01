@@ -10,15 +10,14 @@ docs/CASE_STUDY_BUILD_GUIDE.md.
 Usage:
     python tools/casestudy/adventureworks_good.py RAW_DIR [--out OUT_DIR] [--force]
 
-RAW_DIR is the "AdventureWorks Raw Data" folder. Output defaults to C:\\AWGood
-on Windows and ~/Desktop/AW_good_sources elsewhere.
+RAW_DIR is the "AdventureWorks Raw Data" folder. Output defaults to
+~/Desktop/AW_good_sources; the build guide passes --out explicitly.
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import json
-import os
 from pathlib import Path
 import shutil
 import sys
@@ -148,8 +147,8 @@ def categories_json(raw: dict[str, list[dict[str, str]]]) -> list[dict]:
 WINDOWS_README = """AdventureWorks good-twin case study - source package
 ====================================================
 
-Location: anywhere. Power BI reads it through the SourceFolder parameter
-(default C:\\AWGood), and MariaDB through the DbServer/DbName parameters.
+Location: anywhere. Power BI reads it through the SourceFolder parameter,
+and MariaDB through the DbServer/DbName parameters.
 
 MariaDB:
   mysql -u root -p < mariadb\\01_schema.sql
@@ -181,17 +180,13 @@ def build(raw_dir: Path, out: Path) -> dict:
     return manifest
 
 
-def default_out() -> Path:
-    return Path("C:/AWGood") if os.name == "nt" else Path.home() / "Desktop" / "AW_good_sources"
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("raw_dir", type=Path, help='The "AdventureWorks Raw Data" folder')
-    parser.add_argument("--out", type=Path, default=None)
+    parser.add_argument("--out", type=Path, default=Path.home() / "Desktop" / "AW_good_sources")
     parser.add_argument("--force", action="store_true", help="Replace an existing output folder")
     args = parser.parse_args(argv)
-    out = (args.out or default_out()).expanduser().resolve()
+    out = args.out.expanduser().resolve()
     if not replace_output(out, args.force):
         return 2
     manifest = build(args.raw_dir.expanduser(), out)

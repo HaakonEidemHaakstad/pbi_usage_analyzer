@@ -2,7 +2,9 @@ import contextlib
 import filecmp
 import io
 import json
+import os
 import sqlite3
+import stat
 import sys
 import tempfile
 import unittest
@@ -125,6 +127,20 @@ class CaseStudySourceTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(case.main([str(self.raw_dir), '--out', str(self.out)]), 2)
         self.assertIn('--force', err.getvalue())
+
+    def test_force_removes_read_only_folders(self):
+        # OneDrive marks synced folders read-only; Windows then refuses to delete them.
+        out = Path(self.tmp.name) / 'read_only'
+        locked = out / 'csv' / 'sales_archive'
+        locked.mkdir(parents=True)
+        (locked / 'old.csv').write_text('x\n', encoding='utf-8')
+        os.chmod(locked, stat.S_IREAD | stat.S_IEXEC)
+        try:
+            self.assertTrue(case.replace_output(out, force=True))
+        finally:
+            if locked.exists():
+                os.chmod(locked, stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+        self.assertFalse(out.exists())
 
 
 if __name__ == '__main__':

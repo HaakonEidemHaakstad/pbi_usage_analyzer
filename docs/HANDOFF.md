@@ -73,14 +73,22 @@ Windows machine state (verified 2026-10-01):
   `$env:PBI_AW_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW"`; it passes.
 - No `make`; Docker not checked. Symlinks need Developer Mode/admin, so
   `test_symlinks_are_rejected` now skips when the OS refuses (CI still runs it).
-- Case-study source packages generated on 2026-10-01: mess in `C:\AWCase` (the path
-  its M steps hard-code), good twin in `C:\AWGood`. MariaDB is not installed yet;
-  the user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md. Layout (agreed
-  2026-10-01): sources and projects in separate folders. Projects go to
-  `C:\AWProjects\Mess\AW Mess.pbip` and `C:\AWProjects\Good\AW Good.pbip` (folders
-  created, empty), each with an optional `NOTES.txt` of deviations. Both
-  generators refuse to replace an output folder containing any `*.pbip`, even
-  with `--force` (`replace_output` in `adventureworks_mess.py`).
+- Case-study folders, all in `C:\Users\hehaa\OneDrive\Desktop\USBL` (moved there
+  from `C:\` at the user's request on 2026-10-01, before any PBIP existed):
+  `USBL\AWCase` (mess sources; its M steps hard-code this path), `USBL\AWGood`
+  (good-twin sources), `USBL\AWProjects\Mess` and `USBL\AWProjects\Good` (the
+  user's hand-built PBIPs, `AW Mess.pbip` / `AW Good.pbip`, each with an optional
+  `NOTES.txt` of deviations; currently empty). Sources and projects are kept
+  apart; both generators refuse to replace an output folder containing any
+  `*.pbip`, even with `--force` (`replace_output` in `adventureworks_mess.py`).
+  `USBL` is synced by OneDrive: the guide has the user set *Always keep on this
+  device* on `AWProjects` and pause syncing if a PBIP save fails. OneDrive marks
+  synced folders `ReadOnly` + `ReparsePoint`; plain `shutil.rmtree` then fails
+  with WinError 5 (found when regenerating after the move), so `replace_output`
+  clears the read-only flag per failing path and retries briefly. Mess-model path
+  findings will therefore also carry the user-profile/OneDrive evidence note.
+  MariaDB is not installed yet; the user builds both PBIPs from
+  docs/CASE_STUDY_BUILD_GUIDE.md.
 - Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
 
@@ -136,7 +144,7 @@ add a good-practice twin case study and detailed Power BI build instructions (do
   clean model on the same data measures specificity (false positives, the costlier
   error per AGENTS.md). Pairing means each difference maps to one practice.
 - `tools/casestudy/adventureworks_good.py RAW_DIR [--out] [--force]` (default
-  `C:\AWGood` on Windows): MariaDB `aw_dw` (`fact_sales` all years with composite
+  `~/Desktop/AW_good_sources`; the guide passes `--out ...\USBL\AWGood`): MariaDB `aw_dw` (`fact_sales` all years with composite
   PK, `dim_customer`, `dim_territory`, PascalCase, integer keys), Excel tables
   `Products`/`Subcategories`, `csv/returns/returns_YYYY.csv` + `README.txt` (the
   folder query must filter), `csv/calendar.csv`, `json/categories.json`. Reuses
@@ -570,8 +578,8 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 ## Next planned implementation
 
 Waiting on the user: build both case studies per docs/CASE_STUDY_BUILD_GUIDE.md
-(MariaDB setup, AW Mess, AW Good) into `C:\AWProjects\Mess` and
-`C:\AWProjects\Good`, and say when done. Then for each:
+(MariaDB setup, AW Mess, AW Good) into `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess` and
+`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`, and say when done. Then for each:
 check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
 independently (subagent without analyzer output), run the analyzer, record
 expectations like `tests/integration/adventureworks_expected.json` (optional env

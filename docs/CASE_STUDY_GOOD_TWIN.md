@@ -15,7 +15,7 @@ Click-by-click instructions for both models: [build guide](CASE_STUDY_BUILD_GUID
 ## Source package
 
 ```powershell
-.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py "<...>\AdventureWorks Raw Data" --out C:\AWGood
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py "<...>\AdventureWorks Raw Data" --out C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood
 ```
 
 | Folder | Contents | Good practice shown |
@@ -29,7 +29,7 @@ Click-by-click instructions for both models: [build guide](CASE_STUDY_BUILD_GUID
 ## Model specification
 
 **Settings.** Auto date/time **off** for the file. Paths and server come from three
-text parameters: `SourceFolder` (`C:\AWGood`), `DbServer` (`localhost`), `DbName`
+text parameters: `SourceFolder` (`C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood`), `DbServer` (`localhost`), `DbName`
 (`aw_dw`).
 
 **Queries** (load enabled unless stated):

@@ -18,8 +18,11 @@ import argparse
 import csv
 import json
 from pathlib import Path
+import os
 import shutil
+import stat
 import sys
+import time
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
@@ -321,8 +324,8 @@ def write_csvs(raw_dir: Path, raw: dict[str, list[dict[str, str]]], out: Path) -
 WINDOWS_README = """AdventureWorks bad-practice case study - source package
 =========================================================
 
-Copy this whole folder to C:\\AWCase on the Windows PC (the case study guide
-assumes that path; hard-coding it is one of the bad practices).
+Keep this folder where docs/CASE_STUDY_BUILD_GUIDE.md says (its Power Query
+steps hard-code that path; hard-coding it is one of the bad practices).
 
 MariaDB (run on the Windows PC):
   1. Install MariaDB Server and MariaDB Connector/ODBC (64-bit).
@@ -380,8 +383,24 @@ def replace_output(out: Path, force: bool) -> bool:
     if not force:
         print(f"{out} exists; pass --force to replace it.", file=sys.stderr)
         return False
-    shutil.rmtree(out)
-    return True
+    def clear_readonly(function, path, _exc):
+        # OneDrive marks synced folders read-only; Windows refuses to delete those.
+        os.chmod(path, stat.S_IWRITE)
+        function(path)
+
+    handler = {"onexc" if sys.version_info >= (3, 12) else "onerror": clear_readonly}
+    # Sync clients (OneDrive) may also briefly lock folders they are uploading.
+    for attempt in range(6):
+        try:
+            shutil.rmtree(out, **handler)
+            return True
+        except PermissionError as exc:
+            if attempt == 5:
+                print(f"Could not remove {out}: {exc}. If OneDrive syncs this folder, pause "
+                      "syncing and run again.", file=sys.stderr)
+                return False
+            time.sleep(2)
+    return False
 
 
 def main(argv: list[str] | None = None) -> int:
