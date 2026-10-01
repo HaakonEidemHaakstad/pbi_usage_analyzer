@@ -31,7 +31,9 @@ class GuiSmokeTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         settings = QSettings(str(Path(self.tmp.name) / "settings.ini"), QSettings.Format.IniFormat)
-        self.window = MainWindow(settings)
+        # Never touch the real per-user settings or review state.
+        self.data_dir = Path(self.tmp.name) / "data"
+        self.window = MainWindow(settings, self.data_dir)
         self.addCleanup(self.window.close)
 
     def run_analysis(self, path):
@@ -147,6 +149,87 @@ class GuiSmokeTests(unittest.TestCase):
         self.assertEqual(len(summary['reports']), 3)
         self.assertEqual(smoke_test(Path(self.tmp.name) / 'missing', out), 1)
         self.assertIn('NotADirectoryError', (out / 'smoke-test-error.txt').read_text(encoding='utf-8'))
+
+    def test_changes_since_the_previous_run(self):
+        project = Path(self.tmp.name) / 'project'
+        shutil.copytree(SUITE / '41_m_usage_aware_lineage', project)
+        self.run_analysis(project)
+        self.assertIsNone(self.window.changes)
+        self.assertIn('First analysis', self.window.changes_tab.empty.text())
+        (next(project.rglob('Visual2')) / 'visual.json').unlink()
+        self.window.rerun_action.trigger()
+        self.wait_for_analysis()
+        rows = self.window.changes_tab.table.model.rows
+        self.assertIn(('Budget[Note]', 'Used', 'Likely unused'), [(c.label, c.before, c.after) for c in rows])
+        self.assertTrue(self.window.changes_tab.table.select(lambda c: c.label == 'Budget[Note]'))
+        text = self.window.detail.toPlainText()
+        self.assertIn('Report -> Budget[Note]', text)  # the evidence path it had before
+        # The comparison survives a restart: a new window compares with the last run.
+        again = MainWindow(QSettings(str(Path(self.tmp.name) / "s2.ini"), QSettings.Format.IniFormat), self.data_dir)
+        self.addCleanup(again.close)
+        self.window = again
+        self.run_analysis(project)
+        self.assertEqual(again.changes, ())
+
+    def test_acknowledgements_persist_hide_and_can_be_removed(self):
+        project = Path(self.tmp.name) / 'project'
+        shutil.copytree(SUITE / '37_duplicate_measures', project)
+        self.run_analysis(project)
+        health = self.window.health
+        total = health.table.model.rowCount()
+        key = health.table.model.rows[0].key
+        self.window.acknowledge(key, note='Intentional copy for the finance page')
+        self.assertEqual(health.table.model.rowCount(), total - 1)
+        # A new window (restart) reads the saved acknowledgement.
+        again = MainWindow(QSettings(str(Path(self.tmp.name) / "s2.ini"), QSettings.Format.IniFormat), self.data_dir)
+        self.addCleanup(again.close)
+        self.window = again
+        self.run_analysis(project)
+        self.assertEqual(again.health.table.model.rowCount(), total - 1)
+        again.tabs.setCurrentWidget(again.health)
+        self.assertTrue(again.health.select_key(key))  # reveals acknowledged rows
+        self.assertIn('Intentional copy for the finance page', again.detail.toPlainText())
+        again.unacknowledge(key)
+        self.assertNotIn(key, again.state.acknowledgements)
+
+    def test_stale_acknowledgements_and_unreadable_state(self):
+        project = Path(self.tmp.name) / 'project'
+        shutil.copytree(SUITE / '02_dax_transitive', project)
+        self.run_analysis(project)
+        self.window.acknowledge('Column|Gone|Away', note='')
+        self.window.acknowledge('Column|Sales|Amount', note='')
+        self.window.prune_acknowledgements()
+        self.assertEqual(list(self.window.state.acknowledgements), ['Column|Sales|Amount'])
+        # Corrupt the saved state: a new window warns, moves it aside and starts fresh.
+        from pbi_usage_analyzer_gui.main_window import state_file
+        path = state_file(self.data_dir, project)
+        path.write_text('{broken', encoding='utf-8')
+        shown = []
+        original = QMessageBox.warning
+        QMessageBox.warning = staticmethod(lambda *args, **kwargs: shown.append(args))
+        try:
+            again = MainWindow(QSettings(str(Path(self.tmp.name) / "s2.ini"), QSettings.Format.IniFormat),
+                               self.data_dir)
+            self.addCleanup(again.close)
+            self.window = again
+            self.run_analysis(project)
+        finally:
+            QMessageBox.warning = original
+        self.assertTrue(shown)
+        self.assertEqual(again.state.acknowledgements, {})
+        self.assertTrue(list(path.parent.glob('*.unreadable-*.json')))
+
+    def test_references_link_to_the_objects_a_measure_uses(self):
+        from PySide6.QtCore import QUrl
+        self.run_analysis(SUITE / '02_dax_transitive')
+        window = self.window
+        window.tabs.setCurrentWidget(window.cleanup)
+        self.assertTrue(window.cleanup.select_key('Measure|Sales|Measure A'))
+        self.assertIn('References', window.detail.toPlainText())
+        index = next(i for i, link in enumerate(window.detail._links)
+                     if link[0] == 'object' and link[1].name == 'Measure B')
+        window.detail._clicked(QUrl(f'link:{index}'))
+        self.assertEqual(window.cleanup.table.selected().name, 'Measure B')
 
     def test_pbip_file_stands_for_its_folder(self):
         pbip = next((SUITE / '02_dax_transitive').glob('*.pbip'))

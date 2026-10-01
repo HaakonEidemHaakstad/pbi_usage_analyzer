@@ -81,6 +81,16 @@ SEVERITY_LABELS = {
 }
 
 
+# Kinds of change between two runs (views.history.ChangeKind values).
+CHANGE_LABELS = {
+    "status_changed": "Status changed",
+    "object_added": "New object",
+    "object_removed": "Object removed",
+    "finding_added": "New finding",
+    "finding_resolved": "Finding resolved",
+}
+
+
 def rule_info(rule_id: str) -> RuleInfo:
     return RULE_INFO[rule_id]
 

@@ -163,12 +163,15 @@ def _selected(value, selection) -> bool:
 
 def filter_objects(rows: Iterable[ObjectRow], *, statuses: Iterable[Status] | None = None,
                    types: Iterable[ObjectType] | None = None, tables: Iterable[str] | None = None,
-                   text: str = "", include_internal: bool = False) -> tuple[ObjectRow, ...]:
-    """Rows matching every selection; `text` is a case-insensitive table/name search."""
+                   text: str = "", include_internal: bool = False,
+                   exclude_keys: Iterable[str] = ()) -> tuple[ObjectRow, ...]:
+    """Rows matching every selection; `text` is a case-insensitive table/name search.
+    `exclude_keys` drops rows by key (e.g. acknowledged objects)."""
     statuses, types, tables = (None if s is None else tuple(s) for s in (statuses, types, tables))
     needle = text.strip().casefold()
+    excluded = frozenset(exclude_keys)
     return tuple(row for row in rows
-                 if (include_internal or not row.internal)
+                 if row.key not in excluded and (include_internal or not row.internal)
                  and _selected(row.status, statuses) and _selected(row.object_type, types)
                  and _selected(row.table, tables)
                  and (not needle or needle in row.table.casefold() or needle in row.name.casefold()))
@@ -176,12 +179,15 @@ def filter_objects(rows: Iterable[ObjectRow], *, statuses: Iterable[Status] | No
 
 def filter_health(rows: Iterable[HealthRow], *, rule_ids: Iterable[str] | None = None,
                   severities: Iterable[HealthSeverity] | None = None,
-                  categories: Iterable[str] | None = None, text: str = "") -> tuple[HealthRow, ...]:
-    """Rows matching every selection; `text` searches rule, scope and title."""
+                  categories: Iterable[str] | None = None, text: str = "",
+                  exclude_keys: Iterable[str] = ()) -> tuple[HealthRow, ...]:
+    """Rows matching every selection; `text` searches rule, scope and title.
+    `exclude_keys` drops rows by key (e.g. acknowledged findings)."""
     rule_ids, severities, categories = (None if s is None else tuple(s) for s in (rule_ids, severities, categories))
     needle = text.strip().casefold()
+    excluded = frozenset(exclude_keys)
     return tuple(row for row in rows
-                 if _selected(row.rule_id, rule_ids) and _selected(row.severity, severities)
+                 if row.key not in excluded and _selected(row.rule_id, rule_ids) and _selected(row.severity, severities)
                  and _selected(row.category, categories)
                  and (not needle or any(needle in value.casefold()
                                         for value in (row.rule_id, row.rule_name, row.scope,

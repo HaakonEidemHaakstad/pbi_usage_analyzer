@@ -138,7 +138,8 @@ match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1
 queries, done), then option 4 because no other real project is available (GUI
 design document, done; no code), then "go with the toolkit you think is best. build
 windows app. interface language english, start G0 now" (G0 done), then "proceed"
-(G1 read-only viewer, done), then "proceed with 3" (G3 Windows build, done).
+(G1 read-only viewer, done), then "proceed with 3" (G3 Windows build, done), then
+"proceed" (G2 workflow aids, done).
 
 ## Implemented work in the current tree
 
@@ -158,7 +159,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| GUI phase G3 | Latest change: standalone Windows app (`packaging/`, `scripts/build_windows.ps1`, `requirements-build.txt`, CI job "Windows application build"). Details below. |
+| GUI phase G2 | Latest change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
+| GUI phase G3 | Previous change: standalone Windows app (`packaging/`, `scripts/build_windows.ps1`, `requirements-build.txt`, CI job "Windows application build"). Details below. |
 | GUI phase G1 | Previous change: `pbi_usage_analyzer_gui` read-only viewer; `requirements-gui.txt`, `scripts/gui.ps1`, `bootstrap.ps1 -Gui`; Windows CI runs offscreen GUI tests. Details below. |
 | GUI phase G0 | Previous change: `pbi_usage_analyzer.views` (catalog, explain, rows), `RULE_INFO`, `HealthFinding.object_ref`, `reporting.files.write_reports`, Excel evidence paths. Details below. |
 | GUI design | Previous change: docs/GUI_DESIGN.md (design only; no code). Facts checked 2026-10-01: analysis 0.04–0.09 s on the real projects; PySide6 6.11.2 supports Python 3.10–3.14 with Windows wheels; Tk 9.0 present in this Python. |
@@ -185,7 +187,19 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: GUI phase G3, standalone Windows app (2026-10-01)
+## Latest change: GUI phase G2, workflow aids (2026-10-01)
+
+- Details: GUI_DESIGN.md section 16. Core `views/history.py` (snapshot,
+  `compare_runs`, `ProjectState`); `MainWindow(settings, data_dir)` loads/saves the
+  per-project state on every analysis; `state_file()` names it by a hash of the
+  normalized project path.
+- Caution found while building it: `MainWindow()` without `data_dir` uses the real
+  per-user AppData; a QApplication without names maps that to `%APPDATA%\Python`.
+  Tests, the smoke test and screenshot helpers must pass a temporary `data_dir`
+  (six test-written files there were removed; checked empty afterwards).
+- No analysis change.
+
+## Previous change: GUI phase G3, standalone Windows app (2026-10-01)
 
 - Files and verification: GUI_DESIGN.md section 15. Build locally with
   `scripts\build_windows.ps1 -OutDir "$env:TEMP\pbi_build"` (keep the 120 MB output out
@@ -807,16 +821,17 @@ references are done, and the GUI design exists (docs/GUI_DESIGN.md, 2026-10-01).
 Owner decisions (2026-10-01): toolkit left to the agent (PySide6 chosen), a
 standalone Windows app (G3), English UI, start G0 immediately. **G0 is done**
 (GUI_DESIGN.md section 13 lists where each change lives). **G1 is done** (section 14).
-**G3 is done** (section 15): standalone Windows build and CI artifact. **Next: G2**
-(run comparison, acknowledgements), or an app icon/version resource; the owner
-should pick a project license before giving the app to others. Other candidates:
+**G3 is done** (section 15) and **G2 is done** (section 16): all GUI phases are
+complete. The owner should pick a project license before giving the app to
+others. Candidates now: an app icon/version resource, more real projects, or the
+analysis items below:
 1. Lineage through currently unsupported steps seen in real exports (e.g. the folder
    combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`; matters only
    when such a step sits between two model queries).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
-4. GUI: G0, G1 and G3 done; G2 next (see above).
+4. GUI: all phases (G0–G3) done.
 Remaining answer-key gaps need data access (encoding, totals rows, folder
 duplicates) or name heuristics (`stg_*` staging).
 
@@ -842,6 +857,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
+- Windows, Python 3.14, 2026-10-01 after GUI phase G2: 283 tests OK (2 skipped), 359
+  synthetic checks, fixture drift, compilation and `git diff --check` pass; rebuilt
+  Windows app smoke test passes (zip 50.1 MB).
 - Windows, Python 3.14, 2026-10-01 after GUI phase G3: 269 tests OK (2 skipped), 359
   synthetic checks; local build + frozen smoke test pass (zip 50.1 MB); frozen app
   on AW Mess matches the library (178 / 45 rows).

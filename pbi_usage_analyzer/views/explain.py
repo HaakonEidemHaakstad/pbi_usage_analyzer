@@ -36,6 +36,8 @@ class Explanation:
     review_path: Path
     # All evidence pointing at the object, in graph order.
     evidence: tuple[Evidence, ...]
+    # Evidence from the object to what it references or is loaded from.
+    dependencies: tuple[Evidence, ...] = ()
 
 
 class Explainer:
@@ -57,6 +59,7 @@ class Explainer:
             self.use_path(ref) if ref in self._used else (),
             self.review_path(ref) if status == Status.MANUAL_REVIEW else (),
             tuple(self._graph.incoming(ref)),
+            tuple(self._graph.outgoing(ref)),
         )
 
     def use_path(self, ref: ObjectRef) -> Path:

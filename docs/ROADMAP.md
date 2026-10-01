@@ -184,5 +184,8 @@ export), started with `scripts/gui.ps1`, tested offscreen in the Windows CI job.
 G3 is done: `scripts/build_windows.ps1` builds a standalone one-folder Windows app
 (about 50 MB zipped) with license notices and a headless smoke test; CI builds it on
 every push and keeps the zip as an artifact.
-Next: G2 workflow aids (run comparison, acknowledgements); more real projects when
-available.
+G2 is done: the Changes tab compares with the previous analysis (persisted per
+user), acknowledgements with notes hide reviewed items across re-runs, and the
+detail panel links along dependencies (`views.history`, tested without Qt).
+All GUI phases are complete. Next: more real projects when available; small GUI
+polish (icon, version resource) on request.

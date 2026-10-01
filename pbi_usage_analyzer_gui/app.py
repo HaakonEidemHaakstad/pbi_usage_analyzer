@@ -25,7 +25,8 @@ def smoke_test(project: Path, output: Path) -> int:
     output.mkdir(parents=True, exist_ok=True)
     try:
         result = analyze_project(project_folder(project))
-        window = MainWindow(QSettings(str(output / "smoke-test-settings.ini"), QSettings.Format.IniFormat))
+        window = MainWindow(QSettings(str(output / "smoke-test-settings.ini"), QSettings.Format.IniFormat),
+                            output / "smoke-test-state")
         window.show_result(result)
         window.resize(1400, 860)
         window.grab().save(str(output / "smoke-test.png"))  # rendered without showing the window

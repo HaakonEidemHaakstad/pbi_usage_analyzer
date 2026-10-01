@@ -1,12 +1,14 @@
-"""Main window: start page, result tabs, detail panel, re-run and export."""
+"""Main window: start page, result tabs, detail panel, re-run, export and review state."""
 from __future__ import annotations
 
+import hashlib
+import os
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QUrl
+from PySide6.QtCore import QSettings, QStandardPaths, Qt, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
-from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel, QListWidget,
+from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget,
                                QListWidgetItem, QMainWindow,
                                QMessageBox, QPushButton, QSplitter, QStackedWidget, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -14,11 +16,11 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel, Q
 from pbi_usage_analyzer import AnalysisResult, __version__
 from pbi_usage_analyzer.model import ObjectType
 from pbi_usage_analyzer.reporting.files import write_reports
-from pbi_usage_analyzer.views import (Explainer, diagnostic_rows, health_rows, object_rows,
-                                      query_dependency_rows)
+from pbi_usage_analyzer.views import (Change, Explainer, ProjectState, compare_runs, diagnostic_rows,
+                                      health_rows, object_key, object_rows, query_dependency_rows, snapshot)
 
-from .detail import DetailPanel, diagnostic_html, health_html, object_html, query_html
-from .tabs import CleanupTab, DiagnosticsTab, HealthTab, OverviewTab, QueriesTab
+from .detail import (DetailPanel, change_html, diagnostic_html, health_html, object_html, query_html)
+from .tabs import ChangesTab, CleanupTab, DiagnosticsTab, HealthTab, OverviewTab, QueriesTab
 from .worker import AnalysisThread
 
 APP_NAME = "Power BI Model Health Analyzer"
@@ -28,6 +30,12 @@ MAX_RECENT = 8
 def project_folder(path: Path) -> Path:
     """A `.pbip` file stands for its folder."""
     return path.parent if path.suffix.casefold() == ".pbip" else path
+
+
+def state_file(data_dir: Path, project_root: Path) -> Path:
+    """Per-user review state of one project (outside the project folder)."""
+    identity = os.path.normcase(str(project_root.resolve()))
+    return data_dir / "projects" / (hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24] + ".json")
 
 
 class StartPage(QWidget):
@@ -69,9 +77,13 @@ class StartPage(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings: QSettings | None = None):
+    def __init__(self, settings: QSettings | None = None, data_dir: Path | None = None):
         super().__init__()
         self.settings = settings or QSettings("pbi-usage-analyzer", "Power BI Model Health Analyzer")
+        self.data_dir = data_dir or Path(QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.AppDataLocation))
+        self.state: ProjectState | None = None
+        self.changes: tuple[Change, ...] | None = None
         self.result: AnalysisResult | None = None
         self.project: Path | None = None
         self.explainer: Explainer | None = None
@@ -89,9 +101,10 @@ class MainWindow(QMainWindow):
         self.banner.setWordWrap(True)
         self.tabs = QTabWidget()
         self.overview, self.cleanup, self.health = OverviewTab(), CleanupTab(), HealthTab()
-        self.diagnostics, self.queries = DiagnosticsTab(), QueriesTab()
+        self.diagnostics, self.queries, self.changes_tab = DiagnosticsTab(), QueriesTab(), ChangesTab()
         for widget, title in ((self.overview, "Overview"), (self.cleanup, "Cleanup"), (self.health, "Health"),
-                              (self.diagnostics, "Diagnostics"), (self.queries, "Queries")):
+                              (self.changes_tab, "Changes"), (self.diagnostics, "Diagnostics"),
+                              (self.queries, "Queries")):
             self.tabs.addTab(widget, title)
         self.detail = DetailPanel()
         splitter = QSplitter()
@@ -113,8 +126,13 @@ class MainWindow(QMainWindow):
         self.overview.show_objects.connect(self._show_objects)
         self.overview.show_health.connect(self._show_health)
         self.overview.show_diagnostics.connect(lambda: self.tabs.setCurrentWidget(self.diagnostics))
+        self.overview.show_changes.connect(lambda: self.tabs.setCurrentWidget(self.changes_tab))
         self.cleanup.object_selected.connect(self._object_selected)
-        self.health.finding_selected.connect(lambda row: self.detail.show_html(health_html(row)))
+        self.health.finding_selected.connect(self._finding_selected)
+        self.changes_tab.row_selected.connect(self._change_selected)
+        for tab in (self.cleanup, self.health):
+            tab.acknowledge_requested.connect(self.acknowledge)
+            tab.unacknowledge_requested.connect(self.unacknowledge)
         self.diagnostics.row_selected.connect(lambda row: self.detail.show_html(diagnostic_html(row)))
         self.queries.row_selected.connect(lambda row: self.detail.show_html(query_html(row)))
         self.detail.open_file.connect(self.open_file)
@@ -146,6 +164,13 @@ class MainWindow(QMainWindow):
         file_menu.addActions([self.rerun_action, self.export_action, self.export_json_action])
         file_menu.addSeparator()
         file_menu.addAction(self.quit_action)
+        self.acknowledge_action = action("Acknowledge selected…", self._acknowledge_selected, "Ctrl+K")
+        self.unacknowledge_action = action("Remove acknowledgement", self._unacknowledge_selected, "Ctrl+Shift+K")
+        self.prune_action = action("Remove acknowledgements of missing items", self.prune_acknowledgements)
+        review_menu = self.menuBar().addMenu("&Review")
+        review_menu.addActions([self.acknowledge_action, self.unacknowledge_action])
+        review_menu.addSeparator()
+        review_menu.addAction(self.prune_action)
         help_menu = self.menuBar().addMenu("&Help")
         help_menu.addAction(action("About", self.about))
         toolbar = self.addToolBar("Main")
@@ -154,7 +179,8 @@ class MainWindow(QMainWindow):
         self._set_result_actions(False)
 
     def _set_result_actions(self, enabled: bool) -> None:
-        for item in (self.rerun_action, self.export_action, self.export_json_action):
+        for item in (self.rerun_action, self.export_action, self.export_json_action,
+                     self.acknowledge_action, self.unacknowledge_action, self.prune_action):
             item.setEnabled(enabled)
 
     def _refresh_recent(self) -> None:
@@ -230,9 +256,20 @@ class MainWindow(QMainWindow):
         self.explainer = Explainer(result.graph, result.findings)
         objects, health = object_rows(result), health_rows(result)
         diagnostics, queries = diagnostic_rows(result), query_dependency_rows(result)
-        self.overview.set_result(objects, health, diagnostics)
+        if not same_project or self.state is None:
+            self.state = self._load_state(result.project.root)
+        current = snapshot(result)
+        previous = self.state.last_run
+        self.changes = compare_runs(previous, current) if previous is not None else None
+        self.state.last_run = current
+        self._save_state()
+        acknowledgements = self.state.acknowledgements
+        self.overview.set_result(objects, health, diagnostics, frozenset(acknowledgements), self.changes)
+        self.cleanup.acknowledgements = acknowledgements
+        self.health.acknowledgements = acknowledgements
         self.cleanup.set_rows(objects)
         self.health.set_rows(health)
+        self.changes_tab.set_changes(self.changes, _when(previous.analyzed_at) if previous else None)
         self.diagnostics.set_rows(diagnostics)
         self.queries.set_rows(queries)
         if not same_project:
@@ -250,7 +287,8 @@ class MainWindow(QMainWindow):
             f"{columns.business_total + measures.business_total} business objects: "
             f"{columns.used + measures.used} Used, {columns.manual_review + measures.manual_review} "
             f"Needs manual review, {columns.likely_unused + measures.likely_unused} Likely unused · "
-            f"{len(health)} health findings · {len(diagnostics)} diagnostics")
+            f"{len(health)} health findings · {len(diagnostics)} diagnostics"
+            + (f" · {len(self.changes)} changes since last run" if self.changes else ""))
         if selected is None or not self._restore(selected):
             self.detail.clear_detail()
 
@@ -269,7 +307,98 @@ class MainWindow(QMainWindow):
 
     def _object_selected(self, row) -> None:
         if self.explainer is not None:
-            self.detail.show_html(object_html(row, self.explainer.explain(row.ref), self.explainer.status_of))
+            self.detail.show_html(object_html(row, self.explainer.explain(row.ref), self.explainer.status_of,
+                                              self._acknowledgement(row.key)))
+
+    def _finding_selected(self, row) -> None:
+        self.detail.show_html(health_html(row, self._acknowledgement(row.key)))
+
+    def _change_selected(self, change: Change) -> None:
+        current = None
+        if self.result is not None:
+            current = next((f.ref for f in self.result.findings if object_key(f.ref) == change.key), None)
+        self.detail.show_html(change_html(change, current))
+
+    # Review state: acknowledgements and the last run, per user and project
+
+    def _load_state(self, root: Path) -> ProjectState:
+        path = state_file(self.data_dir, root)
+        try:
+            return ProjectState.load(path, str(root))
+        except ValueError as exc:
+            backup = path.with_name(path.stem + f".unreadable-{datetime.now():%Y%m%d-%H%M%S}.json")
+            path.replace(backup)
+            QMessageBox.warning(self, "Review state reset",
+                                f"The saved acknowledgements for this project could not be read and were "
+                                f"moved aside:\n{backup}\n\n{exc}")
+            return ProjectState(str(root))
+
+    def _save_state(self) -> None:
+        if self.state is None or self.result is None:
+            return
+        try:
+            self.state.save(state_file(self.data_dir, self.result.project.root))
+        except OSError as exc:
+            self.statusBar().showMessage(f"Could not save the review state: {exc}")
+
+    def _acknowledgement(self, key: str):
+        return self.state.acknowledgements.get(key) if self.state else None
+
+    def _selected_review_key(self) -> str | None:
+        tab = self.tabs.currentWidget()
+        if tab in (self.cleanup, self.health) and tab.table.selected() is not None:
+            return tab.table.selected().key
+        return None
+
+    def _acknowledge_selected(self) -> None:
+        key = self._selected_review_key()
+        if key is None:
+            self.statusBar().showMessage("Select a row in the Cleanup or Health tab to acknowledge it.")
+            return
+        self.acknowledge(key)
+
+    def _unacknowledge_selected(self) -> None:
+        key = self._selected_review_key()
+        if key is not None:
+            self.unacknowledge(key)
+
+    def acknowledge(self, key: str, note: str | None = None) -> None:
+        """Mark a row as reviewed; asks for an optional note unless one is given."""
+        if self.state is None:
+            return
+        if note is None:
+            existing = self._acknowledgement(key)
+            note, accepted = QInputDialog.getMultiLineText(
+                self, "Acknowledge", "Optional note (why this is fine, who decided):",
+                existing.note if existing else "")
+            if not accepted:
+                return
+        self.state.acknowledge(key, note)
+        self._review_changed(f"Acknowledged. Acknowledged rows are hidden unless you clear 'Hide acknowledged'.")
+
+    def unacknowledge(self, key: str) -> None:
+        if self.state is not None and key in self.state.acknowledgements:
+            self.state.unacknowledge(key)
+            self._review_changed("Acknowledgement removed.")
+
+    def prune_acknowledgements(self) -> None:
+        if self.state is None or self.result is None:
+            return
+        current = {row.key for row in object_rows(self.result)} | {row.key for row in health_rows(self.result)}
+        stale = self.state.stale_acknowledgements(current)
+        for item in stale:
+            self.state.unacknowledge(item.key)
+        self._review_changed(f"Removed {len(stale)} acknowledgements of items that no longer exist.")
+
+    def _review_changed(self, message: str) -> None:
+        self._save_state()
+        acknowledgements = self.state.acknowledgements
+        self.cleanup.set_acknowledgements(acknowledgements)
+        self.health.set_acknowledgements(acknowledgements)
+        if self.result is not None:
+            self.overview.set_result(object_rows(self.result), health_rows(self.result),
+                                     diagnostic_rows(self.result), frozenset(acknowledgements), self.changes)
+        self.statusBar().showMessage(message)
 
     def _show_objects(self, status, object_type, table) -> None:
         self.cleanup.set_filters(status=status, object_type=object_type, table=table)
@@ -329,3 +458,11 @@ class MainWindow(QMainWindow):
         if self.thread is not None and self.thread.isRunning():
             self.thread.wait(5000)
         super().closeEvent(event)
+
+
+def _when(iso: str) -> str:
+    """'2026-10-01T14:32:05' as '2026-10-01 14:32'."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return iso

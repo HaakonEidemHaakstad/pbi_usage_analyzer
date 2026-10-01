@@ -8,9 +8,13 @@ from PySide6.QtCore import QUrl, Signal
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication, QTextBrowser
 
-from pbi_usage_analyzer.model import ObjectRef, Status
-from pbi_usage_analyzer.views import (EVIDENCE_LABELS, SEVERITY_LABELS, STATUS_INFO, DiagnosticRow,
-                                      Explanation, HealthRow, ObjectRow, QueryDependencyRow, format_path)
+from pbi_usage_analyzer.model import ObjectRef, ObjectType, Status
+from pbi_usage_analyzer.views import (CHANGE_LABELS, EVIDENCE_LABELS, SEVERITY_LABELS, STATUS_INFO,
+                                      Acknowledgement, Change, ChangeKind, DiagnosticRow, Explanation,
+                                      HealthRow, ObjectRow, QueryDependencyRow, format_path)
+
+# Objects the user can jump to from the detail panel.
+LINKABLE = {ObjectType.COLUMN, ObjectType.MEASURE, ObjectType.QUERY}
 
 # Status colours are a hint only; the label always carries the meaning. Qt follows
 # the Windows light/dark setting, so each status has a shade for either background.
@@ -54,11 +58,24 @@ class _Html:
         self.add(f"<p><b>Source:</b> {self.link(where, ('file', path))}<br>"
                  f"<span style='color:gray'>{escape(path)}</span></p>")
 
+    def object(self, ref: ObjectRef) -> str:
+        """A link that selects the object, when it is one the panels can show."""
+        if ref.object_type in LINKABLE:
+            return self.link(ref.label, ("object", ref))
+        return escape(ref.label)
+
+    def acknowledgement(self, item: Acknowledgement | None) -> None:
+        if item is not None:
+            note = f": {escape(item.note)}" if item.note else ""
+            self.add(f"<p style='border-left:3px solid gray; padding-left:6px'><b>Acknowledged</b> "
+                     f"{escape(item.acknowledged_at)}{note}</p>")
+
     def html(self) -> str:
         return "".join(self.parts)
 
 
-def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: None) -> _Html:
+def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: None,
+                acknowledgement: Acknowledgement | None = None) -> _Html:
     """`status_of` gives the cleanup status of evidence sources (e.g. an unused measure)."""
     info = STATUS_INFO[row.status]
     out = _Html()
@@ -69,6 +86,7 @@ def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: 
     out.add(f"<p><b style='color:{status_colour(row.status)}'>{escape(info.label)}</b> — "
             f"{escape(info.summary)}</p>")
     out.paragraph(info.explanation)
+    out.acknowledgement(acknowledgement)
     if explanation.use_path:
         out.heading("Why it is used")
         out.add(f"<p><code>{escape(format_path(explanation.use_path))}</code></p>")
@@ -89,17 +107,24 @@ def object_html(row: ObjectRow, explanation: Explanation, status_of=lambda ref: 
             if owner is not None and owner != Status.USED:
                 owner_note = (f" — <span style='color:{status_colour(owner)}'>"
                               f"{escape(ev.source.label)} is {escape(STATUS_INFO[owner].label)}</span>")
+            origin = f" ({out.object(ev.source)})" if ev.source is not None and ev.source.object_type in LINKABLE \
+                and ev.source.object_type != ObjectType.QUERY else ""
             items.append(f"<li><b>{escape(EVIDENCE_LABELS[ev.evidence_type])}</b> "
                          f"<span style='color:gray'>[{escape(ev.confidence)}]</span>: "
-                         f"{escape(ev.reason)}{owner_note}{source}</li>")
+                         f"{escape(ev.reason)}{origin}{owner_note}{source}</li>")
         out.add("<ul>" + "".join(items) + "</ul>")
     else:
         out.paragraph("No evidence points at this object.")
+    if explanation.dependencies:
+        out.heading("References")
+        out.add("<ul>" + "".join(
+            f"<li>{escape(EVIDENCE_LABELS[ev.evidence_type])}: {out.object(ev.target)}</li>"
+            for ev in explanation.dependencies) + "</ul>")
     out.source(row.source_file, row.source_line)
     return out
 
 
-def health_html(row: HealthRow) -> _Html:
+def health_html(row: HealthRow, acknowledgement: Acknowledgement | None = None) -> _Html:
     out = _Html()
     out.add(f"<h2>{escape(row.title)}</h2>")
     out.add(f"<p style='color:gray'>{escape(row.rule_name)} · {escape(row.rule_id)}</p>")
@@ -111,6 +136,7 @@ def health_html(row: HealthRow) -> _Html:
     if row.scope_label != row.scope:
         scope += f" <span style='color:gray'>({escape(row.scope)})</span>"
     out.add(f"<p><b>Scope:</b> {scope}</p>")
+    out.acknowledgement(acknowledgement)
     out.paragraph(row.explanation)
     out.heading("Evidence")
     out.add("<ul>" + "".join(f"<li>{escape(item)}</li>" for item in row.evidence) + "</ul>")
@@ -139,6 +165,32 @@ def query_html(row: QueryDependencyRow) -> _Html:
     if row.via:
         out.paragraph("Through load-disabled queries: " + " -> ".join(row.via))
     out.source(row.source_file, None)
+    return out
+
+
+def change_html(change: Change, current: ObjectRef | None) -> _Html:
+    """A change between runs; `current` is the object if it still exists."""
+    out = _Html()
+    out.add(f"<h2>{escape(change.label)}</h2>")
+    out.add(f"<p style='color:gray'>{escape(CHANGE_LABELS[change.kind.value])}</p>")
+    if change.kind in (ChangeKind.FINDING_ADDED, ChangeKind.FINDING_RESOLVED):
+        out.paragraph(change.after or change.before)
+        out.paragraph("New findings appear in the Health tab." if change.kind == ChangeKind.FINDING_ADDED
+                      else "This finding no longer occurs.")
+        return out
+    out.add(f"<p><b>Before:</b> {escape(change.before or 'not in the model')}<br>"
+            f"<b>Now:</b> {escape(change.after or 'not in the model')}</p>")
+    if change.before_path:
+        out.heading("Evidence path before")
+        out.add(f"<p><code>{escape(change.before_path)}</code></p>")
+    if change.after_path:
+        out.heading("Evidence path now")
+        out.add(f"<p><code>{escape(change.after_path)}</code></p>")
+    elif change.kind == ChangeKind.STATUS_CHANGED:
+        out.paragraph("No use path now: the object lost the evidence that made it used. "
+                      "Open it to see its current evidence.")
+    if current is not None:
+        out.add(f"<p>{out.link('Show the object and its current evidence', ('object', current))}</p>")
     return out
 
 

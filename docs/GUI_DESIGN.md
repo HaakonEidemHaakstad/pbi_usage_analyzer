@@ -1,7 +1,7 @@
 # GUI design — Power BI Model Health Analyzer
 
-Status: accepted 2026-10-01. Phases G0 (core preparation), G1 (read-only viewer)
-and G3 (Windows build) are implemented (sections 13–15). G2 remains. This document fixes the architecture and scope (AGENTS.md, "Future GUI
+Status: accepted 2026-10-01. All phases are implemented: G0 (core preparation), G1
+(read-only viewer), G2 (workflow aids) and G3 (Windows build); sections 13–16. This document fixes the architecture and scope (AGENTS.md, "Future GUI
 requirement"; ROADMAP Phase 4).
 
 Owner decisions (2026-10-01): toolkit chosen by the developer (PySide6, section 7);
@@ -303,4 +303,46 @@ SmartScreen may warn on first start of an unsigned download), an installer. The
 project itself has no license file yet; decide one before distributing the app to
 others.
 
-Next: G2 (run comparison, acknowledgements).
+## 16. G2 result
+
+Core (`pbi_usage_analyzer/views/history.py`, tested in `tests/test_history.py`):
+
+- `snapshot(result)` -> `RunSnapshot`: per object key the label, status and evidence
+  path (use or lineage-review path); per health key the rule, scope label and title.
+- `compare_runs(before, after)` -> `Change` rows (`ChangeKind`: status changed, object
+  added/removed, finding added/resolved), ordered by kind and label; each status
+  change carries the before and after evidence paths, so every change is explained.
+- `ProjectState` (acknowledgements by stable key with note and date, plus the last
+  run), versioned JSON (`format: 1`), atomic save, `ValueError` for unreadable or
+  foreign files; `stale_acknowledgements`.
+- `filter_objects`/`filter_health` accept `exclude_keys`; `Explanation.dependencies`
+  (outgoing evidence); `CHANGE_LABELS` in the catalog.
+
+GUI:
+
+- State file per user and project: `<AppData>/projects/<sha256 of the normalized
+  project path>.json` (`QStandardPaths.AppDataLocation`; with the app's names that is
+  `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer`). An unreadable file
+  is moved aside (`*.unreadable-<time>.json`) with a warning, never overwritten
+  silently. Tests and the smoke test pass their own folder (a test run once wrote
+  into `%APPDATA%\Python` before this was added; those files were removed).
+- Changes tab (and an Overview button): comparison with the previous analysis of
+  the project, which is the last run on this computer, so it also works after a
+  restart; the first run says there is nothing to compare yet. The detail shows
+  before/now and both evidence paths, with a link to the object.
+- Acknowledge… / Remove acknowledgement in Cleanup and Health (also Review menu,
+  Ctrl+K / Ctrl+Shift+K), optional note; "Hide acknowledged" (on by default),
+  an Acknowledged column with the note, the note in the detail panel, acknowledged
+  counts on the Overview health buttons; Review > Remove acknowledgements of missing
+  items. Selecting a hidden acknowledged item (e.g. from a link) reveals it.
+- Detail panel "References" (what the object references or is loaded from) and
+  links on evidence sources: walk the dependency graph one object at a time. A
+  drawn graph view was not built; the links cover the navigation need.
+
+Verification: `tests/test_history.py` (10), five new offscreen GUI tests (changes
+across re-run and restart, acknowledgement persistence/hiding/removal, stale and
+unreadable state, reference links); native renderings of the Changes tab and an
+acknowledged object reviewed; the rebuilt Windows app passes its smoke test.
+
+Remaining ideas (not planned phases): open a file at a line in an editor, a drawn
+dependency graph, an app icon and version resource, code signing, an installer.

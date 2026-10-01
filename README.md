@@ -102,7 +102,14 @@ The GUI never changes the project. Tabs: Overview (counts that open filtered
 lists), Cleanup, Health, Diagnostics and Queries; the detail panel explains each
 status with its evidence path and links to source files. F5 re-runs the analysis
 and keeps the selection; File > Export writes the text/Excel (and optionally JSON)
-reports to a chosen folder.
+reports to a chosen folder. The Changes tab lists every difference from the
+previous analysis of the same project (also across restarts), with the evidence
+path each object had before. Review > Acknowledge (Ctrl+K) marks a cleanup object
+or health finding as reviewed with an optional note; acknowledged rows are hidden
+by default and stay acknowledged across re-runs. The detail panel links to the
+objects an object references and to the objects that reference it. Review state is
+stored per Windows user (`%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\projects`),
+never in the project folder.
 
 **Standalone Windows app** (no Python needed): every push builds
 `PBI-Model-Health-<version>-win64.zip` as the `pbi-model-health-windows` artifact of
@@ -542,8 +549,8 @@ then resolved all 37 append-input manual reviews in the mess case. A thin deskto
 GUI over `analyze_project()` is designed in [docs/GUI_DESIGN.md](docs/GUI_DESIGN.md)
 (PySide6, Windows app, English). Phases G0 (core presentation layer,
 `pbi_usage_analyzer.views`) and G1 (read-only viewer, `pbi_usage_analyzer_gui`)
-and G3 (standalone Windows build) are done; G2 (run comparison, acknowledgements)
-remains.
+G2 (run comparison, acknowledgements, dependency links) and G3 (standalone
+Windows build) are done.
 
 ## Case studies: AdventureWorks, mess and good twin
 
