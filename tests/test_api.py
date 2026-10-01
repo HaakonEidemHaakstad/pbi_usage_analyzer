@@ -31,7 +31,8 @@ class AnalysisApiTests(unittest.TestCase):
         self.assertEqual(output.getvalue(), '')
         self.assertEqual(before, {p.relative_to(self.project): p.read_bytes()
                                  for p in self.project.rglob('*') if p.is_file()})
-        self.assertEqual(result.project.root, self.project)
+        # Discovery resolves the root; Windows temp paths may use 8.3 short names.
+        self.assertEqual(result.project.root, self.project.resolve())
         self.assertEqual(result.summary.columns.business_total, 3)
         self.assertEqual(result.summary.columns.internal, 2)
         self.assertEqual(result.summary.columns.likely_unused, 2)
