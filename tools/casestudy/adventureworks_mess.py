@@ -357,7 +357,7 @@ def build(raw_dir: Path, out: Path) -> dict:
         "views": sorted(VIEWS),
         "excel": {"Product Master.xlsx": ["Read me", "Products", "Discontinued", "Subcategories", "Categories"],
                   "Returns by Year.xlsx": years + ["Summary"]},
-        "csv": sorted(str(p.relative_to(out / "csv")) for p in (out / "csv").rglob("*.csv")),
+        "csv": sorted(p.relative_to(out / "csv").as_posix() for p in (out / "csv").rglob("*.csv")),
         "json": ["product_categories.json", "territories.json"],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

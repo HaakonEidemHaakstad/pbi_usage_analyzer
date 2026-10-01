@@ -110,6 +110,7 @@ class CaseStudySourceTests(unittest.TestCase):
         archive = self.out / 'csv' / 'sales_archive'
         self.assertTrue(filecmp.cmp(archive / 'AdventureWorks Sales Data 2020.csv',
                                     archive / 'AdventureWorks Sales Data 2020 - Copy.csv', shallow=False))
+        self.assertIn('sales_archive/AdventureWorks Sales Data 2020 - Copy.csv', self.manifest['csv'])  # same on every OS
         latin = (self.out / 'csv' / 'Customer Lookup (latin1).csv').read_bytes()
         self.assertIn('JOSÉ'.encode('latin-1'), latin)
         self.assertTrue((self.out / 'csv' / 'Largest companies.csv').is_file())
