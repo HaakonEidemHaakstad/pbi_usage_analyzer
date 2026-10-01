@@ -1708,6 +1708,82 @@ table Budget
     write_json(expected_path, expected)
 
 
+def build_m_local_servers(root: Path):
+    name = "38_m_local_servers"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    write(tables / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    Source = MariaDB.Contents("localhost:3306", "aw_ops"),
+                    Data = Source{[Name = "sales_2021"]}[Data]
+                in
+                    Data
+""")
+    write(tables / "Orders.tmdl", """
+table Orders
+    column Id
+        sourceColumn: Id
+    partition Orders = m
+        mode: import
+        source =
+                let
+                    Shop = Sql.Database("(localdb)\\MSSQLLocalDB", "Shop"),
+                    Odbc = Odbc.Query("driver={MariaDB ODBC 3.1 Driver};server=127.0.0.1;database=aw_ops", "select 1")
+                in
+                    Odbc
+""")
+    write(tables / "Api.tmdl", """
+table Api
+    column Value
+        sourceColumn: Value
+    partition Api = m
+        mode: import
+        source = Json.Document(Web.Contents("http://localhost:8080/api/values"))
+""")
+    write(tables / "Remote.tmdl", """
+table Remote
+    column Id
+        sourceColumn: Id
+    partition Remote = m
+        mode: import
+        source =
+                let
+                    // Was Sql.Database("localhost", "Shop") before the migration
+                    Source = Sql.Database("sql-prod.contoso.com", "Shop"),
+                    Note = "Hosted on localhost previously",
+                    Parts = Text.Split("localhostname.example.com", "."),
+                    Local = Sql.Database(Server, "Shop")
+                in
+                    Source
+""")
+    write(model / "definition" / "expressions.tmdl", """
+expression Server = "localhost" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+    lineageTag: 88888888-8888-8888-8888-888888888888
+""")
+    save_expected(p, {
+        "Column|Sales|Amount": "Likely unused",
+        "Column|Orders|Id": "Likely unused",
+        "Column|Api|Value": "Likely unused",
+        "Column|Remote|Id": "Likely unused",
+    }, "Text literals naming the local machine (localhost, 127.0.0.1, (localdb), local URLs and "
+       "connection-string server keys) are reported per query; remote hosts, comments, prose, "
+       "longer host names and parameter queries are not.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "POWERQUERY_LOCAL_SERVER", "scope": "Api"},
+        {"rule_id": "POWERQUERY_LOCAL_SERVER", "scope": "Orders"},
+        {"rule_id": "POWERQUERY_LOCAL_SERVER", "scope": "Sales"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1757,6 +1833,7 @@ def main():
         build_m_append_health,
         build_m_folder_sources,
         build_duplicate_measures,
+        build_m_local_servers,
     ]
     for builder in builders:
         builder(root)

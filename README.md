@@ -265,7 +265,15 @@ compute the same result differently are not detected.
 (`C:\...`) or network (`\\server\share`) path, listing each path and its line
 and calling out user-profile or OneDrive folders. Table partitions and shared
 queries in `expressions.tmdl` are checked; parameter queries, comments and
-`#"quoted identifiers"` are not. URLs and database server names are not checked.
+`#"quoted identifiers"` are not. URLs and database server names are not checked
+by this rule.
+
+`POWERQUERY_LOCAL_SERVER` warns when a query's text literals point at the local
+machine: `localhost`, `127.0.0.1`, `::1`, `(local)` or `(localdb)` as a server
+(with optional port or instance), as a URL host, or as a connection-string
+`server=`/`data source=`/`host=` value. Elsewhere, including the Power BI service
+through a gateway, that name means a different machine. Named remote servers are
+not reported, since keeping them literal is common practice.
 
 `POWERQUERY_APPEND_INPUT_LOADED` warns when a loaded table is appended
 (`Table.Combine`) into another loaded table, so its rows are imported twice; the

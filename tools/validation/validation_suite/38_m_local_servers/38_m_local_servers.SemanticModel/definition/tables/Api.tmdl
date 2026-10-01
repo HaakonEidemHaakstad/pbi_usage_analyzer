@@ -1,0 +1,6 @@
+table Api
+    column Value
+        sourceColumn: Value
+    partition Api = m
+        mode: import
+        source = Json.Document(Web.Contents("http://localhost:8080/api/values"))

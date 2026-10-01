@@ -1,0 +1,23 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Likely unused",
+    "Column|Orders|Id": "Likely unused",
+    "Column|Api|Value": "Likely unused",
+    "Column|Remote|Id": "Likely unused"
+  },
+  "notes": "Text literals naming the local machine (localhost, 127.0.0.1, (localdb), local URLs and connection-string server keys) are reported per query; remote hosts, comments, prose, longer host names and parameter queries are not.",
+  "expected_health": [
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "Api"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "Orders"
+    },
+    {
+      "rule_id": "POWERQUERY_LOCAL_SERVER",
+      "scope": "Sales"
+    }
+  ]
+}

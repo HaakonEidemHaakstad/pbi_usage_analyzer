@@ -1,0 +1,11 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    Source = MariaDB.Contents("localhost:3306", "aw_ops"),
+                    Data = Source{[Name = "sales_2021"]}[Data]
+                in
+                    Data

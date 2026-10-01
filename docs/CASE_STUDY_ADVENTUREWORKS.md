@@ -171,7 +171,7 @@ investigate every difference.
 | BP-08 | Many-to-many relationship at month grain | `RELATIONSHIP_MANY_TO_MANY` (warning) | Detected |
 | BP-09 | Auto date/time on | `LocalDateTable_*`/`DateTableTemplate_*` reported as **Internal**, not cleanup candidates; the auto-date hierarchy on `Sales[OrderDate]` protects `Sales[OrderDate]` | Detected; PBIR `PropertyVariationSource` handling first verified here. No "many auto-date tables" rule yet |
 | BP-10 | Measures without descriptions, scattered | `MEASURE_DESCRIPTION_MISSING` (info) for every measure | Detected (descriptions); display folders not checked |
-| BP-11 | Hard-coded file paths and server | `POWERQUERY_HARDCODED_PATH` (warning) for each query reading from `C:\AWCase\...` | Detected for paths; server names (`localhost`) not yet |
+| BP-11 | Hard-coded file paths and server | `POWERQUERY_HARDCODED_PATH` (warning) for each query reading from `C:\AWCase\...`; `POWERQUERY_LOCAL_SERVER` (warning) for each MariaDB query on `localhost` | Detected, assuming Power BI writes the server as a `localhost` literal (verify in the saved PBIP) |
 | BP-12 | Calculated column that belongs in Power Query (`Age`) | `customers[Age]` Likely unused (unused), `customers[birth_date]` Needs manual review | Cleanup detected; no rule for the practice itself |
 | BP-13 | Totals row imported as data (`Returns`) | — | Not yet (needs data inspection) |
 | BP-14 | Unrelated/technical tables loaded (`Largest companies`, `etl_log`) | All columns **Likely unused** | Detected (cleanup) |

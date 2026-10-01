@@ -371,8 +371,8 @@ table partitions and `expressions.tmdl`, stored on the analysis context as
 identifiers. `appended_query_refs` returns bare query identifiers in `Table.Combine({...})`
 lists (comment/string-masked, local `let` names excluded). `POWERQUERY_HARDCODED_PATH`,
 `folder_listing` returns `Folder.Files` calls, the first `[Content]` read and possible
-file selections. `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND` and
-`POWERQUERY_FOLDER_UNFILTERED` consume these; dependency extraction
+file selections. `POWERQUERY_LOCAL_SERVER`, `POWERQUERY_APPEND_INPUT_LOADED`,
+`POWERQUERY_ANNUAL_APPEND` and `POWERQUERY_FOLDER_UNFILTERED` consume these; dependency extraction
 still uses its own partition reader, and shared expressions are not graph nodes.
 
 ### Health finding filters

@@ -1,0 +1,14 @@
+table Remote
+    column Id
+        sourceColumn: Id
+    partition Remote = m
+        mode: import
+        source =
+                let
+                    // Was Sql.Database("localhost", "Shop") before the migration
+                    Source = Sql.Database("sql-prod.contoso.com", "Shop"),
+                    Note = "Hosted on localhost previously",
+                    Parts = Text.Split("localhostname.example.com", "."),
+                    Local = Sql.Database(Server, "Shop")
+                in
+                    Source

@@ -1,0 +1,11 @@
+table Orders
+    column Id
+        sourceColumn: Id
+    partition Orders = m
+        mode: import
+        source =
+                let
+                    Shop = Sql.Database("(localdb)\MSSQLLocalDB", "Shop"),
+                    Odbc = Odbc.Query("driver={MariaDB ODBC 3.1 Driver};server=127.0.0.1;database=aw_ops", "select 1")
+                in
+                    Odbc

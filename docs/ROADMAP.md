@@ -151,6 +151,7 @@ generator and a build guide with an answer key (docs/CASE_STUDY_ADVENTUREWORKS.m
 inputs and year-named append inputs (scenario 35).
 `POWERQUERY_FOLDER_UNFILTERED` reports folder combines without file selection (scenario 36).
 `MEASURE_DUPLICATE_EXPRESSION` reports measures with lexically identical DAX (scenario 37).
+`POWERQUERY_LOCAL_SERVER` reports `localhost`-style servers in M (scenario 38).
 Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
-remaining "not yet" items (server names, text keys, name-based staging) into
-health rules; then GUI planning.
+remaining "not yet" items (text keys, name-based staging) into health rules;
+then GUI planning.

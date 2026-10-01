@@ -207,6 +207,45 @@ def hardcoded_m_paths(queries: Iterable[MQuery]) -> list[HealthFinding]:
     return findings
 
 
+_LOCAL_HOST = r"(?:localhost|127(?:\.\d{1,3}){3}|\[?::1\]?|\(local\)|\(localdb\))"
+# Bare server (with port or instance), URL host, or connection-string server key.
+LOCAL_SERVER = re.compile(
+    rf"^{_LOCAL_HOST}(?:[:,]\d+)?(?:\\[\w$-]+)?$"
+    rf"|^[a-z][a-z0-9+.-]*://(?:[^/@\s]*@)?{_LOCAL_HOST}(?:[:/?#]|$)"
+    rf"|(?:^|;)\s*(?:server|data source|host|hostname|address|addr|network address)\s*=\s*"
+    rf"(?:tcp:)?{_LOCAL_HOST}\s*(?:[:,;\\]|$)", re.I)
+
+
+def local_servers(queries: Iterable[MQuery]) -> list[HealthFinding]:
+    findings = []
+    for query in queries:
+        # A parameter is the recommended home for a server name.
+        if query.kind == MQueryKind.PARAMETER:
+            continue
+        servers: list[tuple[str, int]] = []
+        for value, line in m_string_literals(query.source):
+            if LOCAL_SERVER.search(value) and value not in (v for v, _ in servers):
+                servers.append((value, query.file_line(line)))
+        if not servers:
+            continue
+        findings.append(HealthFinding(
+            rule_id="POWERQUERY_LOCAL_SERVER", category="power_query",
+            severity=HealthSeverity.WARNING, confidence="high", scope=query.name,
+            title="Replace local server names with the real host",
+            explanation="This query connects to the local machine (localhost or equivalent). On "
+                        "another computer, and in the Power BI service through a gateway, that name "
+                        "refers to that machine instead, so refresh works only where the server "
+                        "happens to run on the same computer.",
+            evidence=tuple(f"line {line}: {value}" for value, line in servers),
+            recommendation="Use the server's network host name or address, ideally from a text "
+                           "parameter (Manage Parameters) so it can be switched between environments. "
+                           "Plan an on-premises data gateway for scheduled refresh. Keep localhost "
+                           "only for a strictly personal model, and record that decision.",
+            source_file=query.source_file, line=servers[0][1],
+        ))
+    return findings
+
+
 def _appends(queries: tuple[MQuery, ...]) -> list[tuple[MQuery, MQuery, int]]:
     """(appending query, appended query, file line of Table.Combine), first occurrence each."""
     by_name = {query.name: query for query in queries if query.kind != MQueryKind.PARAMETER}
