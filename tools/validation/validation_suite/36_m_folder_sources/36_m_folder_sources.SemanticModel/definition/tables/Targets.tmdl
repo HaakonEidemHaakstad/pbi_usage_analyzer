@@ -1,0 +1,14 @@
+table Targets
+    column Amount
+        sourceColumn: Amount
+    partition Targets = m
+        mode: import
+        source =
+                let
+                    Source = Folder.Files(DataFolder),
+                    // Table.SelectRows(Source, each [Name] = "targets.csv") was removed
+                    Read = Table.AddColumn(Source, "Data", each Csv.Document([Content])),
+                    Expanded = Table.ExpandTableColumn(Read, "Data", {"Amount"}),
+                    Positive = Table.SelectRows(Expanded, each [Amount] > 0)
+                in
+                    Positive

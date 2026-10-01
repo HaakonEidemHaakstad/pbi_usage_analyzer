@@ -149,6 +149,7 @@ generator and a build guide with an answer key (docs/CASE_STUDY_ADVENTUREWORKS.m
 `POWERQUERY_HARDCODED_PATH` reports literal drive/UNC paths in partitions and shared queries.
 `POWERQUERY_APPEND_INPUT_LOADED` and `POWERQUERY_ANNUAL_APPEND` report loaded append
 inputs and year-named append inputs (scenario 35).
+`POWERQUERY_FOLDER_UNFILTERED` reports folder combines without file selection (scenario 36).
 Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
-remaining "not yet" items (name-based staging, text keys, duplicate measures,
-folder combines, server names) into health rules; then GUI planning.
+remaining "not yet" items (duplicate measures, server names, text keys,
+name-based staging) into health rules; then GUI planning.

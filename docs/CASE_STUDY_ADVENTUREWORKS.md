@@ -20,6 +20,13 @@ The raw data is course material and is not in this repository.
 This writes `~/Desktop/AW_case_sources` (use `--out` to change it, `--force` to
 replace it). `manifest.json` lists every table, sheet and file.
 
+On the Windows PC, generate straight into the expected location (skips the copy
+in section 2, step 1):
+
+```powershell
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py "<...>\AdventureWorks+Raw+Data\AdventureWorks Raw Data" --out C:\AWCase
+```
+
 | Folder | Contents | Built-in traps |
 | --- | --- | --- |
 | `mariadb/` | `01_schema.sql`, `02_data.sql`, `03_views.sql` for database `aw_ops` | `sales_2021`/`sales_2022` split by year with snake_case columns; `territories.territory_key` is text; `stg_customers_raw` (all text, junk rows); `dim_product` (thin duplicate of the Excel master); `etl_log`; wide view `v_sales_report` (29 columns); aggregate view `v_sales_by_month` |
@@ -155,7 +162,7 @@ investigate every difference.
 | ID | Bad practice | Expected analyzer result | Status |
 | --- | --- | --- | --- |
 | BP-01 | Hard-coded annual appends across three different source types (`Sales`, `Returns`) | Append dependencies `Sales → Sales 2020 / sales_2021 / sales_2022`, `Returns → Returns 20xx`; per-year query columns are **Needs manual review**, not Likely unused | Detected as lineage; `POWERQUERY_ANNUAL_APPEND` (info) on `Sales` and `Returns`; `POWERQUERY_APPEND_INPUT_LOADED` (warning) for each loaded per-year query |
-| BP-02 | Folder combine includes a duplicate file (2020 counted twice) | Not visible statically without reading the folder | Not yet (a rule could flag `Folder.Files` without a file filter) |
+| BP-02 | Folder combine includes a duplicate file (2020 counted twice) | `POWERQUERY_FOLDER_UNFILTERED` (warning) on `Sales 2020`: the folder is combined with only the default hidden-files filter. The duplicate file itself is not visible statically | Detected as a risk; actual duplicates need folder access |
 | BP-03 | Wide denormalized view imported in full | `v_sales_report` columns used only by the hidden page, the implicit card and `Revenue (view)` are Used; the rest **Likely unused** | Detected (cleanup) |
 | BP-04 | Staging and per-year queries loaded into the model | `stg_customers_raw` columns Likely unused; per-year sales/returns queries as BP-01 | Cleanup detected; loaded per-year queries via `POWERQUERY_APPEND_INPUT_LOADED`; no rule for a loaded but unreferenced staging query (`stg_*` name heuristics not implemented) |
 | BP-05 | Duplicate/conflicting sources (`dim_product`, customers CSV, categories JSON, territories JSON) | Their columns **Likely unused** (no relationships or references) | Detected (cleanup) |

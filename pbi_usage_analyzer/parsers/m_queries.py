@@ -217,6 +217,90 @@ def appended_query_refs(source: str) -> list[tuple[str, int]]:
     return refs
 
 
+def _closing(masked: str, start: int) -> int:
+    """Index after the bracket matching the one at ``start`` (len if unbalanced)."""
+    depth, i = 0, start
+    while i < len(masked):
+        if masked.startswith('#"', i):
+            match = QUOTED_IDENTIFIER.match(masked, i)
+            i = match.end() if match else len(masked)
+            continue
+        if masked[i] in "([{":
+            depth += 1
+        elif masked[i] in ")]}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return len(masked)
+
+
+FOLDER_FILES_CALL = re.compile(r'(?<![\w.#"])Folder\.Files\s*\(')
+SELECT_ROWS_CALL = re.compile(r'(?<![\w.#"])Table\.SelectRows\s*\(')
+FILE_SELECTING_CALL = re.compile(
+    r'(?<![\w.#"])Table\.(?:FirstN|LastN|First|Last|Skip|Range|Max|Min|MaxN|MinN|'
+    r'RemoveFirstN|RemoveLastN|RemoveRows|Distinct)\s*\(')
+FIELD_ACCESS = re.compile(r'\[\s*(?:#"((?:[^"]|"")*)"|([^\[\]=,"]+?))\s*\]')
+# `x{0}` / `x{[Name = ...]}` item access; `{` after a keyword starts a list instead.
+ITEM_ACCESS = re.compile(r'([\w"\)\]])\s*\{\s*(?:\d|\[)')
+M_KEYWORDS = {"each", "then", "else", "in", "and", "or", "not", "type", "meta", "as", "is",
+              "let", "if", "try", "otherwise"}
+# Columns of a Folder.Files listing and fields of its Attributes record.
+FILE_LISTING_FIELDS = {
+    "Content", "Name", "Extension", "Date accessed", "Date modified", "Date created",
+    "Folder Path", "Content Type", "Kind", "Size", "ReadOnly", "System", "Directory",
+    "Archive", "Device", "Normal", "Temporary", "SparseFile", "ReparsePoint", "Compressed",
+    "Offline", "NotContentIndexed", "Encrypted",
+}
+HIDDEN_FILTER_FIELDS = {"Attributes", "Hidden"}
+
+
+@dataclass(frozen=True)
+class FolderListing:
+    """Folder.Files facts in one M source; lines are 1-based within the source."""
+    calls: tuple[tuple[int, str], ...]       # (line, argument text)
+    content_line: int | None                 # first `[Content]` read
+    selections: tuple[tuple[int, str], ...]  # (line, description) of possible file selections
+    hidden_filter_lines: tuple[int, ...]     # filters on Attributes/Hidden only
+
+
+def folder_listing(source: str) -> FolderListing | None:
+    """Folder.Files calls and anything that may select files, or None without a call.
+
+    Field-access predicates over data columns only are not file selections;
+    predicates without any field access are treated as possible selections.
+    """
+    masked = _mask_m(source)
+    line_of = lambda index: masked.count("\n", 0, index) + 1
+    calls = []
+    for call in FOLDER_FILES_CALL.finditer(masked):
+        end = _closing(masked, call.end() - 1)
+        calls.append((line_of(call.start()), " ".join(source[call.end():end - 1].split())))
+    if not calls:
+        return None
+    fields = [(m.group(1).replace('""', '"') if m.group(1) is not None else m.group(2), m.start())
+              for m in FIELD_ACCESS.finditer(masked)]
+    content = next((index for name, index in fields if name == "Content"), None)
+    selections, hidden = [], []
+    for call in SELECT_ROWS_CALL.finditer(masked):
+        end = _closing(masked, call.end() - 1)
+        names = {name for name, index in fields if call.end() <= index < end}
+        if names and names <= HIDDEN_FILTER_FIELDS:
+            hidden.append(line_of(call.start()))
+        elif not names or names & FILE_LISTING_FIELDS:
+            selections.append((line_of(call.start()), "Table.SelectRows on file attributes"
+                               if names else "Table.SelectRows with an unrecognized predicate"))
+    for call in FILE_SELECTING_CALL.finditer(masked):
+        selections.append((line_of(call.start()), call.group().rstrip("( \t\n")))
+    for access in ITEM_ACCESS.finditer(masked):
+        word = re.search(r"\w+$", masked[:access.start(1) + 1])
+        if word and word.group() in M_KEYWORDS:
+            continue
+        selections.append((line_of(access.start()), "item access {...}"))
+    return FolderListing(tuple(calls), None if content is None else line_of(content),
+                         tuple(sorted(selections)), tuple(hidden))
+
+
 def m_string_literals(source: str) -> list[tuple[str, int]]:
     """M text literals as (value, 1-based line within source), skipping comments.
 

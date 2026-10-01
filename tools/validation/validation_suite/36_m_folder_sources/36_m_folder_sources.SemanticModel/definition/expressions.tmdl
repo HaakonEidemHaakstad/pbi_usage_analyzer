@@ -1,0 +1,20 @@
+expression DataFolder = "C:\Data" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+    lineageTag: 55555555-5555-5555-5555-555555555555
+
+expression 'Sample File' =
+        let
+            Source = Folder.Files("C:\AWCase\csv\sales_archive"),
+            Navigation1 = Source{0}[Content]
+        in
+            Navigation1
+    lineageTag: 66666666-6666-6666-6666-666666666666
+
+expression 'Transform File' =
+        let
+            Source = (Parameter1 as binary) => let
+                Source = Csv.Document(Parameter1, [Delimiter=",", Encoding=65001])
+            in
+                Source
+        in
+            Source
+    lineageTag: 77777777-7777-7777-7777-777777777777

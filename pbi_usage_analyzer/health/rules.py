@@ -4,7 +4,7 @@ import re
 
 from ..model import ModelObject, ObjectType
 from ..parsers.dax import DaxIndex, unresolved_references
-from ..parsers.m_queries import MQuery, MQueryKind, appended_query_refs, m_string_literals
+from ..parsers.m_queries import MQuery, MQueryKind, appended_query_refs, folder_listing, m_string_literals
 from ..util import norm_key
 from ..util import is_internal_table
 from ..parsers.relationships import Relationship
@@ -212,6 +212,39 @@ def loaded_append_inputs(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "append keeps working and the query becomes a shared expression. If reports "
                            "use it, consider pointing them at the appended table instead.",
             source_file=query.source_file, line=query.line,
+        ))
+    return findings
+
+
+def unfiltered_folder_sources(queries: Iterable[MQuery]) -> list[HealthFinding]:
+    findings = []
+    for query in queries:
+        if query.kind == MQueryKind.PARAMETER:
+            continue
+        listing = folder_listing(query.source)
+        # A listing without content reads is a file inventory, not a combine.
+        if listing is None or listing.content_line is None or listing.selections:
+            continue
+        evidence = [f"line {query.file_line(line)}: Folder.Files({argument})" for line, argument in listing.calls]
+        evidence.append(f"line {query.file_line(listing.content_line)}: reads file contents ([Content])")
+        evidence.append("Only the hidden-files filter Power BI adds by default" if listing.hidden_filter_lines
+                        else "No filter on file name, extension, folder path or date")
+        findings.append(HealthFinding(
+            rule_id="POWERQUERY_FOLDER_UNFILTERED", category="power_query",
+            # Absence of a filter is inferred; a custom function may still select files.
+            severity=HealthSeverity.WARNING, confidence="medium", scope=query.name,
+            title="Filter folder sources to the intended files",
+            explanation="This query combines the contents of every file in a folder, including "
+                        "subfolders. Any extra file placed there later, such as a copy, backup, "
+                        "export or temporary Excel lock file, is combined without warning and can "
+                        "double count rows or break the refresh.",
+            evidence=tuple(evidence),
+            recommendation="Add a filter step right after the folder source, for example on "
+                           "Extension and a Name pattern (Table.SelectRows(Source, each [Extension] = "
+                           "\".csv\" and Text.StartsWith([Name], \"Sales\"))). Check the folder for "
+                           "duplicates now. If the folder is controlled and all files belong, "
+                           "record that decision.",
+            source_file=query.source_file, line=query.file_line(listing.calls[0][0]),
         ))
     return findings
 

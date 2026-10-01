@@ -34,7 +34,8 @@
     "32_m_case_sensitive_refs",
     "33_dax_unresolved_references",
     "34_m_hardcoded_paths",
-    "35_m_append_health"
+    "35_m_append_health",
+    "36_m_folder_sources"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

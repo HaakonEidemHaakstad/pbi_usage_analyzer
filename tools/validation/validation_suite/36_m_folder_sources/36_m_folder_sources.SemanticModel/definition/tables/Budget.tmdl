@@ -1,0 +1,12 @@
+table Budget
+    column Amount
+        sourceColumn: Amount
+    partition Budget = m
+        mode: import
+        source =
+                let
+                    Source = Folder.Files(DataFolder),
+                    Csv = Table.SelectRows(Source, each [Extension] = ".csv"),
+                    Read = Table.AddColumn(Csv, "Data", each Csv.Document([Content]))
+                in
+                    Read

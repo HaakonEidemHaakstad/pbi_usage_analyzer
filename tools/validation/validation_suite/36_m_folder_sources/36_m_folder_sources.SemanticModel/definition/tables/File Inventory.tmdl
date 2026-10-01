@@ -1,0 +1,11 @@
+table 'File Inventory'
+    column Name
+        sourceColumn: Name
+    partition 'File Inventory' = m
+        mode: import
+        source =
+                let
+                    Source = Folder.Files(DataFolder),
+                    Listed = Table.SelectColumns(Source, {"Name", "Date modified"})
+                in
+                    Listed

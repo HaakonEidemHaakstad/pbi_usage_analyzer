@@ -270,6 +270,13 @@ an append whose input query names contain years, such as `Sales 2021` and
 Only list items that name another query directly count; local steps, nested
 calls, comments and strings do not.
 
+`POWERQUERY_FOLDER_UNFILTERED` (warning, medium confidence) reports a query that
+reads the contents of every file returned by `Folder.Files` without selecting
+files, so a stray copy or backup in the folder is combined silently. Power BI's
+default hidden-files filter and filters on data columns do not count as
+selection; filters on file name, extension, path, date or attributes, item access
+such as `Source{0}`, and calls such as `Table.FirstN` or `Table.Distinct` do.
+
 ## Filtering model-health findings
 
 ```bash

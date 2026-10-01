@@ -1,0 +1,33 @@
+{
+  "query": {
+    "Commands": [
+      {
+        "SemanticQueryDataShapeCommand": {
+          "Query": {
+            "Version": 2,
+            "From": [
+              {
+                "Name": "s",
+                "Entity": "Sales 2020",
+                "Type": 0
+              }
+            ],
+            "Select": [
+              {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Source": "s"
+                    }
+                  },
+                  "Property": "Amount"
+                },
+                "Name": "Sales 2020.Amount"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}
