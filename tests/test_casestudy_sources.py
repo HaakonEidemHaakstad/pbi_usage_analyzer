@@ -57,7 +57,7 @@ class CaseStudySourceTests(unittest.TestCase):
             encoding = 'latin-1' if 'Customer' in name else 'utf-8'
             (cls.raw_dir / name).write_bytes(text.encode(encoding))
         (root / 'Largest companies').mkdir()
-        (root / 'Largest companies' / 'Largest companies.csv').write_text('Rank, Firm\n1, BlackRock\n')
+        (root / 'Largest companies' / 'Largest companies.csv').write_text('Rank, Firm\n1, BlackRock\n', encoding='utf-8')
         cls.out = root / 'out'
         cls.manifest = case.build(cls.raw_dir, cls.out)
         cls.raw = case.load_raw(cls.raw_dir)
@@ -113,9 +113,9 @@ class CaseStudySourceTests(unittest.TestCase):
         latin = (self.out / 'csv' / 'Customer Lookup (latin1).csv').read_bytes()
         self.assertIn('JOSÉ'.encode('latin-1'), latin)
         self.assertTrue((self.out / 'csv' / 'Largest companies.csv').is_file())
-        categories = json.loads((self.out / 'json' / 'product_categories.json').read_text())
+        categories = json.loads((self.out / 'json' / 'product_categories.json').read_text(encoding='utf-8'))
         self.assertIn({'id': 3, 'name': 'Apparel'}, categories)  # conflicts with Excel "Clothing"
-        territories = json.loads((self.out / 'json' / 'territories.json').read_text())
+        territories = json.loads((self.out / 'json' / 'territories.json').read_text(encoding='utf-8'))
         regions = [r for c in territories['continents'] for k in c['countries'] for r in k['regions']]
         self.assertEqual(sorted(r['key'] for r in regions), [1, 2])
 

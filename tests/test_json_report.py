@@ -54,14 +54,14 @@ class JsonReportTests(unittest.TestCase):
         output = Path(self.tmp.name) / 'analysis.json'
         write_json(output, result)
         self.assertIn('Økonomi 日本語', output.read_text(encoding='utf-8'))
-        self.assertEqual(json.loads(output.read_text())['project']['project_name'], 'Økonomi 日本語')
+        self.assertEqual(json.loads(output.read_text(encoding='utf-8'))['project']['project_name'], 'Økonomi 日本語')
 
     def test_cli_json_export_uses_selected_scope(self):
         with patch('sys.argv', ['analyzer', str(self.root), '--json', '--health-severity', 'warning']):
             with contextlib.redirect_stdout(io.StringIO()):
                 cli()
         output, = self.root.glob('*_usage_analysis_v2.json')
-        document = json.loads(output.read_text())
+        document = json.loads(output.read_text(encoding='utf-8'))
         self.assertEqual(document['health_filter_scope']['severities'], ['warning'])
         self.assertEqual(document['health_findings'], [])
         self.assertTrue(list(self.root.glob('*.xlsx')))

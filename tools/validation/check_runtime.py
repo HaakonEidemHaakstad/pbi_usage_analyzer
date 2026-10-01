@@ -34,10 +34,10 @@ def worker(repo: Path) -> None:
             raise RuntimeError('Library analysis/export modified project files')
         subprocess.run([sys.executable, str(repo / 'run_analyzer.py'), str(project),
                         '--json', '--health-severity', 'warning'], check=True)
-        exported = json.loads(result.project.root.joinpath(f'{result.project.project_name}_usage_analysis_v2.json').read_text())
+        exported = json.loads(result.project.root.joinpath(f'{result.project.project_name}_usage_analysis_v2.json').read_text(encoding='utf-8'))
         if exported['health_findings'] or exported['health_filter_scope']['severities'] != ['warning']:
             raise RuntimeError('CLI JSON export did not preserve health filters')
-        if not result.project.text_output.read_text().strip():
+        if not result.project.text_output.read_text(encoding='utf-8').strip():
             raise RuntimeError('Text report is empty')
         with zipfile.ZipFile(result.project.excel_output) as workbook:
             if workbook.testzip() is not None or 'xl/workbook.xml' not in workbook.namelist():

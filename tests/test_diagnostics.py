@@ -46,7 +46,7 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(result.warnings, [d.message for d in result.diagnostics])
 
     def test_incomplete_m_and_unresolved_backing_column_keep_provenance(self):
-        self.internal.write_text(self.internal.read_text().replace('Table.SelectColumns(Source, {"Date"})', 'CustomFunction(Source)'))
+        self.internal.write_text(self.internal.read_text(encoding='utf-8').replace('Table.SelectColumns(Source, {"Date"})', 'CustomFunction(Source)'), encoding='utf-8')
         result = analyze_project(self.root)
         codes = {d.code for d in result.diagnostics}
         self.assertIn('M_LINEAGE_INCOMPLETE', codes)
@@ -58,7 +58,7 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(result.context.warnings, [d.message for d in result.diagnostics])
 
     def test_unresolved_source_column_points_to_referencing_query(self):
-        self.internal.write_text(self.internal.read_text().replace('{"Date"}', '{"MissingDate"}'))
+        self.internal.write_text(self.internal.read_text(encoding='utf-8').replace('{"Date"}', '{"MissingDate"}'), encoding='utf-8')
         result = analyze_project(self.root)
         diagnostic, = [d for d in result.diagnostics if d.code == 'AUTODATE_SOURCE_COLUMN_UNRESOLVED']
         self.assertEqual(diagnostic.source_file, str(self.internal))

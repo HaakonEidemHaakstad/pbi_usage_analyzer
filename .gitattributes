@@ -1,0 +1,8 @@
+# Normalize text to LF in the repository and working tree on every OS.
+* text=auto eol=lf
+# The synthetic fixture corpus is compared byte for byte (check_fixture_drift.py)
+# and deliberately contains a CRLF TMDL file: never convert it.
+tools/validation/validation_suite/** -text
+*.png binary
+*.xlsx binary
+*.pbix binary

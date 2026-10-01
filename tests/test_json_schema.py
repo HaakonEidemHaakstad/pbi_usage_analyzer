@@ -11,7 +11,7 @@ class JsonSchemaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.root = Path(__file__).resolve().parents[1]
-        schema = json.loads((cls.root / 'schemas/analysis-result-v1.schema.json').read_text())
+        schema = json.loads((cls.root / 'schemas/analysis-result-v1.schema.json').read_text(encoding='utf-8'))
         Draft202012Validator.check_schema(schema)
         cls.validator = Draft202012Validator(schema)
         cls.suite = cls.root / 'tools/validation/validation_suite'

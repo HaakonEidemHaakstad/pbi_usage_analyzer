@@ -76,4 +76,4 @@ class AnalysisApiTests(unittest.TestCase):
         self.assertTrue(text.is_file())
         self.assertTrue(excel.is_file())
         self.assertIn('Columns: 3\n', output.getvalue())
-        self.assertIn('2 of 3 columns', text.read_text())
+        self.assertIn('2 of 3 columns', text.read_text(encoding='utf-8'))

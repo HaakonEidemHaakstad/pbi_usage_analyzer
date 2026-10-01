@@ -54,15 +54,15 @@ class AutoDateTests(unittest.TestCase):
 
     def test_relationship_protects_only_backing_column(self):
         internal = self.tables / 'LocalDateTable_test.tmdl'
-        internal.write_text(internal.read_text().split('    partition ')[0] + '''    partition calendar = calculated
+        internal.write_text(internal.read_text(encoding='utf-8').split('    partition ')[0] + '''    partition calendar = calculated
         source = CALENDAR(MIN(Sales[Date]), MAX(Sales[Date]))
-''')
+''', encoding='utf-8')
         business = self.tables / 'Sales.tmdl'
-        business.write_text(business.read_text() + '\n    column OtherDate\n        dataType: dateTime\n        sourceColumn: OtherDate\n')
+        business.write_text(business.read_text(encoding='utf-8') + '\n    column OtherDate\n        dataType: dateTime\n        sourceColumn: OtherDate\n', encoding='utf-8')
         (self.model / 'definition/relationships.tmdl').write_text('''relationship date_link
     fromColumn: 'sales'.'DATE '
     toColumn: LocalDateTable_test.Date
-''')
+''', encoding='utf-8')
         ctx, _, statuses = self.analyze()
         self.assertEqual(statuses[('Sales', 'Date')], Status.USED)
         self.assertEqual(statuses[('Sales', 'Amount')], Status.LIKELY_UNUSED)
@@ -71,7 +71,7 @@ class AutoDateTests(unittest.TestCase):
 
     def test_unresolved_internal_query_warns_without_blanket_edges(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('Table.SelectColumns(Source, {"Date"})', 'CustomFunction(Source)'))
+        p.write_text(p.read_text(encoding='utf-8').replace('Table.SelectColumns(Source, {"Date"})', 'CustomFunction(Source)'), encoding='utf-8')
         ctx, findings, _ = self.analyze()
         self.assertTrue(ctx.warnings)
         self.assertIn('backing column could not be resolved', generate_text('test', findings, ctx))
@@ -81,12 +81,12 @@ class AutoDateTests(unittest.TestCase):
 
     def test_template_and_source_column_mapping(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('LocalDateTable_test', 'DateTableTemplate_test')
+        p.write_text(p.read_text(encoding='utf-8').replace('LocalDateTable_test', 'DateTableTemplate_test')
                      .replace('Source = Sales', 'Source = #"Événements"')
-                     .replace('{"Date"}', '{"DATE "}') + '\n    measure Helper = 1\n')
+                     .replace('{"Date"}', '{"DATE "}') + '\n    measure Helper = 1\n', encoding='utf-8')
         p = self.tables / 'Sales.tmdl'
-        p.write_text(p.read_text().replace('table Sales', "table 'Événements'")
-                     .replace('column Date', "column 'Display Date'"))
+        p.write_text(p.read_text(encoding='utf-8').replace('table Sales', "table 'Événements'")
+                     .replace('column Date', "column 'Display Date'"), encoding='utf-8')
         _, _, statuses = self.analyze()
         self.assertEqual(statuses[('Événements', 'Display Date')], Status.MANUAL_REVIEW)
         self.assertEqual(statuses[('Événements', 'Amount')], Status.LIKELY_UNUSED)
@@ -94,7 +94,7 @@ class AutoDateTests(unittest.TestCase):
 
     def test_ordinary_query_uses_complete_column_projection(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery'))
+        p.write_text(p.read_text(encoding='utf-8').replace('LocalDateTable_test', 'BusinessQuery'), encoding='utf-8')
         _, _, statuses = self.analyze()
         self.assertEqual(statuses[('Sales', 'Date')], Status.MANUAL_REVIEW)
         for name in ('Amount', 'Customer'):
@@ -102,10 +102,10 @@ class AutoDateTests(unittest.TestCase):
 
     def test_business_partitions_union_their_column_requirements(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery') + '''
+        p.write_text(p.read_text(encoding='utf-8').replace('LocalDateTable_test', 'BusinessQuery') + '''
     partition extra = m
         source = Table.SelectColumns(Sales, {"Amount"})
-''')
+''', encoding='utf-8')
         _, _, statuses = self.analyze()
         for name in ('Date', 'Amount'):
             self.assertEqual(statuses[('Sales', name)], Status.MANUAL_REVIEW)
@@ -113,10 +113,10 @@ class AutoDateTests(unittest.TestCase):
 
     def test_one_unsupported_partition_preserves_business_query_fallback(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('LocalDateTable_test', 'BusinessQuery') + '''
+        p.write_text(p.read_text(encoding='utf-8').replace('LocalDateTable_test', 'BusinessQuery') + '''
     partition extra = m
         source = CustomFunction(Sales)
-''')
+''', encoding='utf-8')
         ctx, _, statuses = self.analyze()
         self.assertFalse(ctx.powerquery.column_demands)
         self.assertTrue(ctx.warnings)
@@ -125,10 +125,10 @@ class AutoDateTests(unittest.TestCase):
 
     def test_multiple_partitions_do_not_claim_complete_projection(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text() + '''
+        p.write_text(p.read_text(encoding='utf-8') + '''
     partition extra = m
         source = Sales
-''')
+''', encoding='utf-8')
         ctx, _, _ = self.analyze()
         self.assertFalse(ctx.powerquery.projected_columns)
         self.assertTrue(ctx.warnings)
@@ -141,12 +141,12 @@ class AutoDateTests(unittest.TestCase):
 
     def test_unresolved_selection_does_not_match_another_table(self):
         p = self.tables / 'LocalDateTable_test.tmdl'
-        p.write_text(p.read_text().replace('{"Date"}', '{"MissingDate"}'))
+        p.write_text(p.read_text(encoding='utf-8').replace('{"Date"}', '{"MissingDate"}'), encoding='utf-8')
         (self.tables / 'Other.tmdl').write_text('''table Other
     column MissingDate
         dataType: dateTime
         sourceColumn: MissingDate
-''')
+''', encoding='utf-8')
         ctx, _, statuses = self.analyze()
         self.assertIn('Unresolved auto-date source column: Sales[MissingDate]', ctx.warnings)
         self.assertEqual(statuses[('Other', 'MissingDate')], Status.LIKELY_UNUSED)
@@ -154,12 +154,12 @@ class AutoDateTests(unittest.TestCase):
                              for e in ctx.graph.evidence))
 
     def test_independent_internal_queries_keep_their_own_column_scope(self):
-        original = (self.tables / 'LocalDateTable_test.tmdl').read_text()
+        original = (self.tables / 'LocalDateTable_test.tmdl').read_text(encoding='utf-8')
         (self.tables / 'LocalDateTable_other.tmdl').write_text(
             original.replace('LocalDateTable_test', 'LocalDateTable_other')
                     .replace('Source = Sales', 'Source = Other')
                     .replace('{"Date"}', '{"ShipDate"}')
-        )
+        , encoding='utf-8')
         (self.tables / 'Other.tmdl').write_text('''table Other
     column ShipDate
         dataType: dateTime
@@ -167,7 +167,7 @@ class AutoDateTests(unittest.TestCase):
     column Date
         dataType: dateTime
         sourceColumn: Date
-''')
+''', encoding='utf-8')
         ctx, _, statuses = self.analyze()
         self.assertEqual(statuses[('Sales', 'Date')], Status.MANUAL_REVIEW)
         self.assertEqual(statuses[('Other', 'ShipDate')], Status.MANUAL_REVIEW)

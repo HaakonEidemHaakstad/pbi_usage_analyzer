@@ -8,12 +8,13 @@ from pathlib import Path
 
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text.strip() + "\n", encoding="utf-8")
+    # Fixed newlines so regeneration is byte-identical on every OS.
+    path.write_text(text.strip() + "\n", encoding="utf-8", newline="\n")
 
 
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
 
 def visual_column(table: str, field: str) -> dict:

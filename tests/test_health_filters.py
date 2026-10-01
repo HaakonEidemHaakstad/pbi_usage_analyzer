@@ -20,7 +20,7 @@ class HealthFilterTests(unittest.TestCase):
         shutil.copytree(fixture, self.root)
         model = next(self.root.glob('*.SemanticModel'))
         path = model / 'definition/tables/Fact.tmdl'
-        path.write_text(path.read_text() + '\n    measure Undocumented = 1\n')
+        path.write_text(path.read_text(encoding='utf-8') + '\n    measure Undocumented = 1\n', encoding='utf-8')
 
     def test_filters_intersect_without_changing_analysis(self):
         original = analyze_project(self.root)
@@ -50,7 +50,7 @@ class HealthFilterTests(unittest.TestCase):
         with patch('sys.argv', ['analyzer', str(self.root), '--health-severity', 'info', '--health-rule', 'MEASURE_DESCRIPTION_MISSING']):
             with contextlib.redirect_stdout(io.StringIO()):
                 cli()
-        text = next(self.root.glob('*_usage_summary_v2.txt')).read_text()
+        text = next(self.root.glob('*_usage_summary_v2.txt')).read_text(encoding='utf-8')
         self.assertIn('[MEASURE_DESCRIPTION_MISSING]', text)
         self.assertNotIn('[RELATIONSHIP_MANY_TO_MANY]', text)
         book = load_workbook(next(self.root.glob('*.xlsx')))
@@ -80,7 +80,7 @@ class HealthFilterTests(unittest.TestCase):
         from pbi_usage_analyzer.main import run
         with contextlib.redirect_stdout(io.StringIO()):
             text, excel = run(self.root, health_rule_ids=[])
-        report = text.read_text()
+        report = text.read_text(encoding='utf-8')
         self.assertIn('Health rule filter: None (empty selection)', report)
         self.assertIn('Health findings before filtering: 2', report)
         self.assertIn('Health findings included: 0', report)
