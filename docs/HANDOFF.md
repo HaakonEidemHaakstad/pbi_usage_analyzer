@@ -82,9 +82,10 @@ Windows machine state (verified 2026-10-01):
 Latest user requests (2026-10-01, Windows): familiarize and keep this handoff
 current; use `..\AW` as dummy data; commits and pushes are now allowed (AGENTS.md);
 generate the case-study package and start the folder-source rule; then "proceed"
-twice (duplicate measures, local servers). Done: Windows verification, append
-rules, package, `POWERQUERY_FOLDER_UNFILTERED`, `MEASURE_DUPLICATE_EXPRESSION`,
-`POWERQUERY_LOCAL_SERVER`.
+three times (duplicate measures, local servers, text keys). Done: Windows
+verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`,
+`MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_LOCAL_SERVER`, `RELATIONSHIP_TEXT_KEY`.
+The case study's statically detectable backlog is now exhausted.
 
 ## Implemented work in the current tree
 
@@ -94,7 +95,7 @@ rules, package, `POWERQUERY_FOLDER_UNFILTERED`, `MEASURE_DUPLICATE_EXPRESSION`,
 | Auto-date | Internal objects excluded from business totals and cleanup candidates. Only resolved backing columns receive internal-query protection; no blanket upstream-table protection. See `tests/test_autodate.py` and scenario 08. |
 | Application API | `api.py`: `analyze_project(path, *, health_rule_ids=None, health_severities=None)`. No terminal output or report writes. Returns project paths, graph, cleanup findings, diagnostics, summaries, selected health findings and filter scope. CLI and synthetic validator share this entry point. |
 | Diagnostics | `diagnostics.py` provides stable codes, severity, message, source file, optional location/object reference. Parser/context `warnings` is a derived compatibility list; append to `diagnostics`, not `warnings`. |
-| Health rules | `health/engine.py` registry: `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `MEASURE_DESCRIPTION_MISSING`, `DAX_REFERENCE_UNRESOLVED`, `MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_HARDCODED_PATH`, `POWERQUERY_LOCAL_SERVER`, `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`, `POWERQUERY_FOLDER_UNFILTERED`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
+| Health rules | `health/engine.py` registry (`(rule_id, evaluator, input names tuple)`): `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `RELATIONSHIP_TEXT_KEY`, `MEASURE_DESCRIPTION_MISSING`, `DAX_REFERENCE_UNRESOLVED`, `MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_HARDCODED_PATH`, `POWERQUERY_LOCAL_SERVER`, `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`, `POWERQUERY_FOLDER_UNFILTERED`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
 | Relationships | Structured records in `parsers/relationships.py` shared by graph and rules. Adjacent declarations no longer lose endpoint evidence. Cardinalities are explicit-only for health detection. |
 | Descriptions | `ModelObject.description` is empty for absent/blank parsed descriptions, `None` when unknown/not parsed. Adjacent TMDL `///` descriptions are read for measures. Internal measures excluded from documentation rule. |
 | Health selection | `health/filtering.py`: exact IDs/severities, OR within each selection and AND between selections. `None` is unrestricted; empty iterable selects none. Unknown values fail before project I/O. `HealthFilterScope` records canonical selections and before/after counts. |
@@ -104,7 +105,8 @@ rules, package, `POWERQUERY_FOLDER_UNFILTERED`, `MEASURE_DUPLICATE_EXPRESSION`,
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Local servers | Latest change: `LOCAL_SERVER` pattern and `POWERQUERY_LOCAL_SERVER` in `health/rules.py`. Details below. |
+| Text keys | Latest change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
+| Local servers | Previous change: `LOCAL_SERVER` pattern and `POWERQUERY_LOCAL_SERVER` in `health/rules.py`. Details below. |
 | Duplicate measures | Previous change: `normalize_dax` in `parsers/dax_lexer.py`; `MEASURE_DUPLICATE_EXPRESSION`. Details below. |
 | Folder rule | Previous change: `folder_listing` in `parsers/m_queries.py`; `POWERQUERY_FOLDER_UNFILTERED`. Details below. |
 | Append rules | Previous change: `appended_query_refs` in `parsers/m_queries.py`; `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`. Details below. |
@@ -121,7 +123,23 @@ rules, package, `POWERQUERY_FOLDER_UNFILTERED`, `MEASURE_DUPLICATE_EXPRESSION`,
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: local servers in M (2026-10-01)
+## Latest change: text-key relationships (2026-10-01)
+
+- `health/engine.py`: the third registry element is now a tuple of input names
+  passed positionally (`("relationships", "objects")` etc.); CLI/filter code only
+  reads IDs and is unchanged.
+- `RELATIONSHIP_TEXT_KEY` (info, medium, `relationships`): named relationship with
+  both endpoints parsed, no auto-date endpoint, and either endpoint column's
+  `data_type == "string"` (matched via `norm_key`). Active and inactive (inactive
+  ones still back `USERELATIONSHIP`). Evidence shows both endpoints' types as
+  written in the relationship (unknown types shown as `unknown`).
+- Changed expectations, all explained: scenarios 18 and 19 each gain a finding for
+  their inactive `Fact.Value` (double) → `Dim.Label` (string) relationship;
+  `tests/test_health_filters.py` counts (built on scenario 19) went 2 → 3.
+  Scenario 39 `39_text_key_relationships` added. AdventureWorks unchanged (integer
+  keys). No cleanup status changed.
+
+## Previous change: local servers in M (2026-10-01)
 
 - Decision: report only servers that name the local machine, not every literal
   server (parameterizing remote servers is a preference; `localhost` breaks refresh
@@ -517,10 +535,11 @@ Waiting on the user: install MariaDB, load `C:\AWCase\mariadb\*.sql`, build the 
 study in Power BI Desktop per docs/CASE_STUDY_ADVENTUREWORKS.md and save the PBIP.
 Then score it (independent ground truth vs analyzer; record expectations like
 `tests/integration/adventureworks_expected.json`). Engineering candidates
-meanwhile, from the answer key's "Not yet" rows. Next: text-key relationships
-(needs data types on relationship endpoint columns; cardinality is not visible
-statically, so medium confidence at most). After that the answer key's remaining
-gaps need data access or are name heuristics; consider GUI planning. GUI: none exists; thin desktop
+meanwhile: the answer key's statically detectable rows are all covered. Remaining
+gaps need data access (encoding, totals rows, folder duplicates) or name
+heuristics (`stg_*` staging). Recommended next engineering step: GUI planning
+(thin desktop front end over `analyze_project()`; see AGENTS.md "Future GUI
+requirement"), or broader validation on more real PBIP projects. GUI: none exists; thin desktop
 front end over `analyze_project()` after more validation.
 
 ## Verification and environment
@@ -545,9 +564,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- Windows, Python 3.14, 2026-10-01 after the local-server rule: 206 tests OK
+- Windows, Python 3.14, 2026-10-01 after the text-key rule: 208 tests OK
   with `PBI_AW_PROJECT` set (AdventureWorks passes); 2 skipped (opt-in timing;
-  symlink privilege). 297 synthetic checks pass across 38 scenarios. Compilation,
+  symlink privilege). 306 synthetic checks pass across 39 scenarios. Compilation,
   fixture drift and `git diff --check` pass. Large-model benchmark 0.33 s.
 - Earlier (Ubuntu, 2026-09-30): 180 tests, 266 checks across 34 scenarios.
 - Fixture reproducibility, compilation, and `git diff --check` passed.

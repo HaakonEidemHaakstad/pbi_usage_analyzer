@@ -241,6 +241,13 @@ bridge designs, and legitimate higher-grain facts; the rule does not inspect
 source data or prove incorrect totals. Inactive relationships are skipped.
 See [Microsoft's many-to-many guidance](https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many).
 
+`RELATIONSHIP_TEXT_KEY` (info, medium confidence) notes relationships, active or
+inactive, where an endpoint column has `dataType: string`. Text keys with many
+distinct values cost memory and filter speed compared with integer keys; short
+code lists are usually fine. The model files do not show cardinality, so check
+it (for example with VertiPaq Analyzer) before changing keys. Columns without a
+declared data type are not reported.
+
 `MEASURE_DESCRIPTION_MISSING` is an informational documentation opportunity for
 business measures with absent or blank descriptions. The parser reads adjacent
 TMDL `///` description lines, including multiline descriptions. Internal auto-date

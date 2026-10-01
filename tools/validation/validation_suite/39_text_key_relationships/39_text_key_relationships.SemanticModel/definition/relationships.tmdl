@@ -1,0 +1,9 @@
+relationship SalesTerritory
+    fromColumn: Sales.TerritoryKey
+    toColumn: 'Territory Lookup'.TerritoryKey
+relationship SalesProduct
+    fromColumn: Sales.ProductKey
+    toColumn: Products.ProductKey
+relationship SalesStore
+    fromColumn: Sales.StoreKey
+    toColumn: Stores.StoreKey

@@ -70,11 +70,11 @@ class HealthFilterTests(unittest.TestCase):
         scope = result.health_filter_scope
         self.assertEqual(scope.rule_ids, ('MEASURE_DESCRIPTION_MISSING',))
         self.assertEqual(scope.severities, ('info',))
-        self.assertEqual((scope.total_findings, scope.selected_findings), (2, 1))
+        self.assertEqual((scope.total_findings, scope.selected_findings), (3, 1))
         unrestricted = analyze_project(self.root).health_filter_scope
         self.assertIsNone(unrestricted.rule_ids)
         self.assertIsNone(unrestricted.severities)
-        self.assertEqual((unrestricted.total_findings, unrestricted.selected_findings), (2, 2))
+        self.assertEqual((unrestricted.total_findings, unrestricted.selected_findings), (3, 3))
 
     def test_empty_selection_is_explicit_in_both_reports(self):
         from pbi_usage_analyzer.main import run
@@ -82,13 +82,13 @@ class HealthFilterTests(unittest.TestCase):
             text, excel = run(self.root, health_rule_ids=[])
         report = text.read_text(encoding='utf-8')
         self.assertIn('Health rule filter: None (empty selection)', report)
-        self.assertIn('Health findings before filtering: 2', report)
+        self.assertIn('Health findings before filtering: 3', report)
         self.assertIn('Health findings included: 0', report)
         book = load_workbook(excel)
         self.addCleanup(book.close)
         summary = dict(book['Summary'].iter_rows(min_row=2, values_only=True))
         self.assertEqual(summary['Health rule filter'], 'None (empty selection)')
-        self.assertEqual(summary['Health findings before filtering'], 2)
+        self.assertEqual(summary['Health findings before filtering'], 3)
         self.assertEqual(summary['Health findings included'], 0)
         self.assertEqual(book['Model health'].max_row, 1)
 

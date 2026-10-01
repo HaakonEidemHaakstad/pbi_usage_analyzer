@@ -1,0 +1,4 @@
+table Products
+    column ProductKey
+        dataType: int64
+        sourceColumn: ProductKey

@@ -378,7 +378,10 @@ still uses its own partition reader, and shared expressions are not graph nodes.
 ### Health finding filters
 
 The health engine has one explicit registry of stable IDs, evaluators and input
-kinds. CLI choices and API filter validation derive their IDs from that registry.
+kinds. Each entry names the parsed inputs its evaluator receives, in order
+(`relationships`, `objects`, `m_queries`); `RELATIONSHIP_TEXT_KEY` takes
+relationships and objects to read endpoint data types. CLI choices and API filter
+validation derive their IDs from that registry.
 `health/filtering.py` normalizes selections and provides a pure, order-preserving
 filter usable on existing findings. API options are validated before project I/O.
 

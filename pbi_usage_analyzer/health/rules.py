@@ -72,6 +72,40 @@ def many_to_many_relationships(relationships: list[Relationship]) -> list[Health
     return findings
 
 
+def text_key_relationships(relationships: list[Relationship], objects: Iterable[ModelObject]) -> list[HealthFinding]:
+    types = {norm_key(o.ref.table, o.ref.name): o.data_type for o in objects
+             if o.ref.object_type == ObjectType.COLUMN and o.data_type}
+    findings = []
+    for relationship in relationships:
+        if not relationship.name or not relationship.from_column or not relationship.to_column:
+            continue
+        endpoints = (relationship.from_column, relationship.to_column)
+        if any(is_internal_table(table) for table, _ in endpoints):
+            continue
+        endpoint_types = [types.get(norm_key(table, column)) for table, column in endpoints]
+        if "string" not in endpoint_types:
+            continue
+        findings.append(HealthFinding(
+            rule_id="RELATIONSHIP_TEXT_KEY", category="relationships",
+            # The data type is certain; whether the key has many distinct values is not visible.
+            severity=HealthSeverity.INFO, confidence="medium", scope=relationship.name,
+            title="Consider an integer key for this text relationship",
+            explanation="This relationship joins on a text column. Text keys with many distinct "
+                        "values (order numbers, codes, composite keys) take more memory and make "
+                        "relationship filtering slower than integer keys. Short code lists such as "
+                        "country codes are usually fine; cardinality cannot be seen in the model files.",
+            evidence=tuple(f"{table}[{column}] dataType: {data_type or 'unknown'}"
+                           for (table, column), data_type in zip(endpoints, endpoint_types)),
+            recommendation="If the key column has many distinct values, add an integer surrogate key "
+                           "in the source or Power Query on both tables and relate on it. If the text "
+                           "actually holds numbers (for example a key stored as text), change both "
+                           "columns to a whole-number type. Check cardinality with VertiPaq Analyzer "
+                           "(DAX Studio) before changing anything.",
+            source_file=relationship.source_file, line=relationship.line,
+        ))
+    return findings
+
+
 def missing_measure_descriptions(objects: Iterable[ModelObject]) -> list[HealthFinding]:
     findings = []
     for obj in objects:

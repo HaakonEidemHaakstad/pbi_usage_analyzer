@@ -166,7 +166,7 @@ investigate every difference.
 | BP-03 | Wide denormalized view imported in full | `v_sales_report` columns used only by the hidden page, the implicit card and `Revenue (view)` are Used; the rest **Likely unused** | Detected (cleanup) |
 | BP-04 | Staging and per-year queries loaded into the model | `stg_customers_raw` columns Likely unused; per-year sales/returns queries as BP-01 | Cleanup detected; loaded per-year queries via `POWERQUERY_APPEND_INPUT_LOADED`; no rule for a loaded but unreferenced staging query (`stg_*` name heuristics not implemented) |
 | BP-05 | Duplicate/conflicting sources (`dim_product`, customers CSV, categories JSON, territories JSON) | Their columns **Likely unused** (no relationships or references) | Detected (cleanup) |
-| BP-06 | Relationship on a text key | Keys **Used** (relationship endpoints) | No text-key health rule yet |
+| BP-06 | Relationship on a text key | Keys **Used** (relationship endpoints); `RELATIONSHIP_TEXT_KEY` (info) on `Sales[TerritoryKey]` → `territories[territory_key]` | Detected (data type only; the key has few values, so the finding is a prompt to check, not a defect) |
 | BP-07 | Bidirectional relationships | `RELATIONSHIP_BIDIRECTIONAL` (warning) ×2 | Detected |
 | BP-08 | Many-to-many relationship at month grain | `RELATIONSHIP_MANY_TO_MANY` (warning) | Detected |
 | BP-09 | Auto date/time on | `LocalDateTable_*`/`DateTableTemplate_*` reported as **Internal**, not cleanup candidates; the auto-date hierarchy on `Sales[OrderDate]` protects `Sales[OrderDate]` | Detected; PBIR `PropertyVariationSource` handling first verified here. No "many auto-date tables" rule yet |

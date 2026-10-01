@@ -1,0 +1,17 @@
+{
+  "expected_status": {
+    "Column|Sales|TerritoryKey": "Used",
+    "Column|Territory Lookup|territorykey": "Used",
+    "Column|Sales|ProductKey": "Used",
+    "Column|Products|ProductKey": "Used",
+    "Column|Sales|StoreKey": "Used",
+    "Column|Stores|StoreKey": "Used"
+  },
+  "notes": "Relationships with a string endpoint are reported (names match case-insensitively); integer keys and columns without a declared data type are not.",
+  "expected_health": [
+    {
+      "rule_id": "RELATIONSHIP_TEXT_KEY",
+      "scope": "SalesTerritory"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+table Sales
+    column TerritoryKey
+        dataType: string
+        sourceColumn: TerritoryKey
+    column ProductKey
+        dataType: int64
+        sourceColumn: ProductKey
+    column StoreKey
+        sourceColumn: StoreKey

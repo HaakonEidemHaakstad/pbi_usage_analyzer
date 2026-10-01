@@ -245,7 +245,9 @@ relationship Inactive
 
     expected_path = p / "expected.json"
     expected = json.loads(expected_path.read_text(encoding="utf-8"))
-    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_BIDIRECTIONAL", "scope": "Rel1"}]
+    # Inactive is skipped by the direction rule but still joins on text (Dim.Label).
+    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_BIDIRECTIONAL", "scope": "Rel1"},
+                                   {"rule_id": "RELATIONSHIP_TEXT_KEY", "scope": "Inactive"}]
     write_json(expected_path, expected)
 
 
@@ -295,7 +297,9 @@ relationship Inactive
 
     expected_path = p / "expected.json"
     expected = json.loads(expected_path.read_text(encoding="utf-8"))
-    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_MANY_TO_MANY", "scope": "Rel1"}]
+    # Inactive is skipped by the cardinality rule but still joins on text (Dim.Label).
+    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_MANY_TO_MANY", "scope": "Rel1"},
+                                   {"rule_id": "RELATIONSHIP_TEXT_KEY", "scope": "Inactive"}]
     write_json(expected_path, expected)
 
 
@@ -1784,6 +1788,64 @@ expression Server = "localhost" meta [IsParameterQuery=true, Type="Text", IsPara
     write_json(expected_path, expected)
 
 
+def build_text_key_relationships(root: Path):
+    name = "39_text_key_relationships"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    write(tables / "Sales.tmdl", """
+table Sales
+    column TerritoryKey
+        dataType: string
+        sourceColumn: TerritoryKey
+    column ProductKey
+        dataType: int64
+        sourceColumn: ProductKey
+    column StoreKey
+        sourceColumn: StoreKey
+""")
+    write(tables / "Territory Lookup.tmdl", """
+table 'Territory Lookup'
+    column territorykey
+        dataType: string
+        sourceColumn: territorykey
+""")
+    write(tables / "Products.tmdl", """
+table Products
+    column ProductKey
+        dataType: int64
+        sourceColumn: ProductKey
+""")
+    write(tables / "Stores.tmdl", """
+table Stores
+    column StoreKey
+        sourceColumn: StoreKey
+""")
+    write(model / "definition" / "relationships.tmdl", """
+relationship SalesTerritory
+    fromColumn: Sales.TerritoryKey
+    toColumn: 'Territory Lookup'.TerritoryKey
+relationship SalesProduct
+    fromColumn: Sales.ProductKey
+    toColumn: Products.ProductKey
+relationship SalesStore
+    fromColumn: Sales.StoreKey
+    toColumn: Stores.StoreKey
+""")
+    save_expected(p, {
+        "Column|Sales|TerritoryKey": "Used",
+        "Column|Territory Lookup|territorykey": "Used",
+        "Column|Sales|ProductKey": "Used",
+        "Column|Products|ProductKey": "Used",
+        "Column|Sales|StoreKey": "Used",
+        "Column|Stores|StoreKey": "Used",
+    }, "Relationships with a string endpoint are reported (names match case-insensitively); "
+       "integer keys and columns without a declared data type are not.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [{"rule_id": "RELATIONSHIP_TEXT_KEY", "scope": "SalesTerritory"}]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1834,6 +1896,7 @@ def main():
         build_m_folder_sources,
         build_duplicate_measures,
         build_m_local_servers,
+        build_text_key_relationships,
     ]
     for builder in builders:
         builder(root)

@@ -152,6 +152,8 @@ inputs and year-named append inputs (scenario 35).
 `POWERQUERY_FOLDER_UNFILTERED` reports folder combines without file selection (scenario 36).
 `MEASURE_DUPLICATE_EXPRESSION` reports measures with lexically identical DAX (scenario 37).
 `POWERQUERY_LOCAL_SERVER` reports `localhost`-style servers in M (scenario 38).
-Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
-remaining "not yet" items (text keys, name-based staging) into health rules;
-then GUI planning.
+`RELATIONSHIP_TEXT_KEY` notes relationships on text columns (scenario 39).
+The answer key's statically detectable items are now covered; the remainder needs
+data access or name heuristics.
+Next: build the case study in Power BI Desktop and score the analyzer; then GUI
+planning over `analyze_project()`.

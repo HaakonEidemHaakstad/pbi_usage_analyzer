@@ -1,0 +1,4 @@
+table 'Territory Lookup'
+    column territorykey
+        dataType: string
+        sourceColumn: territorykey

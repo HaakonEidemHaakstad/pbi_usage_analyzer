@@ -1,0 +1,3 @@
+table Stores
+    column StoreKey
+        sourceColumn: StoreKey

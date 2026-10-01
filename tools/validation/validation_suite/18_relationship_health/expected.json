@@ -10,6 +10,10 @@
     {
       "rule_id": "RELATIONSHIP_BIDIRECTIONAL",
       "scope": "Rel1"
+    },
+    {
+      "rule_id": "RELATIONSHIP_TEXT_KEY",
+      "scope": "Inactive"
     }
   ]
 }
