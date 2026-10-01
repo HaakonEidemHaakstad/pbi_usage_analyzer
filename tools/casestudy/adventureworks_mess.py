@@ -371,7 +371,7 @@ def replace_output(out: Path, force: bool) -> bool:
     """Clear an existing output folder for regeneration; False if it must be kept.
 
     A hand-built Power BI project inside the folder is never deleted, even with
-    --force: projects belong in their own folder (C:\\AWProjects in the guide).
+    --force: projects belong in their own folder (AWProjects in the guide).
     """
     if not out.exists():
         return True
@@ -383,23 +383,29 @@ def replace_output(out: Path, force: bool) -> bool:
     if not force:
         print(f"{out} exists; pass --force to replace it.", file=sys.stderr)
         return False
-    def clear_readonly(function, path, _exc):
-        # OneDrive marks synced folders read-only; Windows refuses to delete those.
-        os.chmod(path, stat.S_IWRITE)
-        function(path)
+    errors: list[str] = []
 
-    handler = {"onexc" if sys.version_info >= (3, 12) else "onerror": clear_readonly}
+    def make_writable(_function, path, exc):
+        # OneDrive marks synced folders read-only, which blocks deleting them on
+        # Windows; on POSIX a read-only parent blocks deleting its entries.
+        # Unlock both and let the next pass retry.
+        errors.append(f"{path}: {exc if not isinstance(exc, tuple) else exc[1]}")
+        for target in (path, os.path.dirname(path)):
+            try:
+                os.chmod(target, stat.S_IRWXU)
+            except OSError:
+                pass
+
+    handler = {"onexc" if sys.version_info >= (3, 12) else "onerror": make_writable}
     # Sync clients (OneDrive) may also briefly lock folders they are uploading.
     for attempt in range(6):
-        try:
-            shutil.rmtree(out, **handler)
+        shutil.rmtree(out, **handler)
+        if not out.exists():
             return True
-        except PermissionError as exc:
-            if attempt == 5:
-                print(f"Could not remove {out}: {exc}. If OneDrive syncs this folder, pause "
-                      "syncing and run again.", file=sys.stderr)
-                return False
-            time.sleep(2)
+        if attempt < 5:
+            time.sleep(1)
+    print(f"Could not remove {out} ({errors[-1] if errors else 'unknown error'}). If OneDrive "
+          "syncs this folder, pause syncing and run again.", file=sys.stderr)
     return False
 
 
