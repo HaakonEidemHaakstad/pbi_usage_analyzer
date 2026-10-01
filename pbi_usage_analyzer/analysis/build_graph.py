@@ -9,7 +9,7 @@ from ..parsers.dax import DaxIndex, dax_dependencies
 from ..parsers.dax_lexer import mask_dax
 from ..parsers.special_dax import special_dax_evidence
 from ..parsers.m_lineage import ColumnDemand, ColumnLineage
-from ..parsers.m_queries import MQuery, collect_m_queries
+from ..parsers.m_queries import MQuery, MQueryKind, collect_m_queries
 from ..parsers.pbir import ReportParseResult, parse_report
 from ..parsers.powerquery import PowerQueryResult, parse_power_query_dependencies
 from ..parsers.relationships import Relationship, parse_relationship_metadata, relationship_evidence
@@ -128,7 +128,8 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
         ctx.graph.add_evidence(ev)
 
     ctx.m_queries = collect_m_queries(model_folder)
-    pq = parse_power_query_dependencies(model_folder, table_names)
+    shared = {q.name: q.source for q in ctx.m_queries if q.kind != MQueryKind.PARTITION}
+    pq = parse_power_query_dependencies(model_folder, table_names, shared)
     ctx.powerquery = pq
     ctx.diagnostics.extend(pq.diagnostics)
     for ev in pq.evidence:

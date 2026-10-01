@@ -138,7 +138,14 @@ inventing column edges. Do not interpret unprotected columns as safe to delete
 when these warnings are present; inspect the query and relationship evidence.
 Date-like names and data types are not used to guess a backing column.
 Only actual M partitions are parsed for query dependencies; calculated partition
-DAX is not interpreted as M. Ordinary business queries use complete column demands when available and otherwise
+DAX is not interpreted as M. Shared expressions (load-disabled queries in
+`expressions.tmdl`) are followed only when a partition references them: exact
+lineage evaluates the referenced expression in place (cycle-guarded; unsupported M
+there makes the owner's lineage unsupported), and the fallback reference scanner
+walks them to the loaded tables behind them, recording the path in the evidence
+reason (`Query 'Clean' references query 'Raw' through load-disabled query
+'Staging'`). Load-disabled queries are not graph nodes and have no cleanup status.
+Quoted identifiers count only outside comments and text literals. Ordinary business queries use complete column demands when available and otherwise
 retain conservative query-level behavior.
 
 ### Supported M expressions and conservative boundaries
@@ -400,7 +407,8 @@ lists (comment/string-masked, local `let` names excluded). `POWERQUERY_HARDCODED
 `folder_listing` returns `Folder.Files` calls, the first `[Content]` read and possible
 file selections. `POWERQUERY_LOCAL_SERVER`, `POWERQUERY_APPEND_INPUT_LOADED`,
 `POWERQUERY_ANNUAL_APPEND` and `POWERQUERY_FOLDER_UNFILTERED` consume these; dependency extraction
-still uses its own partition reader, and shared expressions are not graph nodes.
+still uses its own partition reader; shared expressions reach it as
+`shared_sources` (followed from partitions, not graph nodes).
 
 ### Health finding filters
 

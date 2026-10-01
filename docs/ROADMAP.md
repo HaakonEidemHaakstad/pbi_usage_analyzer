@@ -166,4 +166,8 @@ Usage-aware M lineage: each loaded column passes its status to the upstream
 columns it is loaded from (`POWERQUERY_COLUMN_LINEAGE`, scenario 41); schema
 requirements stay manual review. It resolved all 37 append-input reviews in the
 mess, matching the ground truth.
+Query references through load-disabled (shared expression) queries are followed,
+with column lineage when their M is supported (scenario 42); before, a loaded table
+read only through such a query was Likely unused. Quoted identifiers in M comments
+no longer create dependencies.
 Next: more real projects, then GUI planning over `analyze_project()`.

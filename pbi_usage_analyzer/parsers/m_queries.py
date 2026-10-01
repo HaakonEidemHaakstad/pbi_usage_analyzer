@@ -128,7 +128,7 @@ SIMPLE_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 BOUND_NAME = re.compile(r'(?:(?<![\w.#\["])#"((?:[^"]|"")*)"|(?<![\w.#"\[])([A-Za-z_]\w*))\s*=(?![=>])')
 
 
-def _mask_m(source: str) -> str:
+def mask_m(source: str) -> str:
     """Blank comments and text literals (same offsets/newlines); keep `#"..."` names."""
     out = list(source)
     i = 0
@@ -195,7 +195,7 @@ def appended_query_refs(source: str) -> list[tuple[str, int]]:
     returned; other expressions (steps, function calls) are not references.
     Callers must still check the name against known queries (M is case-sensitive).
     """
-    masked = _mask_m(source)
+    masked = mask_m(source)
     local = {match.group(1).replace('""', '"') if match.group(1) is not None else match.group(2)
              for match in BOUND_NAME.finditer(masked)}
     refs: list[tuple[str, int]] = []
@@ -270,7 +270,7 @@ def folder_listing(source: str) -> FolderListing | None:
     Field-access predicates over data columns only are not file selections;
     predicates without any field access are treated as possible selections.
     """
-    masked = _mask_m(source)
+    masked = mask_m(source)
     line_of = lambda index: masked.count("\n", 0, index) + 1
     calls = []
     for call in FOLDER_FILES_CALL.finditer(masked):

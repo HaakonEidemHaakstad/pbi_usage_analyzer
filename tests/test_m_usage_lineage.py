@@ -3,7 +3,7 @@ import unittest
 
 from pbi_usage_analyzer.analysis.classify import classify
 from pbi_usage_analyzer.model import DependencyGraph, Evidence, EvidenceType, ModelObject, ObjectRef, ObjectType, Status
-from pbi_usage_analyzer.parsers.m_lineage import ColumnDemand, parse_column_lineage
+from pbi_usage_analyzer.parsers.m_lineage import ColumnDemand, parse_column_lineage, parse_shared_queries
 from pbi_usage_analyzer.util import norm
 
 
@@ -96,6 +96,30 @@ class LineageClassificationTests(unittest.TestCase):
         statuses = self.statuses()
         self.assertEqual(statuses[self.up['Unused']], Status.USED)
         self.assertEqual(statuses[self.raw['Unused']], Status.USED)
+
+
+class SharedQueryLineageTests(unittest.TestCase):
+    tables = {norm(t): t for t in ('Raw', 'Clean')}
+
+    def lineage(self, source, shared):
+        return parse_column_lineage(source, self.tables, 'Clean', parse_shared_queries(shared))
+
+    def test_lineage_passes_through_shared_queries(self):
+        lineage = self.lineage('Table.RemoveColumns(#"Staging", {"C"}, MissingField.Ignore)', {
+            'Staging': 'let S = Table.SelectColumns(#"Renamed", {"A", "B", "C"}, MissingField.Ignore) in S',
+            'Renamed': 'Table.RenameColumns(Raw, {{"raw a", "A"}})'})
+        demand = lineage.demands(one_output('A'))['Raw']
+        self.assertTrue(demand.feeds('raw a'))
+        self.assertFalse(demand.feeds('B') or demand.feeds('C') or demand.feeds('D'))
+        self.assertFalse(lineage.demands()['Raw'].feeds('C'))
+
+    def test_unsupported_or_cyclic_shared_query_has_no_lineage(self):
+        self.assertIsNone(self.lineage('#"Staging"', {'Staging': 'CustomFunction(Raw)'}))
+        self.assertIsNone(self.lineage('#"A"', {'A': '#"B"', 'B': '#"A"'}))
+        self.assertIsNone(self.lineage('#"Missing"', {}))
+
+    def test_shared_query_name_shadows_a_library_function(self):
+        self.assertIsNone(self.lineage('Table.SelectColumns(Raw, {"A"})', {'Table.SelectColumns': 'Raw'}))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,8 @@
+table 'Report'
+    column X
+        sourceColumn: X
+
+    partition 'Report' = m
+        mode: import
+        source =
+            CustomFunction(#"Helper")

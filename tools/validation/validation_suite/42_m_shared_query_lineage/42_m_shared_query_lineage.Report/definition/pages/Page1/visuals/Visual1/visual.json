@@ -1,0 +1,33 @@
+{
+  "query": {
+    "Commands": [
+      {
+        "SemanticQueryDataShapeCommand": {
+          "Query": {
+            "Version": 2,
+            "From": [
+              {
+                "Name": "s",
+                "Entity": "Clean",
+                "Type": 0
+              }
+            ],
+            "Select": [
+              {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Source": "s"
+                    }
+                  },
+                  "Property": "A"
+                },
+                "Name": "Clean.A"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

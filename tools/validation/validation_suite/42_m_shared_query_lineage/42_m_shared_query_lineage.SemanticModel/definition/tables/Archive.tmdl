@@ -1,0 +1,10 @@
+table 'Archive'
+    column X
+        sourceColumn: X
+    column Y
+        sourceColumn: Y
+
+    partition 'Archive' = m
+        mode: import
+        source =
+            #table({"X", "Y"}, {})

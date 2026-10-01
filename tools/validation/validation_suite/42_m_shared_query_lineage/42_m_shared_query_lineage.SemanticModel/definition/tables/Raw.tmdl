@@ -1,0 +1,14 @@
+table 'Raw'
+    column A
+        sourceColumn: A
+    column B
+        sourceColumn: B
+    column C
+        sourceColumn: C
+    column D
+        sourceColumn: D
+
+    partition 'Raw' = m
+        mode: import
+        source =
+            #table({"A", "B", "C", "D"}, {})

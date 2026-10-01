@@ -394,28 +394,47 @@ class ColumnLineage:
     """A parsed, supported M expression whose source demands can be evaluated
     for any output demand: all output columns, or a single output column."""
 
-    def __init__(self, root, model_tables: dict[str, str], owner: str):
+    def __init__(self, root, model_tables: dict[str, str], owner: str,
+                 shared: dict[str, tuple | None] | None = None):
         self._root = root
         self._model_tables = model_tables
         self._owner = owner
+        self._shared = shared or {}
 
     def demands(self, output: ColumnDemand = ColumnDemand()) -> dict[str, ColumnDemand] | None:
         """Source-column demands per referenced query, or None if evaluation fails."""
         try:
-            return _evaluate(self._root, self._model_tables, self._owner, output)
+            return _evaluate(self._root, self._model_tables, self._owner, output, self._shared)
         except (_Unsupported, RecursionError):
             return None
 
 
-def parse_column_lineage(source: str, model_tables: dict[str, str], owner: str) -> ColumnLineage | None:
-    """Return the lineage of a fully supported expression, or None when unproven."""
+def _parse(source: str):
     try:
         parser = _Parser(source)
         root = parser.expression()
         parser.take('end')
+        return root
     except (_Unsupported, RecursionError):
         return None
-    lineage = ColumnLineage(root, model_tables, owner)
+
+
+def parse_shared_queries(sources: dict[str, str]) -> dict[str, tuple | None]:
+    """Parse shared (load-disabled) queries by exact name; None marks unsupported M."""
+    return {name: _parse(source) for name, source in sources.items()}
+
+
+def parse_column_lineage(source: str, model_tables: dict[str, str], owner: str,
+                         shared: dict[str, tuple | None] | None = None) -> ColumnLineage | None:
+    """Return the lineage of a fully supported expression, or None when unproven.
+
+    `shared` maps load-disabled query names to parsed roots (`parse_shared_queries`);
+    references to them are traced through to the loaded tables they read.
+    """
+    root = _parse(source)
+    if root is None:
+        return None
+    lineage = ColumnLineage(root, model_tables, owner, shared)
     return lineage if lineage.demands() is not None else None
 
 
@@ -425,14 +444,18 @@ def infer_column_demands(source: str, model_tables: dict[str, str], owner: str) 
     return None if lineage is None else lineage.demands()
 
 
-def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDemand) -> dict[str, ColumnDemand]:
+def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDemand,
+              shared: dict[str, tuple | None]) -> dict[str, ColumnDemand]:
     """Trace `output` backward to source demands; raise _Unsupported on unproven shapes."""
     result = {}
     active = set()
     remaining_visits = 10000
 
+    def shadowed(name, scope):
+        return name in scope or norm(name) in model_tables or name in shared
+
     def check_row_calls(calls, scope):
-        if any(name in scope or norm(name) in model_tables for name in calls):
+        if any(shadowed(name, scope) for name in calls):
             raise _Unsupported()
 
     def schema_demand(node, demand):
@@ -461,7 +484,7 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
 
     def type_demand(node, demand, scope):
         symbols = {'Table.TransformColumnTypes'} | node[3]
-        if any(name in scope or norm(name) in model_tables for name in symbols):
+        if any(shadowed(name, scope) for name in symbols):
             raise _Unsupported()
         return ColumnDemand(demand.included, demand.excluded, demand.required | node[2])
 
@@ -480,7 +503,7 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
                 nested[name] = (expression, nested)
             return resolve_nested(node[2], nested, nested_name, demand, reads, depth + 1)
         if node[0] == 'filter':
-            if 'Table.SelectRows' in scope or norm('Table.SelectRows') in model_tables:
+            if shadowed('Table.SelectRows', scope):
                 raise _Unsupported()
             check_row_calls(node[3], scope)
             return resolve_nested(node[1], scope, nested_name, demand, reads | node[2], depth + 1)
@@ -492,9 +515,9 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
         if node[0] in {'select', 'remove', 'rename'}:
             intrinsic = {'select': 'Table.SelectColumns', 'remove': 'Table.RemoveColumns',
                          'rename': 'Table.RenameColumns'}[node[0]]
-            if intrinsic in scope or norm(intrinsic) in model_tables:
+            if shadowed(intrinsic, scope):
                 raise _Unsupported()
-            if node[3] and ('MissingField.Ignore' in scope or norm('MissingField.Ignore') in model_tables):
+            if node[3] and shadowed('MissingField.Ignore', scope):
                 raise _Unsupported()
             if node[0] == 'select' and nested_name not in node[2]:
                 raise _Unsupported()
@@ -512,9 +535,9 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
                                   schema_demand(node, demand), reads, depth + 1)
         if node[0] != 'nestedjoin':
             raise _Unsupported()
-        if 'Table.NestedJoin' in scope or norm('Table.NestedJoin') in model_tables:
+        if shadowed('Table.NestedJoin', scope):
             raise _Unsupported()
-        if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
+        if node[6] and shadowed(node[6], scope):
             raise _Unsupported()
         if nested_name != node[5]:
             raise _Unsupported()
@@ -531,10 +554,10 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
                      'types': 'Table.TransformColumnTypes', 'filter': 'Table.SelectRows',
                      'add': 'Table.AddColumn', 'join': 'Table.Join',
                      'nestedjoin': 'Table.NestedJoin', 'expand': 'Table.ExpandTableColumn'}.get(kind)
-        if intrinsic and (intrinsic in scope or norm(intrinsic) in model_tables):
+        if intrinsic and shadowed(intrinsic, scope):
             raise _Unsupported()
         if kind in {'select', 'remove', 'rename'} and node[3] and (
-                'MissingField.Ignore' in scope or norm('MissingField.Ignore') in model_tables):
+                shadowed('MissingField.Ignore', scope)):
             raise _Unsupported()
         if kind == 'let':
             nested = dict(scope)
@@ -554,6 +577,14 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
             elif norm(name) in model_tables and norm(name) != norm(owner):
                 table = model_tables[norm(name)]
                 result[table] = result[table].union(demand) if table in result else demand
+            elif name in shared:
+                # A load-disabled query: trace through it to the loaded tables it reads.
+                key = ('shared', name)
+                if shared[name] is None or key in active:
+                    raise _Unsupported()
+                active.add(key)
+                visit(shared[name], demand, {}, depth + 1)
+                active.remove(key)
             else:
                 raise _Unsupported()
         elif kind == 'combine':
@@ -578,7 +609,7 @@ def _evaluate(root, model_tables: dict[str, str], owner: str, output: ColumnDema
             visit(node[1], ColumnDemand(included, (demand.excluded - sources) | added,
                                        (demand.required - added) | node[3]), scope, depth + 1)
         elif kind in {'join', 'nestedjoin'}:
-            if node[6] and (node[6] in scope or norm(node[6]) in model_tables):
+            if node[6] and shadowed(node[6], scope):
                 raise _Unsupported()
             left_demand = demand
             right_demand = demand

@@ -1,0 +1,18 @@
+{
+  "expected_status": {
+    "Column|Clean|A": "Used",
+    "Column|Clean|B": "Likely unused",
+    "Column|Raw|A": "Used",
+    "Column|Raw|B": "Likely unused",
+    "Column|Raw|C": "Likely unused",
+    "Column|Raw|D": "Likely unused",
+    "Column|Report|X": "Likely unused",
+    "Column|Archive|X": "Needs manual review",
+    "Column|Archive|Y": "Needs manual review",
+    "Column|Archive 2|X": "Needs manual review",
+    "Column|Raw 2|Z": "Likely unused",
+    "Column|Raw 3|W": "Likely unused",
+    "Column|Notes|Q": "Likely unused"
+  },
+  "notes": "Load-disabled (shared expression) queries are followed from partitions: supported M gives usage-aware column lineage through Staging (Raw[A] was Likely unused before), unsupported M gives query-level manual review through Helper and Deep. Shared queries no partition reaches, or named only in a comment, protect nothing."
+}

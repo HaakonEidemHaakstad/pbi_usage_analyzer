@@ -36,9 +36,12 @@ warning does not establish complete coverage.
 
 ## Power Query / M coverage
 
-Only actual M partition expressions enter query dependency inference. Bounded
-column lineage is accepted only when every relevant partition expression is
-supported; otherwise recognized query references retain conservative fallback.
+Only actual M partition expressions enter query dependency inference, together with
+the shared expressions (load-disabled queries) they reference, followed transitively
+([scenario 42](../tools/validation/validation_suite/42_m_shared_query_lineage)). Shared
+expressions no partition reaches, or named only in comments, create no dependency.
+Bounded column lineage is accepted only when every relevant partition expression,
+including referenced shared expressions, is supported; otherwise recognized query references retain conservative fallback.
 That fallback depends on finding a credible query reference—it does not prove
 complete coverage of unknown expressions.
 

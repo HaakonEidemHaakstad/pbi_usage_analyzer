@@ -1,0 +1,8 @@
+table 'Raw 2'
+    column Z
+        sourceColumn: Z
+
+    partition 'Raw 2' = m
+        mode: import
+        source =
+            #table({"Z"}, {})

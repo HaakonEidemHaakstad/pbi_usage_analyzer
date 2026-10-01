@@ -1,0 +1,24 @@
+expression Staging =
+        let
+            Selected = Table.SelectColumns(Raw, {"A", "B", "C"}, MissingField.Ignore)
+        in
+            Selected
+    lineageTag: 00000000-0000-0000-0000-000000000001
+
+    annotation PBI_ResultType = Table
+
+expression Helper =
+        let
+            Combined = Table.Combine({Archive, #"Deep"})
+        in
+            Combined
+    lineageTag: 00000000-0000-0000-0000-000000000002
+
+expression Deep = #"Archive 2"
+    lineageTag: 00000000-0000-0000-0000-000000000003
+
+expression Orphan = #"Raw 2"
+    lineageTag: 00000000-0000-0000-0000-000000000004
+
+expression 'Orphan 2' = #"Raw 3"
+    lineageTag: 00000000-0000-0000-0000-000000000005

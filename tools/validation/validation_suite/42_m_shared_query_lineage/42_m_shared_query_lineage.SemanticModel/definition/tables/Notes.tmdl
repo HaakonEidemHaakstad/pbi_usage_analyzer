@@ -1,0 +1,12 @@
+table 'Notes'
+    column Q
+        sourceColumn: Q
+
+    partition 'Notes' = m
+        mode: import
+        source =
+            let
+                // Old version read #"Orphan 2"
+                Source = #table({"Q"}, {})
+            in
+                Source

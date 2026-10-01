@@ -1,0 +1,10 @@
+table 'Clean'
+    column A
+        sourceColumn: A
+    column B
+        sourceColumn: B
+
+    partition 'Clean' = m
+        mode: import
+        source =
+            Table.RemoveColumns(#"Staging", {"C"}, MissingField.Ignore)

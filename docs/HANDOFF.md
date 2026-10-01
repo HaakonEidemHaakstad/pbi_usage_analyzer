@@ -134,7 +134,8 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 Then: "reinitiate everything necessary, such as MariaDB" (nothing needed: the
 `MariaDB` service runs automatically, `aw_ops`/`aw_dw` persist, regenerated sources
 match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1"
-(usage-aware M lineage, done).
+(usage-aware M lineage, done), then "proceed" (references through load-disabled
+queries, done).
 
 ## Implemented work in the current tree
 
@@ -154,7 +155,8 @@ match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Usage-aware lineage | Latest change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
+| Shared-query references | Latest change: references through load-disabled queries are followed (exact lineage and fallback); comment `#"..."` fix. Details below. |
+| Usage-aware lineage | Previous change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
 | AW Good scoring | Previous change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
 | Real-export fixes | Previous change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
 | Good twin | Previous change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
@@ -176,7 +178,39 @@ match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: usage-aware M lineage (2026-10-01)
+## Latest change: references through load-disabled queries (2026-10-01)
+
+- Safety bug found while scoping the follow-up (user said "proceed"): a loaded table
+  read only through a load-disabled query (`expressions.tmdl` shared expression) had
+  no dependency evidence at all. `Clean = Table.SelectColumns(#"Staging", ...)`,
+  `Staging = Raw` made `Raw[A]` **Likely unused** although the report needs it: exact
+  lineage raised Unsupported on the unknown name and the fallback scanner only knew
+  model tables. No real project has this shape (checked AW, AW Mess, AW Good).
+- `parsers/m_lineage.py`: `parse_shared_queries(sources)` parses shared queries by
+  exact name; `parse_column_lineage(..., shared)` / `ColumnLineage` evaluate a
+  reference to one in place (scope `{}`, `('shared', name)` cycle guard; unparsed or
+  cyclic -> unsupported -> fallback). `shadowed(name, scope)` now also treats shared
+  names as shadowing library functions.
+- `parsers/powerquery.py`: `parse_power_query_dependencies(..., shared_sources)`
+  (build_graph passes every non-partition `MQuery`; names clashing with a loaded
+  table are dropped). `_table_refs` walks shared queries from a partition with the
+  same `_find_query_refs` syntax rules, memoized per partition, and returns the path;
+  evidence reasons name it. Usage-aware lineage works through shared queries
+  unchanged (it only sees model-table demands).
+- Pre-existing bug fixed: `_find_query_refs` read `#"..."` identifiers from raw text,
+  so `// was #"Archive"` created a dependency (AGENTS.md forbids comment
+  dependencies; error direction was protective). It now reads them from
+  `m_queries.mask_m` output (renamed from `_mask_m`).
+- Comparison with the previous commit (41 scenarios + 3 real projects): no status or
+  evidence-count change. Scenario 42 `42_m_shared_query_lineage` fails on the old
+  analyzer with 4 false Likely unused (`Raw[A]`, `Archive[X]`/`[Y]`, `Archive 2[X]`).
+  Tests: `SharedQueryReferenceTests` and a comment test in `tests/test_powerquery.py`,
+  `SharedQueryLineageTests` in `tests/test_m_usage_lineage.py`.
+- Limits: `_local_let_names` recognizes step names only at line starts (single-line
+  `let X = ...` is not excluded; protective); a reference cycle among shared queries
+  (not refreshable in Power BI) may hide part of a path from the memo.
+
+## Previous change: usage-aware M lineage (2026-10-01)
 
 - Problem: complete M lineage evaluated the demand of *all* output columns, so every
   append-input column feeding the combined table got manual review regardless of
@@ -211,9 +245,8 @@ match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1
 - Performance: large-model benchmark unchanged (0.32 s); a 20-input x 300-column
   append analyzes in 0.75 s.
 - Limits: filter reads and join keys are requirements, not flows (so they stay review
-  even when the output is Used); flat joins attribute an output name to both sides;
-  shared expressions (load-disabled queries) are still not graph nodes, so lineage
-  through them is not followed.
+  even when the output is Used); flat joins attribute an output name to both sides.
+  (Lineage through shared expressions followed in the next change.)
 - OneDrive caution: `git worktree remove` can fail on the read-only
   `.git/worktrees/<name>` folder; clear attributes (PowerShell
   `$_.Attributes = 'Normal'`), delete it, then `git worktree prune`. Prefer worktrees
@@ -702,9 +735,9 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 Both case studies are built and scored, and usage-aware lineage is done; nothing
 waits on the user. Candidate next steps (ask the user which):
-1. Lineage through shared expressions (load-disabled queries are not graph nodes)
-   and through currently unsupported steps seen in real exports (e.g. the folder
-   combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`).
+1. Lineage through currently unsupported steps seen in real exports (e.g. the folder
+   combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`; matters only
+   when such a step sits between two model queries).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
@@ -735,6 +768,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
+- Windows, Python 3.14, 2026-10-01 after shared-query references: 240 tests OK with
+  all three real-project variables set (2 skipped); 359 synthetic checks across 42
+  scenarios; compilation, fixture drift, `git diff --check` pass; benchmark 0.32 s.
 - Windows, Python 3.14, 2026-10-01 after usage-aware lineage: 231 tests OK with all
   three real-project variables set (2 skipped: timing, symlink privilege); 344
   synthetic checks pass across 41 scenarios; compilation, fixture drift and

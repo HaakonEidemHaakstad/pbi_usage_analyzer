@@ -7,7 +7,8 @@ from pathlib import Path
 from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import clean_name, norm, read_source_text
-from .m_lineage import ColumnDemand, ColumnLineage, parse_column_lineage
+from .m_queries import mask_m
+from .m_lineage import ColumnDemand, ColumnLineage, parse_column_lineage, parse_shared_queries
 
 
 @dataclass
@@ -147,9 +148,10 @@ def _local_let_names(m_source: str) -> set[str]:
 
 
 def _find_query_refs(m_source: str, owner_table: str, model_tables: dict[str, str]) -> set[str]:
+    """Names from `model_tables` (normalized key -> name) referenced by `m_source`."""
     # Quoted identifiers (#"Query Name") are syntactically distinct from M string
-    # literals, so capture them before removing strings/comments.
-    quoted_identifiers = [m.group(1).replace('""', '"') for m in re.finditer(r'#"((?:[^"]|"")+)"', m_source)]
+    # literals; read them from text with only comments and literals blanked.
+    quoted_identifiers = [m.group(1).replace('""', '"') for m in re.finditer(r'#"((?:[^"]|"")+)"', mask_m(m_source))]
     cleaned = _strip_comments_and_strings(m_source)
     local_names = _local_let_names(m_source)
     refs: set[str] = set()
@@ -177,10 +179,40 @@ def _find_query_refs(m_source: str, owner_table: str, model_tables: dict[str, st
     return refs
 
 
-def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) -> PowerQueryResult:
+def _table_refs(m_source: str, owner: str, model_tables: dict[str, str], shared: dict[str, str],
+                memo: dict[str, dict[str, tuple[str, ...]] | None] | None = None) -> dict[str, tuple[str, ...]]:
+    """Loaded tables referenced by `m_source`, directly or through shared queries.
+
+    Maps each table to the shared (load-disabled) queries on the first path found.
+    Shared queries count only when reached from a partition. Each is expanded once
+    (`memo`); a reference cycle, which Power BI cannot refresh, ends the path.
+    """
+    memo = {} if memo is None else memo
+    names = {norm(name): name for name in shared}
+    names.update(model_tables)  # A loaded table wins a name clash.
+    found: dict[str, tuple[str, ...]] = {}
+    for name in sorted(_find_query_refs(m_source, owner, names)):
+        if norm(name) in model_tables:
+            found.setdefault(name, ())
+            continue
+        if name not in memo:
+            memo[name] = None  # In progress.
+            memo[name] = _table_refs(shared[name], owner, model_tables, shared, memo)
+        for table, path in (memo[name] or {}).items():
+            found.setdefault(table, (name,) + path)
+    return found
+
+
+def parse_power_query_dependencies(model_folder: Path, table_names: set[str],
+                                   shared_sources: dict[str, str] | None = None) -> PowerQueryResult:
+    """Query dependencies of every M partition. `shared_sources` maps load-disabled
+    (shared expression) query names to their M; references through them are followed."""
     result = PowerQueryResult()
     tables_folder = model_folder / "definition" / "tables"
     model_tables = {norm(t): t for t in table_names}
+    shared_sources = {name: source for name, source in (shared_sources or {}).items()
+                      if norm(name) not in model_tables}
+    shared = parse_shared_queries(shared_sources)
     for path in sorted(tables_folder.glob("*.tmdl")):
         text, _ = read_source_text(path)
         owner = None
@@ -191,17 +223,23 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
         if not owner:
             continue
         sources = _extract_partition_m_sources(text)
-        parsed = [parse_column_lineage(source, model_tables, owner) for source in sources]
+        parsed = [parse_column_lineage(source, model_tables, owner, shared) for source in sources]
         inferred = [None if lineage is None else lineage.demands() for lineage in parsed]
         complete = bool(sources) and all(demands is not None for demands in inferred)
         if complete:
             result.lineages[owner] = tuple(parsed)
         for source, demands in zip(sources, inferred):
-            dependencies = demands.keys() if demands is not None else _find_query_refs(source, owner, model_tables)
+            paths = _table_refs(source, owner, model_tables, shared_sources)
+            dependencies = demands.keys() if demands is not None else paths.keys()
             for dependency in sorted(dependencies):
                 owner_ref = ObjectRef(ObjectType.QUERY, owner)
                 dep_ref = ObjectRef(ObjectType.QUERY, dependency)
-                ev = Evidence(owner_ref, dep_ref, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, f"Query '{owner}' references query '{dependency}'", str(path), "high")
+                via = paths.get(dependency, ())
+                reason = f"Query '{owner}' references query '{dependency}'"
+                if via:
+                    noun = "query" if len(via) == 1 else "queries"
+                    reason += f" through load-disabled {noun} " + " -> ".join(f"'{name}'" for name in via)
+                ev = Evidence(owner_ref, dep_ref, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, reason, str(path), "high")
                 selected = _selected_columns(source, dependency)
                 if len(sources) == 1 and selected is not None:
                     result.projected_columns[(owner, dependency)] = selected

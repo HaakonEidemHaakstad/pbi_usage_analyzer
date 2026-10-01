@@ -2061,6 +2061,84 @@ def build_m_usage_aware_lineage(root: Path):
        "whose loaded columns lack sourceColumn keep conservative manual review.")
 
 
+def build_m_shared_query_lineage(root: Path):
+    name = "42_m_shared_query_lineage"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+
+    def table(table_name: str, cols: tuple[str, ...], source: str) -> None:
+        text = f"table '{table_name}'\n" + "".join(f"    column {c}\n        sourceColumn: {c}\n" for c in cols)
+        text += f"\n    partition '{table_name}' = m\n        mode: import\n        source =\n"
+        text += "".join(f"            {line}\n" for line in source.strip().splitlines())
+        write(tables / f"{table_name}.tmdl", text)
+
+    def empty(cols: tuple[str, ...]) -> str:
+        return "#table({" + ", ".join(f'"{c}"' for c in cols) + "}, {})"
+
+    # Clean reads Raw only through the load-disabled query Staging (supported M).
+    table("Raw", ("A", "B", "C", "D"), empty(("A", "B", "C", "D")))
+    table("Clean", ("A", "B"), 'Table.RemoveColumns(#"Staging", {"C"}, MissingField.Ignore)')
+    # Unsupported M: query-level fallback through two load-disabled queries.
+    table("Archive", ("X", "Y"), empty(("X", "Y")))
+    table("Archive 2", ("X",), empty(("X",)))
+    table("Report", ("X",), 'CustomFunction(#"Helper")')
+    # Load-disabled queries that no partition reaches, or reached only from a comment.
+    table("Raw 2", ("Z",), empty(("Z",)))
+    table("Raw 3", ("W",), empty(("W",)))
+    table("Notes", ("Q",), """
+let
+    // Old version read #"Orphan 2"
+    Source = #table({"Q"}, {})
+in
+    Source
+""")
+    write(model / "definition" / "expressions.tmdl", """
+expression Staging =
+        let
+            Selected = Table.SelectColumns(Raw, {"A", "B", "C"}, MissingField.Ignore)
+        in
+            Selected
+    lineageTag: 00000000-0000-0000-0000-000000000001
+
+    annotation PBI_ResultType = Table
+
+expression Helper =
+        let
+            Combined = Table.Combine({Archive, #"Deep"})
+        in
+            Combined
+    lineageTag: 00000000-0000-0000-0000-000000000002
+
+expression Deep = #"Archive 2"
+    lineageTag: 00000000-0000-0000-0000-000000000003
+
+expression Orphan = #"Raw 2"
+    lineageTag: 00000000-0000-0000-0000-000000000004
+
+expression 'Orphan 2' = #"Raw 3"
+    lineageTag: 00000000-0000-0000-0000-000000000005
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Clean", "A"))
+    save_expected(p, {
+        "Column|Clean|A": "Used",
+        "Column|Clean|B": "Likely unused",
+        "Column|Raw|A": "Used",
+        "Column|Raw|B": "Likely unused",
+        "Column|Raw|C": "Likely unused",
+        "Column|Raw|D": "Likely unused",
+        "Column|Report|X": "Likely unused",
+        "Column|Archive|X": "Needs manual review",
+        "Column|Archive|Y": "Needs manual review",
+        "Column|Archive 2|X": "Needs manual review",
+        "Column|Raw 2|Z": "Likely unused",
+        "Column|Raw 3|W": "Likely unused",
+        "Column|Notes|Q": "Likely unused",
+    }, "Load-disabled (shared expression) queries are followed from partitions: supported M "
+       "gives usage-aware column lineage through Staging (Raw[A] was Likely unused before), "
+       "unsupported M gives query-level manual review through Helper and Deep. Shared queries "
+       "no partition reaches, or named only in a comment, protect nothing.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -2114,6 +2192,7 @@ def main():
         build_text_key_relationships,
         build_power_bi_desktop_shapes,
         build_m_usage_aware_lineage,
+        build_m_shared_query_lineage,
     ]
     for builder in builders:
         builder(root)
