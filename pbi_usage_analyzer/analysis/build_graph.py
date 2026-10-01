@@ -8,12 +8,13 @@ from ..model import DependencyGraph, Evidence, EvidenceType, ModelObject, Object
 from ..parsers.dax import DaxIndex, dax_dependencies
 from ..parsers.dax_lexer import mask_dax
 from ..parsers.special_dax import special_dax_evidence
+from ..parsers.m_lineage import ColumnDemand, ColumnLineage
 from ..parsers.m_queries import MQuery, collect_m_queries
 from ..parsers.pbir import ReportParseResult, parse_report
 from ..parsers.powerquery import PowerQueryResult, parse_power_query_dependencies
 from ..parsers.relationships import Relationship, parse_relationship_metadata, relationship_evidence
 from ..parsers.tmdl import TmdlModel, parse_model
-from ..util import is_internal_table, norm_key, read_source_text
+from ..util import is_internal_table, norm, norm_key, read_source_text
 
 
 class AnalysisContext(DiagnosticCollection):
@@ -140,6 +141,8 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
     for ref in ctx.graph.objects:
         if ref.object_type == ObjectType.COLUMN:
             columns_by_table[ref.table.casefold()].append(ref)
+    output_demands: dict[str, dict[ObjectRef, dict[str, ColumnDemand]] | None] = {}
+    lineage_done: set[tuple[str, str]] = set()
     for ev in pq.evidence:
         upstream = ev.target.table
         if ev.source and is_internal_table(ev.source.table):
@@ -170,16 +173,51 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
                         ))
             continue
         demand = pq.column_demands.get((ev.source.table, upstream)) if ev.source else None
+        outputs = None
+        if demand is not None:
+            owner = ev.source.table
+            if (owner, upstream) in lineage_done:
+                continue  # Demands already merge every partition of the owner.
+            lineage_done.add((owner, upstream))
+            if owner not in output_demands:
+                output_demands[owner] = _output_demands(
+                    ctx.graph, pq.lineages.get(owner), columns_by_table.get(owner.casefold(), []))
+            outputs = output_demands[owner]
         for col in columns_by_table.get(upstream.casefold(), []):
             if demand is not None:
                 source_name = ctx.graph.objects[col].source_column or col.name
                 if not demand.accepts(source_name):
                     continue
-                ctx.graph.add_evidence(Evidence(
-                    ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,
-                    f"Query {ev.source.table} -> supported M lineage -> {col.label} "
-                    "(output or required schema column)", ev.source_file, "medium",
-                ))
+                if outputs is None:
+                    ctx.graph.add_evidence(Evidence(
+                        ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,
+                        f"Query {owner} -> supported M lineage -> {col.label} "
+                        "(output or required schema column)", ev.source_file, "medium",
+                    ))
+                    continue
+                # Usage-aware lineage: each loaded column passes its status to the
+                # upstream columns it is loaded from.
+                feeders = [out for out, demands in outputs.items()
+                           if upstream in demands and demands[upstream].feeds(source_name)]
+                for out in feeders:
+                    ctx.graph.add_evidence(Evidence(
+                        out, col, EvidenceType.POWERQUERY_COLUMN_LINEAGE,
+                        f"{out.label} is loaded from {col.label} (supported M lineage in query {owner})",
+                        ev.source_file, "high",
+                    ))
+                if norm(source_name) in demand.required:
+                    ctx.graph.add_evidence(Evidence(
+                        ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,
+                        f"Query {owner} -> supported M lineage -> {col.label} "
+                        "(required by an M step)", ev.source_file, "medium",
+                    ))
+                elif not feeders:
+                    ctx.graph.add_evidence(Evidence(
+                        ev.source, col, EvidenceType.POWERQUERY_COLUMN_DEPENDENCY,
+                        f"Query {owner} -> supported M lineage -> {col.label} "
+                        "(flows into a query output with no matching model column)",
+                        ev.source_file, "medium",
+                    ))
             else:
                 ctx.graph.add_evidence(Evidence(ev.source, col, EvidenceType.POWERQUERY_QUERY_DEPENDENCY, f"Upstream query '{upstream}' is referenced by '{ev.source.table if ev.source else ''}'", ev.source_file, "medium"))
 
@@ -189,3 +227,30 @@ def build_graph(report_folder: Path, model_folder: Path) -> AnalysisContext:
             ctx.graph.add_evidence(Evidence(None, ref, EvidenceType.INTERNAL_OBJECT, "Power BI internal/auto-generated table", confidence="high"))
 
     return ctx
+
+
+def _output_demands(graph: DependencyGraph, lineages: tuple[ColumnLineage, ...] | None,
+                    owner_columns: list[ObjectRef]) -> dict[ObjectRef, dict[str, ColumnDemand]] | None:
+    """Source demands of each loaded column of a query, or None when unknown.
+
+    Needs the M output name (sourceColumn) of every loaded column; otherwise the
+    caller keeps the conservative all-output demand. Calculated columns are not
+    M outputs.
+    """
+    if not lineages:
+        return None
+    loaded = [col for col in owner_columns if not graph.objects[col].calculated]
+    if any(not graph.objects[col].source_column for col in loaded):
+        return None
+    result: dict[ObjectRef, dict[str, ColumnDemand]] = {}
+    for col in loaded:
+        output = ColumnDemand(frozenset({norm(graph.objects[col].source_column)}))
+        merged: dict[str, ColumnDemand] = {}
+        for lineage in lineages:
+            demands = lineage.demands(output)
+            if demands is None:
+                return None
+            for table, demand in demands.items():
+                merged[table] = merged[table].union(demand) if table in merged else demand
+        result[col] = merged
+    return result

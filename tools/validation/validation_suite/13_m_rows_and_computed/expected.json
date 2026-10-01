@@ -1,10 +1,10 @@
 {
   "expected_status": {
-    "Column|Archive|Price": "Needs manual review",
-    "Column|Archive|Quantity": "Needs manual review",
+    "Column|Archive|Price": "Used",
+    "Column|Archive|Quantity": "Used",
     "Column|Archive|Active": "Needs manual review",
     "Column|Archive|Unrelated": "Likely unused",
     "Column|Output|Total": "Used"
   },
-  "notes": "Filter inputs and computed-column inputs survive projection; unrelated columns are not protected."
+  "notes": "Computed-column inputs of the used Output[Total] are Used; filter inputs survive projection as manual review; unrelated columns are not protected."
 }

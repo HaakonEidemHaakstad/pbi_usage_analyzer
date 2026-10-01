@@ -52,6 +52,7 @@ def propagate_used(graph: DependencyGraph) -> set[ObjectRef]:
                 EvidenceType.FIELD_PARAMETER_DEPENDENCY,
                 EvidenceType.RLS_DEPENDENCY,
                 EvidenceType.CALCULATION_GROUP_DEPENDENCY,
+                EvidenceType.POWERQUERY_COLUMN_LINEAGE,
             } and ev.target not in used:
                 used.add(ev.target)
                 queue.append(ev.target)
@@ -87,4 +88,23 @@ def classify(graph: DependencyGraph) -> list[Finding]:
         else:
             status = Status.LIKELY_UNUSED
         findings.append(Finding(ref, status, reasons, types))
+    _review_through_lineage(graph, findings)
     return findings
+
+
+def _review_through_lineage(graph: DependencyGraph, findings: list[Finding]) -> None:
+    """An upstream column loaded into a column under manual review needs review too.
+
+    Lineage edges carry no status of their own: a Used source already made the
+    target Used, and an unused source leaves the target to its other evidence.
+    """
+    by_ref = {finding.ref: finding for finding in findings}
+    queue = deque(finding.ref for finding in findings if finding.status == Status.MANUAL_REVIEW)
+    while queue:
+        source = queue.popleft()
+        for ev in graph.outgoing(source):
+            target = by_ref.get(ev.target)
+            if (ev.evidence_type == EvidenceType.POWERQUERY_COLUMN_LINEAGE and target is not None
+                    and target.status == Status.LIKELY_UNUSED):
+                target.status = Status.MANUAL_REVIEW
+                queue.append(target.ref)

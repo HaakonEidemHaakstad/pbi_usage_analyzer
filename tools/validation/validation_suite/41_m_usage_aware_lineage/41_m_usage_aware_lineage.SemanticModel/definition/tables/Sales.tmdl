@@ -1,0 +1,22 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Note
+        sourceColumn: Note
+    column Code
+        sourceColumn: Code
+
+    column Margin = Sales[Amount] * 2
+
+    measure 'Unused Code' = DISTINCTCOUNT(Sales[Code])
+
+    partition Sales = m
+        mode: import
+        source =
+            let
+                Combined = Table.Combine({#"Sales 2023", #"Sales 2024"}),
+                Typed = Table.TransformColumnTypes(Combined, {{"Region", type text}})
+            in
+                Typed

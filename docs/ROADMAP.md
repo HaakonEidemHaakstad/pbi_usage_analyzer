@@ -162,5 +162,8 @@ Both case studies were built and scored on 2026-10-01 (optional integration
 tests). The mess found four real-export bugs (field-parameter groupByColumn,
 many-to-many defaults, auto-date links, display-name whitespace); the twin found
 one (raw-net same-name match) and otherwise no false positives.
-Next: usage-aware M lineage through appends (35 conservative reviews in the mess),
-more real projects, then GUI planning over `analyze_project()`.
+Usage-aware M lineage: each loaded column passes its status to the upstream
+columns it is loaded from (`POWERQUERY_COLUMN_LINEAGE`, scenario 41); schema
+requirements stay manual review. It resolved all 37 append-input reviews in the
+mess, matching the ground truth.
+Next: more real projects, then GUI planning over `analyze_project()`.

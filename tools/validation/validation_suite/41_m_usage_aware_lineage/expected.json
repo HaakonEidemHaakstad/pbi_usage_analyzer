@@ -1,0 +1,29 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Used",
+    "Column|Sales|Region": "Likely unused",
+    "Column|Sales|Note": "Likely unused",
+    "Column|Sales|Code": "Needs manual review",
+    "Column|Sales|Margin": "Likely unused",
+    "Measure|Sales|Unused Code": "Likely unused",
+    "Column|Sales 2023|Amount": "Used",
+    "Column|Sales 2023|Region": "Needs manual review",
+    "Column|Sales 2023|Note": "Used",
+    "Column|Sales 2023|Code": "Needs manual review",
+    "Column|Sales 2023|Legacy": "Needs manual review",
+    "Column|Sales 2024|Amount": "Used",
+    "Column|Sales 2024|Region": "Needs manual review",
+    "Column|Sales 2024|Note": "Likely unused",
+    "Column|Sales 2024|Code": "Needs manual review",
+    "Column|Raw 2024|amt": "Used",
+    "Column|Raw 2024|Region": "Needs manual review",
+    "Column|Raw 2024|Note": "Likely unused",
+    "Column|Raw 2024|Code": "Needs manual review",
+    "Column|Budget|Note": "Used",
+    "Column|Old|X": "Likely unused",
+    "Column|Old|Y": "Likely unused",
+    "Column|Old 2019|X": "Needs manual review",
+    "Column|Old 2019|Y": "Needs manual review"
+  },
+  "notes": "Usage-aware M lineage: append inputs follow the combined column's status (Used, manual review, or unused), through two hops and per consumer. Columns an M step requires (type conversion), input columns with no matching loaded column, and owners whose loaded columns lack sourceColumn keep conservative manual review."
+}

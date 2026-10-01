@@ -32,6 +32,9 @@ class EvidenceType(str, Enum):
     CALCULATION_GROUP_DEPENDENCY = "CALCULATION_GROUP_DEPENDENCY"
     POWERQUERY_QUERY_DEPENDENCY = "POWERQUERY_QUERY_DEPENDENCY"
     POWERQUERY_COLUMN_DEPENDENCY = "POWERQUERY_COLUMN_DEPENDENCY"
+    # Downstream column -> upstream column it is loaded from, proven by supported
+    # M lineage. The target's status follows the source column's status.
+    POWERQUERY_COLUMN_LINEAGE = "POWERQUERY_COLUMN_LINEAGE"
     FALLBACK_MATCH = "FALLBACK_MATCH"
     INTERNAL_OBJECT = "INTERNAL_OBJECT"
     # Source that could not be parsed or decoded may hide evidence for its target.

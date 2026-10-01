@@ -2,10 +2,10 @@
   "expected_status": {
     "Column|Orders|CustomerKey": "Needs manual review",
     "Column|Orders|Region": "Needs manual review",
-    "Column|Orders|Amount": "Needs manual review",
+    "Column|Orders|Amount": "Used",
     "Column|Orders|UnusedOrder": "Likely unused",
     "Column|Customers|Key": "Needs manual review",
-    "Column|Customers|Name": "Needs manual review",
+    "Column|Customers|Name": "Used",
     "Column|Customers|UnusedCustomer": "Likely unused",
     "Column|Output|Rounded": "Used",
     "Column|Output|CustomerName": "Used"

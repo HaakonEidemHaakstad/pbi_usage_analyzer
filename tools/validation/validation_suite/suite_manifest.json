@@ -39,7 +39,8 @@
     "37_duplicate_measures",
     "38_m_local_servers",
     "39_text_key_relationships",
-    "40_power_bi_desktop_shapes"
+    "40_power_bi_desktop_shapes",
+    "41_m_usage_aware_lineage"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

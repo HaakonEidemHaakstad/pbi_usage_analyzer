@@ -163,11 +163,15 @@ hierarchy is used). An independent ground truth was derived from the raw files
 without analyzer code or output, then compared object by object. Expectations:
 `tests/integration/aw_mess_expected.json` (run with `PBI_AW_MESS_PROJECT`).
 
-- **Cleanup:** 178 business objects: 41 Used, 39 Needs manual review, 98 Likely
+- **Cleanup:** 178 business objects: 65 Used, 2 Needs manual review, 111 Likely
   unused (plus 140 internal auto-date objects). **No object the report needs is
-  Likely unused.** All 39 differences from the ground truth are conservative manual
-  reviews: 35 columns of the yearly append inputs (lineage does not map the combined
-  table's column status upstream) and 2+2 objects referenced only by unused DAX.
+  Likely unused.** The only differences from the ground truth are 2 conservative
+  manual reviews, `customers[birth_date]` and `Products[Cost]`, which are
+  referenced only by unused DAX. At first scoring there were 39: the 37 columns of
+  the yearly append inputs were manual review because lineage did not map the
+  combined table's column status upstream. Usage-aware M lineage (same day) now
+  gives each of them the status of the `Sales`/`Returns` column it is loaded into,
+  and all 37 match the ground truth (24 Used, 13 Likely unused).
 - **Health:** every predicted finding below, and nothing else: paths ×14, local
   server ×9, undocumented measures ×8, loaded append inputs ×6, annual appends ×2,
   bidirectional ×2, many-to-many, text key, duplicate measures, unfiltered folder.
@@ -190,7 +194,7 @@ investigate every difference.
 
 | ID | Bad practice | Expected analyzer result | Status |
 | --- | --- | --- | --- |
-| BP-01 | Hard-coded annual appends across three different source types (`Sales`, `Returns`) | Append dependencies `Sales → Sales 2020 / sales_2021 / sales_2022`, `Returns → Returns 20xx`; per-year query columns are **Needs manual review**, not Likely unused | Detected as lineage; `POWERQUERY_ANNUAL_APPEND` (info) on `Sales` and `Returns`; `POWERQUERY_APPEND_INPUT_LOADED` (warning) for each loaded per-year query |
+| BP-01 | Hard-coded annual appends across three different source types (`Sales`, `Returns`) | Append dependencies `Sales → Sales 2020 / sales_2021 / sales_2022`, `Returns → Returns 20xx`; each per-year query column follows the combined column it is loaded into (Used, or Likely unused when the combined column is unused); `Sales[TerritoryKey]`'s type conversion keeps the inputs' `TerritoryKey` protected | Detected as usage-aware lineage; `POWERQUERY_ANNUAL_APPEND` (info) on `Sales` and `Returns`; `POWERQUERY_APPEND_INPUT_LOADED` (warning) for each loaded per-year query |
 | BP-02 | Folder combine includes a duplicate file (2020 counted twice) | `POWERQUERY_FOLDER_UNFILTERED` (warning) on `Sales 2020`: the folder is combined with only the default hidden-files filter. The duplicate file itself is not visible statically | Detected as a risk; actual duplicates need folder access |
 | BP-03 | Wide denormalized view imported in full | `v_sales_report` columns used only by the hidden page, the implicit card and `Revenue (view)` are Used; the rest **Likely unused** | Detected (cleanup) |
 | BP-04 | Staging and per-year queries loaded into the model | `stg_customers_raw` columns Likely unused; per-year sales/returns queries as BP-01 | Cleanup detected; loaded per-year queries via `POWERQUERY_APPEND_INPUT_LOADED`; no rule for a loaded but unreferenced staging query (`stg_*` name heuristics not implemented) |

@@ -7,7 +7,7 @@ from pathlib import Path
 from ..diagnostics import Diagnostic, DiagnosticCollection, DiagnosticSeverity
 from ..model import Evidence, EvidenceType, ObjectRef, ObjectType
 from ..util import clean_name, norm, read_source_text
-from .m_lineage import ColumnDemand, infer_column_demands
+from .m_lineage import ColumnDemand, ColumnLineage, parse_column_lineage
 
 
 @dataclass
@@ -18,6 +18,8 @@ class PowerQueryResult(DiagnosticCollection):
     # Complete source-name projections for the bounded M shape below.
     projected_columns: dict[tuple[str, str], set[str]] = field(default_factory=dict)
     column_demands: dict[tuple[str, str], ColumnDemand] = field(default_factory=dict)
+    # Per owner query, the lineage of every M partition when all are supported.
+    lineages: dict[str, tuple[ColumnLineage, ...]] = field(default_factory=dict)
 
 
 def _strip_comments_and_strings(text: str) -> str:
@@ -189,8 +191,11 @@ def parse_power_query_dependencies(model_folder: Path, table_names: set[str]) ->
         if not owner:
             continue
         sources = _extract_partition_m_sources(text)
-        inferred = [infer_column_demands(source, model_tables, owner) for source in sources]
+        parsed = [parse_column_lineage(source, model_tables, owner) for source in sources]
+        inferred = [None if lineage is None else lineage.demands() for lineage in parsed]
         complete = bool(sources) and all(demands is not None for demands in inferred)
+        if complete:
+            result.lineages[owner] = tuple(parsed)
         for source, demands in zip(sources, inferred):
             dependencies = demands.keys() if demands is not None else _find_query_refs(source, owner, model_tables)
             for dependency in sorted(dependencies):

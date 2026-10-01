@@ -1,0 +1,10 @@
+table Old
+    column X
+        sourceColumn: X
+
+    column Y
+        dataType: string
+
+    partition Old = m
+        mode: import
+        source = Table.Combine({#"Old 2019"})

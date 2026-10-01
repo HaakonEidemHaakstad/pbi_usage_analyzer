@@ -540,10 +540,10 @@ table Combined
     add_visual(report, "Page1", "Visual1", visual_column("Combined", "Amount"))
     expected = {"Column|Combined|Amount": "Used"}
     for table in ("Archive", "Current"):
-        expected.update({f"Column|{table}|Amount": "Needs manual review",
+        expected.update({f"Column|{table}|Amount": "Used",
                          f"Column|{table}|Legacy": "Likely unused",
                          f"Column|{table}|Unrelated": "Likely unused"})
-    save_expected(p, expected, "Supported append/remove/select lineage narrows upstream columns without claiming active use. MissingField.Ignore allows the removed column to be absent.")
+    save_expected(p, expected, "Supported append/remove/select lineage narrows upstream columns; the used Combined[Amount] makes each input's Amount Used. MissingField.Ignore allows the removed column to be absent.")
 
 
 def build_m_lineage_fallback(root: Path):
@@ -604,11 +604,11 @@ table Output
                 Selected
 """)
     add_visual(report, "Page1", "Visual1", visual_column("Output", "Amount"))
-    save_expected(p, {"Column|Archive|Amount display": "Needs manual review",
+    save_expected(p, {"Column|Archive|Amount display": "Used",
                       "Column|Archive|ConversionOnly": "Needs manual review",
                       "Column|Archive|Unrelated": "Likely unused",
                       "Column|Output|Amount": "Used"},
-                  "Rename maps output to original sourceColumn; type conversion retains operational inputs even after projection.")
+                  "Rename maps output to original sourceColumn, so the used Output[Amount] makes Archive[Amount display] Used; type conversion retains operational inputs even after projection.")
 
 
 def build_m_rows_and_computed(root: Path):
@@ -639,12 +639,12 @@ table Output
                 Selected
 """)
     add_visual(report, "Page1", "Visual1", visual_column("Output", "Total"))
-    save_expected(p, {"Column|Archive|Price": "Needs manual review",
-                      "Column|Archive|Quantity": "Needs manual review",
+    save_expected(p, {"Column|Archive|Price": "Used",
+                      "Column|Archive|Quantity": "Used",
                       "Column|Archive|Active": "Needs manual review",
                       "Column|Archive|Unrelated": "Likely unused",
                       "Column|Output|Total": "Used"},
-                  "Filter inputs and computed-column inputs survive projection; unrelated columns are not protected.")
+                  "Computed-column inputs of the used Output[Total] are Used; filter inputs survive projection as manual review; unrelated columns are not protected.")
 
 
 def build_m_join_expansion(root: Path):
@@ -674,14 +674,14 @@ table Output
     add_visual(report, "Page1", "Visual1", visual_column("Output", "Amount"))
     add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
     save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
-                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Amount": "Used",
                       "Column|Orders|UnusedOrder": "Likely unused",
                       "Column|Customers|Key": "Needs manual review",
-                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|Name": "Used",
                       "Column|Customers|UnusedCustomer": "Likely unused",
                       "Column|Output|Amount": "Used",
                       "Column|Output|CustomerName": "Used"},
-                  "Nested join keys survive projection and expanded aliases resolve to the right source only.")
+                  "Nested join keys survive projection as manual review; expanded aliases resolve to the right source only, so the used outputs make Orders[Amount] and Customers[Name] Used.")
 
 
 def build_m_scalar_filtered_join(root: Path):
@@ -714,10 +714,10 @@ table Output
     add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
     save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
                       "Column|Orders|Region": "Needs manual review",
-                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Amount": "Used",
                       "Column|Orders|UnusedOrder": "Likely unused",
                       "Column|Customers|Key": "Needs manual review",
-                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|Name": "Used",
                       "Column|Customers|UnusedCustomer": "Likely unused",
                       "Column|Output|Rounded": "Used",
                       "Column|Output|CustomerName": "Used"},
@@ -757,11 +757,11 @@ table Output
     add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
     save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
                       "Column|Orders|Region": "Needs manual review",
-                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Amount": "Used",
                       "Column|Orders|Discarded": "Needs manual review",
                       "Column|Orders|UnusedOrder": "Likely unused",
                       "Column|Customers|Key": "Needs manual review",
-                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|Name": "Used",
                       "Column|Customers|UnusedCustomer": "Likely unused",
                       "Column|Output|Rounded": "Used",
                       "Column|Output|CustomerName": "Used"},
@@ -802,12 +802,12 @@ table Output
     add_visual(report, "Page1", "Visual2", visual_column("Output", "CustomerName"))
     save_expected(p, {"Column|Orders|CustomerKey": "Needs manual review",
                       "Column|Orders|Region": "Needs manual review",
-                      "Column|Orders|Amount": "Needs manual review",
+                      "Column|Orders|Amount": "Used",
                       "Column|Orders|Discarded": "Needs manual review",
                       "Column|Orders|Converted": "Needs manual review",
                       "Column|Orders|UnusedOrder": "Likely unused",
                       "Column|Customers|Key": "Needs manual review",
-                      "Column|Customers|Name": "Needs manual review",
+                      "Column|Customers|Name": "Used",
                       "Column|Customers|UnusedCustomer": "Likely unused",
                       "Column|Output|Rounded": "Used",
                       "Column|Output|CustomerName": "Used"},
@@ -1964,6 +1964,103 @@ relationship 2abb65fb-c58c-4ab3-a2be-4c92223982bb
     write_json(expected_path, expected)
 
 
+def build_m_usage_aware_lineage(root: Path):
+    name = "41_m_usage_aware_lineage"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+
+    def columns(*names: str) -> str:
+        return "".join(f"    column {n}\n        sourceColumn: {n}\n" for n in names)
+
+    # Sales appends two yearly inputs; Region is required by a type conversion.
+    write(tables / "Sales.tmdl", "table Sales\n" + columns("Amount", "Region", "Note", "Code") + """
+    column Margin = Sales[Amount] * 2
+
+    measure 'Unused Code' = DISTINCTCOUNT(Sales[Code])
+
+    partition Sales = m
+        mode: import
+        source =
+            let
+                Combined = Table.Combine({#"Sales 2023", #"Sales 2024"}),
+                Typed = Table.TransformColumnTypes(Combined, {{"Region", type text}})
+            in
+                Typed
+""")
+    # Legacy is no longer a Sales model column (stale metadata): no status to follow.
+    write(tables / "Sales 2023.tmdl", "table 'Sales 2023'\n" + columns("Amount", "Region", "Note", "Code", "Legacy") + """
+    partition 'Sales 2023' = m
+        mode: import
+        source = #table({"Amount", "Region", "Note", "Code", "Legacy"}, {})
+""")
+    # Second hop: Sales 2024 renames a raw query's column.
+    write(tables / "Sales 2024.tmdl", "table 'Sales 2024'\n" + columns("Amount", "Region", "Note", "Code") + """
+    partition 'Sales 2024' = m
+        mode: import
+        source =
+            let
+                Renamed = Table.RenameColumns(#"Raw 2024", {{"amt", "Amount"}})
+            in
+                Renamed
+""")
+    write(tables / "Raw 2024.tmdl", "table 'Raw 2024'\n" + columns("amt", "Region", "Note", "Code") + """
+    partition 'Raw 2024' = m
+        mode: import
+        source = #table({"amt", "Region", "Note", "Code"}, {})
+""")
+    # Another consumer of Sales 2023 uses Note, which Sales itself does not.
+    write(tables / "Budget.tmdl", "table Budget\n" + columns("Note") + """
+    partition Budget = m
+        mode: import
+        source = Table.SelectColumns(#"Sales 2023", {"Note"})
+""")
+    # Old's Y has no sourceColumn, so usage-aware lineage falls back for Old.
+    write(tables / "Old.tmdl", "table Old\n" + columns("X") + """
+    column Y
+        dataType: string
+
+    partition Old = m
+        mode: import
+        source = Table.Combine({#"Old 2019"})
+""")
+    write(tables / "Old 2019.tmdl", "table 'Old 2019'\n" + columns("X", "Y") + """
+    partition 'Old 2019' = m
+        mode: import
+        source = #table({"X", "Y"}, {})
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Sales", "Amount"))
+    add_visual(report, "Page1", "Visual2", visual_column("Budget", "Note"))
+    save_expected(p, {
+        "Column|Sales|Amount": "Used",
+        "Column|Sales|Region": "Likely unused",
+        "Column|Sales|Note": "Likely unused",
+        "Column|Sales|Code": "Needs manual review",
+        "Column|Sales|Margin": "Likely unused",
+        "Measure|Sales|Unused Code": "Likely unused",
+        "Column|Sales 2023|Amount": "Used",
+        "Column|Sales 2023|Region": "Needs manual review",
+        "Column|Sales 2023|Note": "Used",
+        "Column|Sales 2023|Code": "Needs manual review",
+        "Column|Sales 2023|Legacy": "Needs manual review",
+        "Column|Sales 2024|Amount": "Used",
+        "Column|Sales 2024|Region": "Needs manual review",
+        "Column|Sales 2024|Note": "Likely unused",
+        "Column|Sales 2024|Code": "Needs manual review",
+        "Column|Raw 2024|amt": "Used",
+        "Column|Raw 2024|Region": "Needs manual review",
+        "Column|Raw 2024|Note": "Likely unused",
+        "Column|Raw 2024|Code": "Needs manual review",
+        "Column|Budget|Note": "Used",
+        "Column|Old|X": "Likely unused",
+        "Column|Old|Y": "Likely unused",
+        "Column|Old 2019|X": "Needs manual review",
+        "Column|Old 2019|Y": "Needs manual review",
+    }, "Usage-aware M lineage: append inputs follow the combined column's status (Used, "
+       "manual review, or unused), through two hops and per consumer. Columns an M step "
+       "requires (type conversion), input columns with no matching loaded column, and owners "
+       "whose loaded columns lack sourceColumn keep conservative manual review.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -2016,6 +2113,7 @@ def main():
         build_m_local_servers,
         build_text_key_relationships,
         build_power_bi_desktop_shapes,
+        build_m_usage_aware_lineage,
     ]
     for builder in builders:
         builder(root)

@@ -1,0 +1,9 @@
+table 'Old 2019'
+    column X
+        sourceColumn: X
+    column Y
+        sourceColumn: Y
+
+    partition 'Old 2019' = m
+        mode: import
+        source = #table({"X", "Y"}, {})

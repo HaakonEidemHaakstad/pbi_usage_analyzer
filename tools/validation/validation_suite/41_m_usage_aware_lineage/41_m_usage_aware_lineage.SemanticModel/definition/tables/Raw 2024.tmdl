@@ -1,0 +1,13 @@
+table 'Raw 2024'
+    column amt
+        sourceColumn: amt
+    column Region
+        sourceColumn: Region
+    column Note
+        sourceColumn: Note
+    column Code
+        sourceColumn: Code
+
+    partition 'Raw 2024' = m
+        mode: import
+        source = #table({"amt", "Region", "Note", "Code"}, {})

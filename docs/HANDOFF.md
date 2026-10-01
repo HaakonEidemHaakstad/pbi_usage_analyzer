@@ -110,7 +110,7 @@ Windows machine state (verified 2026-10-01):
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
   Also: never append a comment to a Python line that holds several tuples; it twice
   silently removed column definitions in the generators (caught by `check_rows`).
-- **AW Mess is built and scored** (2026-10-01): `USBL\AWProjects\Mess\AW Mess.pbip`,
+- **AW Mess is built and scored** (2026-10-01; 2 manual reviews left after usage-aware lineage): `USBL\AWProjects\Mess\AW Mess.pbip`,
   TMDL + PBIR, deviations in its `NOTES.txt` (Norwegian step names; M pasted via
   Advanced Editor; relationships/measures/role applied as TMDL scripts; no auto-date
   hierarchy used in the report). Result and bugs: docs/CASE_STUDY_ADVENTUREWORKS.md
@@ -131,6 +131,10 @@ verification, append rules, package, `POWERQUERY_FOLDER_UNFILTERED`,
 `MEASURE_DUPLICATE_EXPRESSION`, `POWERQUERY_LOCAL_SERVER`, `RELATIONSHIP_TEXT_KEY`.
 The case study's statically detectable backlog is now exhausted. Then: agreed to
 add a good-practice twin case study and detailed Power BI build instructions (done).
+Then: "reinitiate everything necessary, such as MariaDB" (nothing needed: the
+`MariaDB` service runs automatically, `aw_ops`/`aw_dw` persist, regenerated sources
+match `USBL\AWCase`/`USBL\AWGood` in content) and "proceed with suggestion nr. 1"
+(usage-aware M lineage, done).
 
 ## Implemented work in the current tree
 
@@ -150,7 +154,8 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| AW Good scoring | Latest change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
+| Usage-aware lineage | Latest change: `POWERQUERY_COLUMN_LINEAGE` edges let upstream columns follow the downstream column's status. Details below. |
+| AW Good scoring | Previous change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
 | Real-export fixes | Previous change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
 | Good twin | Previous change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
 | Text keys | Previous change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
@@ -171,7 +176,50 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: AW Good scoring (2026-10-01)
+## Latest change: usage-aware M lineage (2026-10-01)
+
+- Problem: complete M lineage evaluated the demand of *all* output columns, so every
+  append-input column feeding the combined table got manual review regardless of
+  use (37 columns in AW Mess: `Sales 2020`/`sales_2021`/`sales_2022`, `Returns 20xx`).
+- `parsers/m_lineage.py`: `parse_column_lineage` returns a `ColumnLineage` (parsed
+  root) whose `demands(output)` evaluates any output demand; `infer_column_demands`
+  is a wrapper (unchanged results). `ColumnDemand.feeds(name)` = flows into the
+  demanded output, ignoring `required`. Precision for single outputs: an added
+  column flows from its generator reads; an expanded alias flows from its inner field
+  only (all expanded names stay `required`, so all-output acceptance is unchanged).
+- `parsers/powerquery.py` stores `lineages[owner]` when every partition is supported.
+- `build_graph._output_demands` evaluates each loaded (non-calculated) owner column by
+  its `sourceColumn`; `None` (fallback to the old all-output evidence) when any loaded
+  column lacks `sourceColumn` or an evaluation fails. Per upstream column: a
+  `POWERQUERY_COLUMN_LINEAGE` edge (owner column -> upstream column, high) for each
+  output it feeds; `POWERQUERY_COLUMN_DEPENDENCY` "(required by an M step)" if in the
+  requirements; else, if it feeds no loaded column, `POWERQUERY_COLUMN_DEPENDENCY`
+  "(flows into a query output with no matching model column)". Duplicate
+  `(owner, upstream)` evidence per partition is now emitted once.
+- `classify`: Used propagates along lineage edges; `_review_through_lineage` then
+  passes manual review source -> target (only Likely unused targets change).
+  Lineage edges are not in `MANUAL_REVIEW`; an unused source gives no protection.
+- Comparison with the previous commit (all 41 scenarios + 3 real projects; helper
+  scripts dump `analyze_project` statuses to JSON and diff, HEAD run from a temporary
+  `git worktree` outside OneDrive): only manual review -> Used/Likely unused.
+  Scenarios 10, 12–17: 13 columns -> Used (each feeds a used output; requirement-only
+  columns such as join keys, filter reads, conversions stay review); expectations
+  updated. AW Mess: 37 -> 24 Used + 13 Likely unused, all matching the independent
+  ground truth; now 65 Used / 2 review / 111 Likely unused. AdventureWorks and AW Good
+  unchanged. Scenario 41 `41_m_usage_aware_lineage` (failed with 19 failures on the old
+  analyzer); `tests/test_m_usage_lineage.py`.
+- Performance: large-model benchmark unchanged (0.32 s); a 20-input x 300-column
+  append analyzes in 0.75 s.
+- Limits: filter reads and join keys are requirements, not flows (so they stay review
+  even when the output is Used); flat joins attribute an output name to both sides;
+  shared expressions (load-disabled queries) are still not graph nodes, so lineage
+  through them is not followed.
+- OneDrive caution: `git worktree remove` can fail on the read-only
+  `.git/worktrees/<name>` folder; clear attributes (PowerShell
+  `$_.Attributes = 'Normal'`), delete it, then `git worktree prune`. Prefer worktrees
+  under `%TEMP%`.
+
+## Previous change: AW Good scoring (2026-10-01)
 
 - Same method as AW Mess (independent ground-truth subagent; it also verified the
   nine look-alikes). Analyzer and ground truth agree on all 40 objects (Used) and on
@@ -210,9 +258,8 @@ add a good-practice twin case study and detailed Power BI build instructions (do
      pinned link-as-use); AdventureWorks (auto-date off) and all scenarios unchanged.
   4. `util.clean_name` no longer strips whitespace inside quotes; `norm` trims for
      matching keys. Display names such as `' Country'` are preserved (AGENTS.md).
-- Not changed (candidate feature): "usage-aware" M lineage that maps a combined
-  table's column status back to append inputs; it would resolve all 35 append-input
-  manual reviews in AW Mess. Changes core semantics; design it deliberately.
+- Not changed then: mapping the combined table's column status back to append
+  inputs (37 reviews). Implemented next as usage-aware M lineage (see above).
 
 ## Previous change: good-twin case study and build guide (2026-10-01)
 
@@ -653,15 +700,11 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Both case studies are built and scored; nothing waits on the user. Candidate next
-steps (ask the user which):
-1. Usage-aware M lineage through appends: map a combined table's column status back
-   to the append inputs (`Table.Combine` of queries) so that, e.g., `sales_2021[ProductKey]`
-   becomes Used when `Sales[ProductKey]` is Used and Likely unused when the combined
-   column is unused with no other evidence. Resolves 35 conservative reviews in AW
-   Mess. Changes core semantics: design carefully (renames/types/projections inside
-   the inputs, other consumers of the inputs, partial lineage) and keep failure
-   conservative.
+Both case studies are built and scored, and usage-aware lineage is done; nothing
+waits on the user. Candidate next steps (ask the user which):
+1. Lineage through shared expressions (load-disabled queries are not graph nodes)
+   and through currently unsupported steps seen in real exports (e.g. the folder
+   combine's `Table.ExpandTableColumn(..., Table.ColumnNames(...))`).
 2. Verify the PBIR auto-date variation shape on a real file (neither case study used
    an auto-date hierarchy in a visual).
 3. More real PBIP projects (Forvaltningskunder when available).
@@ -692,6 +735,10 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
+- Windows, Python 3.14, 2026-10-01 after usage-aware lineage: 231 tests OK with all
+  three real-project variables set (2 skipped: timing, symlink privilege); 344
+  synthetic checks pass across 41 scenarios; compilation, fixture drift and
+  `git diff --check` pass; benchmark 0.32 s.
 - Windows, Python 3.14, 2026-10-01 after AW Good scoring: 222 tests OK with
   `PBI_AW_PROJECT`, `PBI_AW_MESS_PROJECT` and `PBI_AW_GOOD_PROJECT` set (all three
   real projects pass); 2 skipped

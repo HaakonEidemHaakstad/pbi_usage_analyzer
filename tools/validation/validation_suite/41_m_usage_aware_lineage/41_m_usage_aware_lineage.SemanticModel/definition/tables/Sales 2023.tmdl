@@ -1,0 +1,15 @@
+table 'Sales 2023'
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Note
+        sourceColumn: Note
+    column Code
+        sourceColumn: Code
+    column Legacy
+        sourceColumn: Legacy
+
+    partition 'Sales 2023' = m
+        mode: import
+        source = #table({"Amount", "Region", "Note", "Code", "Legacy"}, {})

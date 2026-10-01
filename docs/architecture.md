@@ -35,6 +35,7 @@ Edges/evidence currently include:
 - CALCULATION_GROUP_DEPENDENCY
 - POWERQUERY_QUERY_DEPENDENCY
 - POWERQUERY_COLUMN_DEPENDENCY (bounded M lineage and auto-date projections)
+- POWERQUERY_COLUMN_LINEAGE (downstream column -> upstream column it is loaded from)
 - FALLBACK_MATCH
 - INTERNAL_OBJECT
 
@@ -68,9 +69,9 @@ For example:
     Ledger
       -> Ledger 2024
 
-If this edge is proven from the M partition source, columns in `Ledger 2024` are protected as `Needs manual review` unless stronger evidence exists.
+If this edge is proven from the M partition source but column lineage is not, columns in `Ledger 2024` are protected as `Needs manual review` unless stronger evidence exists.
 
-This is deliberately conservative because query-level lineage does not prove every upstream column is propagated.
+This is deliberately conservative because query-level lineage does not prove every upstream column is propagated. When column lineage is proven, usage-aware lineage (below) replaces it.
 
 ### Bounded M column lineage
 
@@ -153,6 +154,27 @@ later steps discard those columns. Requirements are unioned across repeated
 inputs and partitions. No source schema is assumed complete. Graph construction
 maps source names through `sourceColumn`, then emits
 `POWERQUERY_COLUMN_DEPENDENCY` evidence with manual-review semantics.
+
+### Usage-aware lineage
+
+`parse_column_lineage` returns a `ColumnLineage` that keeps the parsed expression,
+so source demands can be evaluated for any output demand: all outputs (above) or a
+single output column. `build_graph` evaluates each loaded (non-calculated) column of
+the owner by its `sourceColumn` and adds a `POWERQUERY_COLUMN_LINEAGE` edge from it
+to every upstream column that can flow into it (`ColumnDemand.feeds`, which ignores
+schema requirements). The classifier propagates Used along these edges like DAX
+edges, then passes manual review from source to target; an unused source gives the
+target nothing. Evidence path example:
+
+    Visual -> Sales[Amount] -> Power Query append -> Sales 2023[Amount]
+
+Upstream columns in the schema requirements still get `POWERQUERY_COLUMN_DEPENDENCY`
+(manual review), because removing them breaks refresh regardless of use. So do
+upstream columns that would flow into an output no model column loads (stale
+metadata), and, when any loaded column lacks `sourceColumn` or a single-output
+evaluation fails, every column the all-output demand accepts. Added columns flow
+from their generator reads; an expanded alias flows from its inner field only.
+Filter reads and join keys are requirements, not flows.
 
 Every M partition must be supported before an ordinary query's blanket column
 protection is narrowed. Unsupported syntax, unresolved references, cycles, and

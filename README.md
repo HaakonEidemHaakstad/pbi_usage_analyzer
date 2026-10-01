@@ -151,8 +151,16 @@ partitions are combined.
 Supported expressions narrow upstream protection to output columns and columns
 required by the transformation's schema. For example, default `RemoveColumns`
 still requires the removed column to exist; `MissingField.Ignore` allows it to be
-absent. Column-level evidence remains **Needs manual review**, not proven active
-use. Source names are resolved through TMDL `sourceColumn` metadata.
+absent. Source names are resolved through TMDL `sourceColumn` metadata.
+
+Lineage is usage-aware: each loaded column of the downstream query passes its
+status to the upstream columns it is loaded from. In `Sales = Table.Combine({Sales
+2023, Sales 2024})`, `Sales 2023[Amount]` is **Used** when `Sales[Amount]` is Used,
+**Needs manual review** when `Sales[Amount]` is, and gets no protection from the
+append when `Sales[Amount]` is unused. Columns an M step needs by name (type
+conversions, filters, join keys, default select/remove/rename inputs) stay **Needs
+manual review**, as do upstream columns that flow into an output with no matching
+model column, and every upstream column when a loaded column has no `sourceColumn`.
 
 If any partition uses unsupported syntax, ordinary queries retain conservative
 query-level protection. Internal auto-date queries retain their separate bounded
@@ -461,9 +469,9 @@ results. Synthetic validation does not establish real-project accuracy.
 ## Next planned improvement
 
 Both AdventureWorks case studies are built and scored (no object the report needs
-is Likely unused in either; the good twin produces no findings). Next: usage-aware
-M lineage through appends, validation on more real projects, and planning a thin
-desktop GUI over `analyze_project()`.
+is Likely unused in either; the good twin produces no findings). Usage-aware M lineage
+then resolved all 37 append-input manual reviews in the mess case. Next: validation
+on more real projects and planning a thin desktop GUI over `analyze_project()`.
 
 ## Case studies: AdventureWorks, mess and good twin
 

@@ -1,0 +1,7 @@
+table Budget
+    column Note
+        sourceColumn: Note
+
+    partition Budget = m
+        mode: import
+        source = Table.SelectColumns(#"Sales 2023", {"Note"})
