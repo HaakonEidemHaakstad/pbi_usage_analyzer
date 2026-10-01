@@ -116,7 +116,12 @@ Windows machine state (verified 2026-10-01):
   hierarchy used in the report). Result and bugs: docs/CASE_STUDY_ADVENTUREWORKS.md
   "Scored result". Expectations: `tests/integration/aw_mess_expected.json`, run with
   `$env:PBI_AW_MESS_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess"`.
-  AW Good is not built yet.
+- **AW Good is built and scored** (2026-10-01): `USBL\AWProjects\Good\AW Good.pbip`
+  (`_Measures` because `Measures` is reserved; parameters load-disabled; Norwegian
+  helper names). 40/40 objects agree with the independent ground truth (all Used),
+  no health findings, all nine look-alikes genuine and silent. Result:
+  docs/CASE_STUDY_GOOD_TWIN.md "Scored result". Expectations:
+  `tests/integration/aw_good_expected.json`, env var `PBI_AW_GOOD_PROJECT`.
 
 Latest user requests (2026-10-01, Windows): familiarize and keep this handoff
 current; use `..\AW` as dummy data; commits and pushes are now allowed (AGENTS.md);
@@ -145,7 +150,8 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Real-export fixes | Latest change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
+| AW Good scoring | Latest change: specificity confirmed; raw safety net no longer lets one whole value count as both table and field. Details below. |
+| Real-export fixes | Previous change: AW Mess scoring; field-parameter `groupByColumn`, many-to-many defaults, auto-date links, display-name whitespace. Details below. |
 | Good twin | Previous change: `tools/casestudy/adventureworks_good.py`, docs/CASE_STUDY_GOOD_TWIN.md, docs/CASE_STUDY_BUILD_GUIDE.md. Details below. |
 | Text keys | Previous change: `RELATIONSHIP_TEXT_KEY`; registry entries now name multiple inputs. Details below. |
 | Local servers | Previous change: `LOCAL_SERVER` pattern and `POWERQUERY_LOCAL_SERVER` in `health/rules.py`. Details below. |
@@ -165,7 +171,25 @@ add a good-practice twin case study and detailed Power BI build instructions (do
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: AW Mess scoring and real-export fixes (2026-10-01)
+## Latest change: AW Good scoring (2026-10-01)
+
+- Same method as AW Mess (independent ground-truth subagent; it also verified the
+  nine look-alikes). Analyzer and ground truth agree on all 40 objects (Used) and on
+  zero health findings; no diagnostics.
+- One issue: `parsers/pbir._readable_hit_files` gave `Date[Date]` raw manual-review
+  evidence because `"Entity": "Date"` satisfied both the field and the table
+  whole-value condition. Now a field named like its table needs a qualified form,
+  `Table.Field` or bracketed `[Field]`. Unit test
+  `test_field_named_like_its_table`; no status changed in any scenario or real project.
+- `tests/test_integration_case_studies.py` gained `AwGoodCaseStudyTests`
+  (`PBI_AW_GOOD_PROJECT`); the expectation file asserts all-Used and no findings, so
+  any future false positive on this model fails it.
+- Helper scripts used for scoring (not in the repo, recreate as needed): dump
+  `analyze_project` statuses/evidence/health to JSON; compare with the ground-truth
+  JSON per object; generate `tests/integration/<name>_expected.json` asserting that
+  every difference is a conservative manual review with a note.
+
+## Previous change: AW Mess scoring and real-export fixes (2026-10-01)
 
 - Method as for AdventureWorks: independent ground-truth subagent (no analyzer
   access) vs `analyze_project`; every difference investigated. Final: 0 false
@@ -629,23 +653,22 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-AW Mess is scored (see "Latest change"). Waiting on the user: build AW Good per
-docs/CASE_STUDY_BUILD_GUIDE.md Part C into
-`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`, and say when done. Then, as
-for AW Mess (reuse the approach: temp scripts that dump analyzer output and compare
-with the ground-truth JSON; add a `PBI_AW_GOOD_PROJECT` class to
-`tests/test_integration_case_studies.py`): check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
-independently (subagent without analyzer output), run the analyzer, record
-expectations like `tests/integration/adventureworks_expected.json` (optional env
-var tests), and investigate every difference. For the good twin, any
-`Likely unused` on a used object or any health finding on a look-alike is a
-false-positive bug: reduce it to a synthetic fixture first. Engineering candidates
-meanwhile: the answer key's statically detectable rows are all covered. Remaining
-gaps need data access (encoding, totals rows, folder duplicates) or name
-heuristics (`stg_*` staging). Recommended next engineering step: GUI planning
-(thin desktop front end over `analyze_project()`; see AGENTS.md "Future GUI
-requirement"), or broader validation on more real PBIP projects. GUI: none exists; thin desktop
-front end over `analyze_project()` after more validation.
+Both case studies are built and scored; nothing waits on the user. Candidate next
+steps (ask the user which):
+1. Usage-aware M lineage through appends: map a combined table's column status back
+   to the append inputs (`Table.Combine` of queries) so that, e.g., `sales_2021[ProductKey]`
+   becomes Used when `Sales[ProductKey]` is Used and Likely unused when the combined
+   column is unused with no other evidence. Resolves 35 conservative reviews in AW
+   Mess. Changes core semantics: design carefully (renames/types/projections inside
+   the inputs, other consumers of the inputs, partial lineage) and keep failure
+   conservative.
+2. Verify the PBIR auto-date variation shape on a real file (neither case study used
+   an auto-date hierarchy in a visual).
+3. More real PBIP projects (Forvaltningskunder when available).
+4. GUI planning: thin desktop front end over `analyze_project()` (AGENTS.md "Future
+   GUI requirement"); write a design document before code.
+Remaining answer-key gaps need data access (encoding, totals rows, folder
+duplicates) or name heuristics (`stg_*` staging).
 
 ## Verification and environment
 
@@ -669,8 +692,9 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- Windows, Python 3.14, 2026-10-01 after the AW Mess fixes: 220 tests OK with
-  `PBI_AW_PROJECT` and `PBI_AW_MESS_PROJECT` set (both real projects pass); 2 skipped
+- Windows, Python 3.14, 2026-10-01 after AW Good scoring: 222 tests OK with
+  `PBI_AW_PROJECT`, `PBI_AW_MESS_PROJECT` and `PBI_AW_GOOD_PROJECT` set (all three
+  real projects pass); 2 skipped
   (opt-in timing; symlink privilege). 318 synthetic checks pass across 40 scenarios. Compilation,
   fixture drift and `git diff --check` pass. Large-model benchmark 0.33 s.
 - Earlier (Ubuntu, 2026-09-30): 180 tests, 266 checks across 34 scenarios.

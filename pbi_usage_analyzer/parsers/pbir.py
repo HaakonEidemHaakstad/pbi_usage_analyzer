@@ -169,9 +169,13 @@ def _readable_hit_files(ref: ObjectRef, texts: dict[Path, ReportText]) -> list[P
     if not name:
         return []
     dotted = f"{table}.{name}"
+    # One whole value cannot be both the table and the field: `"Entity": "Date"`
+    # alone must not protect Date[Date] (seen in the AW Good case study).
+    same_name = name == table
     return [path for path, text in texts.items()
             if (table, name) in text.qualified or _dotted_occurs(text.blob, dotted)
-            or ((name in text.values or name in text.bracketed) and table in text.values)]
+            or (((name in text.values and not same_name) or name in text.bracketed)
+                and table in text.values)]
 
 
 def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef], measures: dict[tuple[str, str], ObjectRef], hierarchies: dict[tuple[str, str], ObjectRef]) -> ReportParseResult:

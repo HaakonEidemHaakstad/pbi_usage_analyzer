@@ -169,7 +169,9 @@ change against the project files.
 
 `tests/test_integration_case_studies.py` does the same for the hand-built case
 studies: `PBI_AW_MESS_PROJECT` (folder with `AW Mess.pbip`) against
-`tests/integration/aw_mess_expected.json`. Its `manual_review_notes` explain every
+`tests/integration/aw_mess_expected.json`, and `PBI_AW_GOOD_PROJECT` (folder with
+`AW Good.pbip`) against `tests/integration/aw_good_expected.json`, which expects
+every object Used and no health findings. Its `manual_review_notes` explain every
 status that differs from the independent ground truth.
 
 ## Performance check

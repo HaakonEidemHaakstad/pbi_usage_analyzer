@@ -72,6 +72,22 @@ class QualifiedFieldTextTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(_dotted_occurs(text, 'sales.amount'))
 
+    def test_field_named_like_its_table(self):
+        # AW Good: visuals name the Date table ("Entity": "Date") without using Date[Date].
+        from pbi_usage_analyzer.model import ObjectRef, ObjectType
+        from pbi_usage_analyzer.parsers.pbir import ReportText, _readable_hit_files
+        ref = ObjectRef(ObjectType.COLUMN, 'Date', 'Date')
+        texts = {
+            Path('entity_only'): ReportText.from_strings(['Date', 'Year'], ['Entity', 'Property']),
+            Path('dotted'): ReportText.from_strings(['Date.Date'], ['Name']),
+            Path('qualified'): ReportText.from_strings(["SUM('Date'[Date])"], ['Expression']),
+            Path('bracketed'): ReportText.from_strings(['Date', 'MAX([Date])'], ['Entity', 'Expression']),
+        }
+        self.assertEqual(_readable_hit_files(ref, texts), [Path('dotted'), Path('qualified'), Path('bracketed')])
+        other = ObjectRef(ObjectType.COLUMN, 'Sales', 'Date')      # different names still match whole values
+        self.assertEqual(_readable_hit_files(other, {Path('f'): ReportText.from_strings(['Sales', 'Date'], [])}),
+                         [Path('f')])
+
     def test_escaping_and_boundaries(self):
         from pbi_usage_analyzer.parsers.pbir import _qualified_field_refs
         self.assertEqual(_qualified_field_refs("sum('bob''s'[rate [%]]])"), {("bob's", 'rate [%]')})

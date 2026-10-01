@@ -105,6 +105,30 @@ named.
 | GP-08 | Measures-only table (no columns left) | — | No cleanup candidates or diagnostics from the empty table |
 | GP-09 | Auto date/time off; marked date table | — | No `LocalDateTable_*` objects at all |
 
+## Scored result (2026-10-01)
+
+Built by the user as `USBL\AWProjects\Good\AW Good.pbip` (deviations in its
+`NOTES.txt`: the measures table is `_Measures` because `Measures` is a reserved
+name; the parameters had to be load-disabled; Norwegian helper and ordinal names).
+An independent ground truth was derived from the raw files without analyzer code
+or output. Expectations: `tests/integration/aw_good_expected.json` (run with
+`PBI_AW_GOOD_PROJECT`).
+
+- **Cleanup:** all 40 objects Used in both the analyzer and the ground truth; no
+  manual reviews, no internal objects.
+- **Health:** no findings, matching the ground truth's metadata facts. All nine
+  look-alikes are genuinely implemented and stay silent, including the generated
+  `Eksempelfil` helper (filtered, `Source{0}`), `localhost` inside a parameter, and
+  measures that reference other measures.
+- **Analyzer issue found and fixed:** the raw report safety net matched `Date[Date]`
+  because a visual's `"Entity": "Date"` satisfied both the table and the field
+  condition. Harmless here (the column is Used), but in another model a column named
+  like its table would have been held for manual review by any visual using the
+  table. One whole value no longer counts as both.
+- The AW Mess fixes generalize: the field parameter's hidden `Metric Felt` column is
+  Used through `groupByColumn`, and the calculation group's ordinal column through
+  sort-by.
+
 ## Answer key (prediction)
 
 To be confirmed against the saved PBIP, as for the bad case.

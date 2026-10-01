@@ -41,5 +41,13 @@ class AwMessCaseStudyTests(CaseStudyMixin, unittest.TestCase):
     expected_file = 'aw_mess_expected.json'
 
 
+@unittest.skipUnless(os.environ.get('PBI_AW_GOOD_PROJECT'),
+                     'set PBI_AW_GOOD_PROJECT to run the AW Good case-study check')
+class AwGoodCaseStudyTests(CaseStudyMixin, unittest.TestCase):
+    """Specificity: a well-built model must stay all-Used with no health findings."""
+    env_var = 'PBI_AW_GOOD_PROJECT'
+    expected_file = 'aw_good_expected.json'
+
+
 if __name__ == '__main__':
     unittest.main()

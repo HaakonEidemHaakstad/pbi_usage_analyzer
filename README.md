@@ -460,9 +460,10 @@ results. Synthetic validation does not establish real-project accuracy.
 
 ## Next planned improvement
 
-Build both AdventureWorks case studies in Power BI Desktop, save them as PBIP and
-score the analyzer against them. Then validate on more real projects and plan a
-thin desktop GUI over `analyze_project()`.
+Both AdventureWorks case studies are built and scored (no object the report needs
+is Likely unused in either; the good twin produces no findings). Next: usage-aware
+M lineage through appends, validation on more real projects, and planning a thin
+desktop GUI over `analyze_project()`.
 
 ## Case studies: AdventureWorks, mess and good twin
 

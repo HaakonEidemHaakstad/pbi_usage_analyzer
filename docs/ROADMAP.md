@@ -158,6 +158,9 @@ data access or name heuristics.
 A good-practice twin (same data and report, built well; docs/CASE_STUDY_GOOD_TWIN.md)
 measures specificity: its answer key expects silence, including on look-alikes of
 bad practices. Both models have a click-by-click guide (docs/CASE_STUDY_BUILD_GUIDE.md).
-Next: build both case studies in Power BI Desktop and score the analyzer
-(sensitivity on the mess, specificity on the twin); then GUI planning over
-`analyze_project()`.
+Both case studies were built and scored on 2026-10-01 (optional integration
+tests). The mess found four real-export bugs (field-parameter groupByColumn,
+many-to-many defaults, auto-date links, display-name whitespace); the twin found
+one (raw-net same-name match) and otherwise no false positives.
+Next: usage-aware M lineage through appends (35 conservative reviews in the mess),
+more real projects, then GUI planning over `analyze_project()`.
