@@ -179,6 +179,11 @@
       "rule_id": "POWERQUERY_HARDCODED_PATH",
       "scope": "Sales Data 2020",
       "note": "CSV path in the author's OneDrive folder"
+    },
+    {
+      "rule_id": "POWERQUERY_ANNUAL_APPEND",
+      "scope": "Sales data",
+      "note": "Table.Combine of Sales Data 2020/2021/2022 (load-disabled shared expressions, so no POWERQUERY_APPEND_INPUT_LOADED)"
     }
   ]
 }

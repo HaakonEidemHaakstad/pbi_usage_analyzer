@@ -1,0 +1,23 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Used",
+    "Column|Sales 2022|Amount": "Needs manual review",
+    "Column|Lookup|Key": "Needs manual review",
+    "Column|Returns|Qty": "Used"
+  },
+  "notes": "Table.Combine health rules: a loaded table appended by a loaded table is imported twice (Sales 2022; sales_2023 is load-disabled); year-named append inputs are reported per appending query. Comments, strings, local steps (Returns' Lookup), nested calls and case-mismatched names (#\"sales 2022\") are not appends.",
+  "expected_health": [
+    {
+      "rule_id": "POWERQUERY_APPEND_INPUT_LOADED",
+      "scope": "Sales 2022"
+    },
+    {
+      "rule_id": "POWERQUERY_ANNUAL_APPEND",
+      "scope": "Returns"
+    },
+    {
+      "rule_id": "POWERQUERY_ANNUAL_APPEND",
+      "scope": "Sales"
+    }
+  ]
+}

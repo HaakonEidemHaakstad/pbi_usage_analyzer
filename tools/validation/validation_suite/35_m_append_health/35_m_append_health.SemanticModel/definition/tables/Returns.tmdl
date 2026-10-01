@@ -1,0 +1,11 @@
+table Returns
+    column Qty
+        sourceColumn: Qty
+    partition Returns = m
+        mode: import
+        source =
+                let
+                    Lookup = #table({"Qty"}, {{2}}),
+                    Combined = Table.Combine({Lookup, #"Returns 2024"})
+                in
+                    Combined

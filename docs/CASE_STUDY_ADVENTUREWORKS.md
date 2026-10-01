@@ -154,10 +154,10 @@ investigate every difference.
 
 | ID | Bad practice | Expected analyzer result | Status |
 | --- | --- | --- | --- |
-| BP-01 | Hard-coded annual appends across three different source types (`Sales`, `Returns`) | Append dependencies `Sales → Sales 2020 / sales_2021 / sales_2022`, `Returns → Returns 20xx`; per-year query columns are **Needs manual review**, not Likely unused | Detected as lineage; no "annual append" health rule yet |
+| BP-01 | Hard-coded annual appends across three different source types (`Sales`, `Returns`) | Append dependencies `Sales → Sales 2020 / sales_2021 / sales_2022`, `Returns → Returns 20xx`; per-year query columns are **Needs manual review**, not Likely unused | Detected as lineage; `POWERQUERY_ANNUAL_APPEND` (info) on `Sales` and `Returns`; `POWERQUERY_APPEND_INPUT_LOADED` (warning) for each loaded per-year query |
 | BP-02 | Folder combine includes a duplicate file (2020 counted twice) | Not visible statically without reading the folder | Not yet (a rule could flag `Folder.Files` without a file filter) |
 | BP-03 | Wide denormalized view imported in full | `v_sales_report` columns used only by the hidden page, the implicit card and `Revenue (view)` are Used; the rest **Likely unused** | Detected (cleanup) |
-| BP-04 | Staging and per-year queries loaded into the model | `stg_customers_raw` columns Likely unused; per-year sales/returns queries as BP-01 | Cleanup detected; no "staging loaded" rule yet |
+| BP-04 | Staging and per-year queries loaded into the model | `stg_customers_raw` columns Likely unused; per-year sales/returns queries as BP-01 | Cleanup detected; loaded per-year queries via `POWERQUERY_APPEND_INPUT_LOADED`; no rule for a loaded but unreferenced staging query (`stg_*` name heuristics not implemented) |
 | BP-05 | Duplicate/conflicting sources (`dim_product`, customers CSV, categories JSON, territories JSON) | Their columns **Likely unused** (no relationships or references) | Detected (cleanup) |
 | BP-06 | Relationship on a text key | Keys **Used** (relationship endpoints) | No text-key health rule yet |
 | BP-07 | Bidirectional relationships | `RELATIONSHIP_BIDIRECTIONAL` (warning) ×2 | Detected |

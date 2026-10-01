@@ -35,7 +35,10 @@ class FixtureDriftTests(unittest.TestCase):
             compare_fixtures(self.root / 'absent', self.generated)
 
     def test_symlinks_are_rejected(self):
-        (self.reference / 'link').symlink_to(self.generated, target_is_directory=True)
+        try:
+            (self.reference / 'link').symlink_to(self.generated, target_is_directory=True)
+        except OSError as exc:  # Windows without Developer Mode/admin cannot create symlinks
+            self.skipTest(f'symlink creation not permitted: {exc}')
         with self.assertRaises(ValueError):
             compare_fixtures(self.reference, self.generated)
 

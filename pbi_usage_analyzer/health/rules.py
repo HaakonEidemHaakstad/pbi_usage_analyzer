@@ -1,9 +1,10 @@
 from collections.abc import Iterable
+from pathlib import Path
 import re
 
 from ..model import ModelObject, ObjectType
 from ..parsers.dax import DaxIndex, unresolved_references
-from ..parsers.m_queries import MQuery, MQueryKind, m_string_literals
+from ..parsers.m_queries import MQuery, MQueryKind, appended_query_refs, m_string_literals
 from ..util import norm_key
 from ..util import is_internal_table
 from ..parsers.relationships import Relationship
@@ -165,5 +166,87 @@ def hardcoded_m_paths(queries: Iterable[MQuery]) -> list[HealthFinding]:
                            "models, prefer a shared location such as SharePoint or a database and plan "
                            "the gateway. A single-user file may accept the path, but record the decision.",
             source_file=query.source_file, line=paths[0][1],
+        ))
+    return findings
+
+
+def _appends(queries: tuple[MQuery, ...]) -> list[tuple[MQuery, MQuery, int]]:
+    """(appending query, appended query, file line of Table.Combine), first occurrence each."""
+    by_name = {query.name: query for query in queries if query.kind != MQueryKind.PARAMETER}
+    appends, seen = [], set()
+    for owner in queries:
+        if owner.kind == MQueryKind.PARAMETER:
+            continue
+        for name, line in appended_query_refs(owner.source):
+            appended = by_name.get(name)
+            if appended is None or appended.name == owner.name or (owner.name, name) in seen:
+                continue
+            seen.add((owner.name, name))
+            appends.append((owner, appended, owner.file_line(line)))
+    return appends
+
+
+def loaded_append_inputs(queries: Iterable[MQuery]) -> list[HealthFinding]:
+    appended_by: dict[str, list[tuple[MQuery, int]]] = {}
+    inputs: dict[str, MQuery] = {}
+    for owner, appended, line in _appends(tuple(queries)):
+        # TMDL keeps loaded queries as table partitions; load-disabled ones are expressions.
+        if owner.kind == MQueryKind.PARTITION and appended.kind == MQueryKind.PARTITION:
+            appended_by.setdefault(appended.name, []).append((owner, line))
+            inputs[appended.name] = appended
+    findings = []
+    for name, owners in appended_by.items():
+        query = inputs[name]
+        findings.append(HealthFinding(
+            rule_id="POWERQUERY_APPEND_INPUT_LOADED", category="power_query",
+            severity=HealthSeverity.WARNING, confidence="high", scope=name,
+            title="Disable load for queries that only feed an append",
+            explanation="This query is loaded as a model table and is also appended into another "
+                        "loaded table, so its rows are imported twice. That increases model size and "
+                        "refresh time, and report authors can use the partial table by mistake.",
+            evidence=(*(f"Appended by query '{owner.name}' (Table.Combine, {Path(owner.source_file).name} "
+                        f"line {line})" for owner, line in owners),
+                      f"'{name}' has an import partition, so it is loaded as a model table"),
+            recommendation="If nothing uses this table directly (check its cleanup statuses and the "
+                           "report), clear Enable load for the query in the Power Query editor; the "
+                           "append keeps working and the query becomes a shared expression. If reports "
+                           "use it, consider pointing them at the appended table instead.",
+            source_file=query.source_file, line=query.line,
+        ))
+    return findings
+
+
+YEAR = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
+
+
+def annual_appends(queries: Iterable[MQuery]) -> list[HealthFinding]:
+    yearly: dict[str, list[tuple[MQuery, int, str]]] = {}
+    owners: dict[str, MQuery] = {}
+    for owner, appended, line in _appends(tuple(queries)):
+        year = YEAR.search(appended.name)
+        if year:
+            yearly.setdefault(owner.name, []).append((appended, line, year.group()))
+            owners[owner.name] = owner
+    findings = []
+    for name, appended in yearly.items():
+        owner = owners[name]
+        years = sorted({year for _, _, year in appended})
+        findings.append(HealthFinding(
+            rule_id="POWERQUERY_ANNUAL_APPEND", category="power_query",
+            severity=HealthSeverity.INFO,
+            # One year-named input may be an archive beside a current query.
+            confidence="high" if len(years) > 1 else "medium", scope=name,
+            title="Replace the hard-coded yearly append with one parameterized source",
+            explanation="This query appends separate queries whose names contain years. Each new year "
+                        "then needs a new query and an edit to the append; a forgotten year silently "
+                        "leaves data out. Per-year queries also repeat the same transformation steps.",
+            evidence=tuple(f"Appends '{query.name}' (year {year}) at {Path(owner.source_file).name} line {line}"
+                           for query, line, year in appended),
+            recommendation="Where the yearly sources share a structure, load them through one query: "
+                           "a folder source filtered by file name, one database table or view with a "
+                           "date filter, or a custom function invoked per file. Consider incremental "
+                           "refresh for large history. Keep separate queries if the years genuinely "
+                           "differ in structure, and record that decision.",
+            source_file=owner.source_file, line=appended[0][1],
         ))
     return findings

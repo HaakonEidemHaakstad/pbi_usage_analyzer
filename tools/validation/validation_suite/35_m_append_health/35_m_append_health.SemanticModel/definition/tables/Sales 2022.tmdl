@@ -1,0 +1,10 @@
+table 'Sales 2022'
+    column Amount
+        sourceColumn: Amount
+    partition 'Sales 2022' = m
+        mode: import
+        source =
+                let
+                    Source = #table({"Amount"}, {{1}})
+                in
+                    Source

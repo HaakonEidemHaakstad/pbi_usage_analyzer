@@ -363,7 +363,9 @@ like measures, so findings and JSON exports locate calculated columns.
 partition / expression / parameter, source, file, per-line file numbers) from
 table partitions and `expressions.tmdl`, stored on the analysis context as
 `m_queries`. `m_string_literals` scans M text literals outside comments and quoted
-identifiers. `POWERQUERY_HARDCODED_PATH` consumes these; dependency extraction
+identifiers. `appended_query_refs` returns bare query identifiers in `Table.Combine({...})`
+lists (comment/string-masked, local `let` names excluded). `POWERQUERY_HARDCODED_PATH`,
+`POWERQUERY_APPEND_INPUT_LOADED` and `POWERQUERY_ANNUAL_APPEND` consume these; dependency extraction
 still uses its own partition reader, and shared expressions are not graph nodes.
 
 ### Health finding filters

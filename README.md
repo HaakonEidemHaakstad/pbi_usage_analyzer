@@ -261,6 +261,15 @@ and calling out user-profile or OneDrive folders. Table partitions and shared
 queries in `expressions.tmdl` are checked; parameter queries, comments and
 `#"quoted identifiers"` are not. URLs and database server names are not checked.
 
+`POWERQUERY_APPEND_INPUT_LOADED` warns when a loaded table is appended
+(`Table.Combine`) into another loaded table, so its rows are imported twice; the
+usual fix is to clear *Enable load* on the input query. Load-disabled queries
+(shared expressions) are not reported. `POWERQUERY_ANNUAL_APPEND` (info) reports
+an append whose input query names contain years, such as `Sales 2021` and
+`Sales 2022`: high confidence for two or more distinct years, medium for one.
+Only list items that name another query directly count; local steps, nested
+calls, comments and strings do not.
+
 ## Filtering model-health findings
 
 ```bash

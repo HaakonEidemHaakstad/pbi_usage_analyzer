@@ -120,6 +120,103 @@ def collect_m_queries(model_folder: Path) -> list[MQuery]:
     return queries
 
 
+COMBINE_CALL = re.compile(r'(?<![\w.#"])Table\.Combine\s*\(\s*\{')
+QUOTED_IDENTIFIER = re.compile(r'#"((?:[^"]|"")*)"')
+SIMPLE_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# Names bound with `name =` (let steps, record fields; `if a = b` over-collects,
+# which only hides references). Field access `[name]` is excluded.
+BOUND_NAME = re.compile(r'(?:(?<![\w.#\["])#"((?:[^"]|"")*)"|(?<![\w.#"\[])([A-Za-z_]\w*))\s*=(?![=>])')
+
+
+def _mask_m(source: str) -> str:
+    """Blank comments and text literals (same offsets/newlines); keep `#"..."` names."""
+    out = list(source)
+    i = 0
+    while i < len(source):
+        if source.startswith("//", i):
+            end = source.find("\n", i)
+            end = len(source) if end < 0 else end
+        elif source.startswith("/*", i):
+            end = source.find("*/", i + 2)
+            end = len(source) if end < 0 else end + 2
+        elif source[i] == '"' or source.startswith('#"', i):
+            identifier = source[i] == "#"
+            end = i + (2 if identifier else 1)
+            while end < len(source):
+                if source.startswith('""', end):
+                    end += 2
+                elif source[end] == '"':
+                    end += 1
+                    break
+                else:
+                    end += 1
+            if identifier:
+                i = end
+                continue
+        else:
+            i += 1
+            continue
+        for j in range(i, end):
+            if out[j] != "\n":
+                out[j] = " "
+        i = end
+    return "".join(out)
+
+
+def _list_items(masked: str, start: int) -> list[str] | None:
+    """Top-level items of the `{...}` list whose contents start at ``start``."""
+    items, depth, i, item_start = [], 0, start, start
+    while i < len(masked):
+        if masked.startswith('#"', i):
+            match = QUOTED_IDENTIFIER.match(masked, i)
+            i = match.end() if match else len(masked)
+            continue
+        char = masked[i]
+        if char in "([{":
+            depth += 1
+        elif char in ")]}":
+            if depth == 0:
+                if char != "}":
+                    return None
+                items.append(masked[item_start:i].strip())
+                return [item for item in items if item]
+            depth -= 1
+        elif char == "," and depth == 0:
+            items.append(masked[item_start:i].strip())
+            item_start = i + 1
+        i += 1
+    return None
+
+
+def appended_query_refs(source: str) -> list[tuple[str, int]]:
+    """Names appended by `Table.Combine({...})` as (name, 1-based line within source).
+
+    Only list items that are a bare identifier naming no local binding are
+    returned; other expressions (steps, function calls) are not references.
+    Callers must still check the name against known queries (M is case-sensitive).
+    """
+    masked = _mask_m(source)
+    local = {match.group(1).replace('""', '"') if match.group(1) is not None else match.group(2)
+             for match in BOUND_NAME.finditer(masked)}
+    refs: list[tuple[str, int]] = []
+    for call in COMBINE_CALL.finditer(masked):
+        items = _list_items(masked, call.end())
+        if items is None:
+            continue
+        line = masked.count("\n", 0, call.start()) + 1
+        for item in items:
+            quoted = QUOTED_IDENTIFIER.fullmatch(item)
+            if quoted:
+                name = quoted.group(1).replace('""', '"')
+            elif SIMPLE_IDENTIFIER.fullmatch(item):
+                name = item
+            else:
+                continue
+            if name not in local:
+                refs.append((name, line))
+    return refs
+
+
 def m_string_literals(source: str) -> list[tuple[str, int]]:
     """M text literals as (value, 1-based line within source), skipping comments.
 

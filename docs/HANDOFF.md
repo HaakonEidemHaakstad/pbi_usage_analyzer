@@ -1,6 +1,6 @@
 # Agent handoff — current working state
 
-Last updated: 2026-09-30. This file is intended to let a new agent continue without
+Last updated: 2026-10-01. This file is intended to let a new agent continue without
 chat history. Treat source files and a fresh `git status` as authoritative if this
 snapshot becomes stale. Update this handoff after material changes.
 
@@ -10,9 +10,9 @@ snapshot becomes stale. Update this handoff after material changes.
    [roadmap](ROADMAP.md), [development](DEVELOPMENT.md), and [Ubuntu setup](UBUNTU_SETUP.md).
 2. Read [format coverage](FORMAT_COVERAGE.md) before making support claims.
 3. Inspect `git status --short` and the relevant source/tests before editing.
-4. Preserve the existing working tree. Substantial implemented work is uncommitted
-   and many essential files are untracked. Do not reset, clean, or reconstruct the
-   project from HEAD. A plain `git diff` omits untracked files.
+4. Preserve the existing working tree. Work may be uncommitted or untracked
+   (`git status` shows it). Do not reset, clean, or reconstruct the project from
+   HEAD. A plain `git diff` omits untracked files.
 5. Run the verification commands below when continuing implementation.
 
 The product is a supervised engineering alpha: a deterministic Power BI PBIP/PBIR
@@ -23,18 +23,19 @@ service is implemented. Correctness and evidence-based conservatism take priorit
 
 ## Repository and publication state
 
-- GitHub: `HaakonEidemHaakstad/pbi_usage_analyzer` (private), branch `main`. As of
-  2026-10-01 everything is committed and pushed; local `main` equals `origin/main`.
-  Run `git log -1` and `gh run list --limit 3` to see the current state.
+- GitHub: `HaakonEidemHaakstad/pbi_usage_analyzer` (private), branch `main`. The
+  append health rules and the commit-policy change were committed and pushed on
+  2026-10-01 from the Windows machine. Run `git log -1` and `gh run list --limit 3`
+  to see the current state.
 - CI ("Analyzer checks") has two jobs: Python 3.12 / Ubuntu and Python 3.12 /
-  Windows. Both passed on `ee82b5b` (run 36826537862).
+  Windows. Both passed on `ee82b5b` (run 36826537862); check the latest run.
 - History note: on 2026-09-30 the local history was rebased onto the remote by
   `git reset --soft` (identical trees, different commit IDs from earlier
   connector-based publication). The old local history exists only as the unpushed
   branch `local-history-backup` on the Ubuntu machine; nothing needs it.
-- Follow AGENTS.md: do not commit or push without explicit user instructions. The
-  user authorized committing/pushing on 2026-09-30 ("feel free to commit and push
-  at your leisure"); treat that as covering routine completed work in this sequence.
+- Commit policy (AGENTS.md, "Agentic development workflow", changed 2026-10-01 at
+  the user's request): agents may commit and push completed, verified work to
+  `origin/main` without asking; no history rewrites without explicit instruction.
 
 ## Continuing on Windows (from 2026-10-01)
 
@@ -62,10 +63,21 @@ Not on GitHub (local to the Ubuntu machine, by design):
 - The optional MariaDB/Docker integration environment was never started (Docker
   is not installed on the Ubuntu machine).
 
-Latest user request (2026-10-01): confirm the project is up to date on GitHub and
-ready for handoff, because work continues on a Windows computer. Windows support
-was then verified in CI (see "Latest change"). When asked to proceed, use the
-next-work section.
+Windows machine state (verified 2026-10-01):
+
+- Clone: `C:\Users\hehaa\OneDrive\Desktop\USBL\pbi_usage_analyzer` (inside OneDrive).
+  Only Python 3.14 is installed (`py -0`); `.venv` was created from it with
+  `scripts/bootstrap.ps1`. CI still uses 3.12; both pass.
+- AdventureWorks PBIP: `C:\Users\hehaa\OneDrive\Desktop\USBL\AW` (raw data under
+  `AdventureWorks+Raw+Data\AdventureWorks Raw Data`). Run the integration test with
+  `$env:PBI_AW_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW"`; it passes.
+- No `make`; Docker not checked. Symlinks need Developer Mode/admin, so
+  `test_symlinks_are_rejected` now skips when the OS refuses (CI still runs it).
+- The case-study package has not been generated on this machine yet.
+
+Latest user request (2026-10-01, Windows): familiarize, keep this handoff current,
+use `..\AW` as dummy data, and proceed with the next step. Done: Windows
+verification and the append health rules (see "Latest change").
 
 ## Implemented work in the current tree
 
@@ -75,7 +87,7 @@ next-work section.
 | Auto-date | Internal objects excluded from business totals and cleanup candidates. Only resolved backing columns receive internal-query protection; no blanket upstream-table protection. See `tests/test_autodate.py` and scenario 08. |
 | Application API | `api.py`: `analyze_project(path, *, health_rule_ids=None, health_severities=None)`. No terminal output or report writes. Returns project paths, graph, cleanup findings, diagnostics, summaries, selected health findings and filter scope. CLI and synthetic validator share this entry point. |
 | Diagnostics | `diagnostics.py` provides stable codes, severity, message, source file, optional location/object reference. Parser/context `warnings` is a derived compatibility list; append to `diagnostics`, not `warnings`. |
-| Health rules | `health/engine.py` registry: `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `MEASURE_DESCRIPTION_MISSING`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
+| Health rules | `health/engine.py` registry: `RELATIONSHIP_BIDIRECTIONAL`, `RELATIONSHIP_MANY_TO_MANY`, `MEASURE_DESCRIPTION_MISSING`, `DAX_REFERENCE_UNRESOLVED`, `POWERQUERY_HARDCODED_PATH`, `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`. Advisory findings remain separate from cleanup. Description opportunities have `info` severity; relationship findings have `warning` severity. |
 | Relationships | Structured records in `parsers/relationships.py` shared by graph and rules. Adjacent declarations no longer lose endpoint evidence. Cardinalities are explicit-only for health detection. |
 | Descriptions | `ModelObject.description` is empty for absent/blank parsed descriptions, `None` when unknown/not parsed. Adjacent TMDL `///` descriptions are read for measures. Internal measures excluded from documentation rule. |
 | Health selection | `health/filtering.py`: exact IDs/severities, OR within each selection and AND between selections. `None` is unrestricted; empty iterable selects none. Unknown values fail before project I/O. `HealthFilterScope` records canonical selections and before/after counts. |
@@ -85,7 +97,8 @@ next-work section.
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Windows readiness | Latest change: `.gitattributes`, LF fixture generation, explicit UTF-8, Windows CI job. Details below. |
+| Append rules | Latest change: `appended_query_refs` in `parsers/m_queries.py`; `POWERQUERY_APPEND_INPUT_LOADED`, `POWERQUERY_ANNUAL_APPEND`. Details below. |
+| Windows readiness | Previous change: `.gitattributes`, LF fixture generation, explicit UTF-8, Windows CI job. Details below. |
 | M path rule | Previous change: `parsers/m_queries.py` and `POWERQUERY_HARDCODED_PATH`. Details below. |
 | DAX health rule | Previous change: `DAX_REFERENCE_UNRESOLVED`. Details below. |
 | Case study | Previous change: multi-source bad-practice package generator and build guide. Details below. |
@@ -98,7 +111,32 @@ next-work section.
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: Windows readiness
+## Latest change: append health rules (2026-10-01)
+
+- `parsers/m_queries.py`: `appended_query_refs(source)` masks comments/text literals
+  (keeps `#"..."`), finds `Table.Combine({...})`, splits top-level list items and
+  returns bare identifiers (decoded `#"..."` or simple names) with source lines,
+  excluding names bound by `name =` anywhere in the query (over-collection only
+  hides references). Callers match exact query names (M is case-sensitive).
+- `health/rules.py`: `_appends` resolves refs against collected `MQuery` names
+  (parameters excluded, no self-reference). `POWERQUERY_APPEND_INPUT_LOADED`
+  (warning, high): table partition appended by a table partition; TMDL keeps
+  load-disabled queries as shared expressions, so partition = loaded. Scope is the
+  input query, line its first M line; evidence lists every appending query and line.
+  `POWERQUERY_ANNUAL_APPEND` (info): per appending query with year-named (19xx/20xx)
+  inputs; high confidence for 2+ distinct years, medium for one (`Hovedbok` +
+  `Hovedbok 2024` pattern).
+- AdventureWorks: one new finding, `POWERQUERY_ANNUAL_APPEND` on `Sales data` (line
+  130 verified); its yearly queries are shared expressions, so no loaded-input
+  finding. Added to `tests/integration/adventureworks_expected.json`.
+- Synthetic: scenario 35 `35_m_append_health` (comment/string/local-step/nested/
+  case-mismatch traps, load-disabled input). Scenario 06 now also yields
+  `POWERQUERY_APPEND_INPUT_LOADED` for `Archive` (it has no `expected_health`, so
+  not pinned). No cleanup status changed anywhere; rules do not affect statuses.
+- Not detected: appends via an intermediate step, list-building expressions,
+  transitive loading through expressions, loaded staging queries nothing appends.
+
+## Previous change: Windows readiness
 
 - `.gitattributes`: `* text=auto eol=lf`; `tools/validation/validation_suite/** -text`
   (byte-compared by `check_fixture_drift.py`; scenario 34 contains a deliberate CRLF
@@ -402,13 +440,14 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 
 ## Next planned implementation
 
-Waiting on the user: build the case study in Power BI Desktop (Windows PC) and
-return the PBIP. Then score it (independent ground truth vs analyzer; record
-expectations like `tests/integration/adventureworks_expected.json`). Engineering
-candidates meanwhile, from the answer key's "Not yet" rows. Next: loaded staging/per-year
-queries (shared expressions are now collected, see `m_queries`), hard-coded annual appends,
-text-key relationships, duplicate measures, `Folder.Files` without a filter. GUI: none
-exists; thin desktop front end over `analyze_project()` after more validation.
+Waiting on the user: build the case study in Power BI Desktop (this Windows PC can
+now do it: generate the package with `tools\casestudy\adventureworks_mess.py` from the
+AW raw data folder) and return the PBIP. Then score it (independent ground truth vs
+analyzer; record expectations like `tests/integration/adventureworks_expected.json`).
+Engineering candidates meanwhile, from the answer key's "Not yet" rows. Next:
+`Folder.Files` without a file filter (BP-02), duplicate measures (BP-17), text-key
+relationships, database server literals in M (BP-11). GUI: none exists; thin desktop
+front end over `analyze_project()` after more validation.
 
 ## Verification and environment
 
@@ -432,10 +471,11 @@ make validate-json EXPORT="/path/to/analysis.json"
 
 Latest completed implementation checks:
 
-- 180 unit/regression tests passed, 2 opt-in tests skipped (timing; AdventureWorks,
-  which passes with `PBI_AW_PROJECT` set) (2026-09-30, after the M path rule).
-- 266 synthetic checks passed across 34 scenarios, including JSON schema and
-  export consistency validation.
+- Windows, Python 3.14, 2026-10-01 after the append rules: 191 tests OK with
+  `PBI_AW_PROJECT` set (AdventureWorks passes); 2 skipped (opt-in timing; symlink
+  privilege). 273 synthetic checks pass across 35 scenarios. Compilation, fixture
+  drift and `git diff --check` pass. Large-model benchmark 0.33 s.
+- Earlier (Ubuntu, 2026-09-30): 180 tests, 266 checks across 34 scenarios.
 - Fixture reproducibility, compilation, and `git diff --check` passed.
 - Runtime-only smoke test passed on 2026-09-30 after damaged-source handling;
   hosted CI reruns it on every push.

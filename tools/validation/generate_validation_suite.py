@@ -1448,6 +1448,93 @@ table Budget
     write_json(expected_path, expected)
 
 
+def build_m_append_health(root: Path):
+    name = "35_m_append_health"
+    p, report, model = project(root, name)
+    tables = model / "definition" / "tables"
+    write(tables / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    // Table.Combine({Lookup}) in a comment is not an append.
+                    Note = "Table.Combine({Lookup})",
+                    Source = Table.Combine({#"Sales 2022", sales_2023, Table.FirstN(Lookup, 0), #"sales 2022"})
+                in
+                    Source
+""")
+    write(tables / "Sales 2022.tmdl", """
+table 'Sales 2022'
+    column Amount
+        sourceColumn: Amount
+    partition 'Sales 2022' = m
+        mode: import
+        source =
+                let
+                    Source = #table({"Amount"}, {{1}})
+                in
+                    Source
+""")
+    write(tables / "Lookup.tmdl", """
+table Lookup
+    column Key
+        sourceColumn: Key
+    partition Lookup = m
+        mode: import
+        source = #table({"Key"}, {{1}})
+""")
+    write(tables / "Returns.tmdl", """
+table Returns
+    column Qty
+        sourceColumn: Qty
+    partition Returns = m
+        mode: import
+        source =
+                let
+                    Lookup = #table({"Qty"}, {{2}}),
+                    Combined = Table.Combine({Lookup, #"Returns 2024"})
+                in
+                    Combined
+""")
+    write(model / "definition" / "expressions.tmdl", """
+expression sales_2023 =
+        let
+            Source = #table({"Amount"}, {{3}})
+        in
+            Source
+    lineageTag: 33333333-3333-3333-3333-333333333333
+
+expression 'Returns 2024' =
+        let
+            Source = #table({"Qty"}, {{4}})
+        in
+            Source
+    lineageTag: 44444444-4444-4444-4444-444444444444
+""")
+    add_visual(report, "Page1", "Visual1", visual_column("Sales", "Amount"))
+    add_visual(report, "Page1", "Visual2", visual_column("Returns", "Qty"))
+    save_expected(p, {
+        "Column|Sales|Amount": "Used",
+        "Column|Sales 2022|Amount": "Needs manual review",
+        "Column|Lookup|Key": "Needs manual review",
+        "Column|Returns|Qty": "Used",
+    }, "Table.Combine health rules: a loaded table appended by a loaded table is imported twice "
+       "(Sales 2022; sales_2023 is load-disabled); year-named append inputs are reported per "
+       "appending query. Comments, strings, local steps (Returns' Lookup), nested calls and "
+       "case-mismatched names (#\"sales 2022\") are not appends.")
+    expected_path = p / "expected.json"
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    expected["expected_health"] = [
+        {"rule_id": "POWERQUERY_APPEND_INPUT_LOADED", "scope": "Sales 2022"},
+        {"rule_id": "POWERQUERY_ANNUAL_APPEND", "scope": "Returns"},
+        {"rule_id": "POWERQUERY_ANNUAL_APPEND", "scope": "Sales"},
+    ]
+    write_json(expected_path, expected)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -1494,6 +1581,7 @@ def main():
         build_m_case_sensitive_refs,
         build_dax_unresolved_references,
         build_m_hardcoded_paths,
+        build_m_append_health,
     ]
     for builder in builders:
         builder(root)

@@ -1,0 +1,12 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    partition Sales = m
+        mode: import
+        source =
+                let
+                    // Table.Combine({Lookup}) in a comment is not an append.
+                    Note = "Table.Combine({Lookup})",
+                    Source = Table.Combine({#"Sales 2022", sales_2023, Table.FirstN(Lookup, 0), #"sales 2022"})
+                in
+                    Source

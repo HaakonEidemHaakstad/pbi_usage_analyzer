@@ -147,6 +147,8 @@ A multi-source bad-practice case study (MariaDB, Excel, CSV, JSON) has a source
 generator and a build guide with an answer key (docs/CASE_STUDY_ADVENTUREWORKS.md).
 `DAX_REFERENCE_UNRESOLVED` reports references to missing columns/measures.
 `POWERQUERY_HARDCODED_PATH` reports literal drive/UNC paths in partitions and shared queries.
+`POWERQUERY_APPEND_INPUT_LOADED` and `POWERQUERY_ANNUAL_APPEND` report loaded append
+inputs and year-named append inputs (scenario 35).
 Next: build it in Power BI Desktop and score the analyzer; turn the answer key's
-"not yet" items (annual appends, staging loaded, text keys, hard-coded paths,
-duplicate measures, folder combines) into health rules; then GUI planning.
+remaining "not yet" items (name-based staging, text keys, duplicate measures,
+folder combines, server names) into health rules; then GUI planning.

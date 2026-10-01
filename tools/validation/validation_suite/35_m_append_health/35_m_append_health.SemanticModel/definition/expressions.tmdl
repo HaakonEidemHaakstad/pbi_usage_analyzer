@@ -1,0 +1,13 @@
+expression sales_2023 =
+        let
+            Source = #table({"Amount"}, {{3}})
+        in
+            Source
+    lineageTag: 33333333-3333-3333-3333-333333333333
+
+expression 'Returns 2024' =
+        let
+            Source = #table({"Qty"}, {{4}})
+        in
+            Source
+    lineageTag: 44444444-4444-4444-4444-444444444444

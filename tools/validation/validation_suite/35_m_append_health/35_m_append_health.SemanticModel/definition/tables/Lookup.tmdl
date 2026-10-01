@@ -1,0 +1,6 @@
+table Lookup
+    column Key
+        sourceColumn: Key
+    partition Lookup = m
+        mode: import
+        source = #table({"Key"}, {{1}})
