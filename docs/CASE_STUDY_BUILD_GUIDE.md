@@ -13,8 +13,8 @@ Part C (Good) in either order, and finish with Part D. Tick the boxes as you go.
 **Build the mistakes faithfully.** In the Mess model, Power BI will sometimes
 offer to fix things (detect relationships, promote headers, fix types). Follow
 this guide rather than the suggestions. If you deviate anywhere, note it in a
-`NOTES.txt` next to the `.pbip` file; deviations are fine as long as they are
-written down.
+`NOTES.txt` next to the `.pbip` file (in `C:\AWProjects\Mess` or
+`C:\AWProjects\Good`); deviations are fine as long as they are written down.
 
 **Menu names** below are the English ones. Your Power BI Desktop appears to run
 in Norwegian (your existing M steps are named `Kilde`, `Fjernede kolonner`).
@@ -29,16 +29,26 @@ data = *Transformer data*, Close & Apply = *Lukk og bruk*, Mark as date table =
 
 ## Part A. One-time setup
 
-### A1. Source packages
+### A1. Folder layout
 
-Both packages are already generated:
+Each case has two folders: generated **sources** (replaceable at any time) and
+your hand-built **project** (the thing being tested). Keep them apart.
 
-- `C:\AWCase` for the Mess model (`mariadb`, `excel`, `csv`, `json` folders)
-- `C:\AWGood` for the Good model
+```
+C:\AWCase\              sources for the Mess model (generated)
+C:\AWGood\              sources for the Good model (generated)
+C:\AWProjects\Mess\     AW Mess.pbip + NOTES.txt   (your work)
+C:\AWProjects\Good\     AW Good.pbip + NOTES.txt   (your work)
+```
 
-- [ ] Open both folders in Explorer and check that they contain those subfolders.
+All four folders already exist; both source packages are generated (`mariadb`,
+`excel`, `csv`, `json` subfolders; the Good package also has `csv\returns`).
 
-If you ever need to regenerate them (this replaces the folder), from the
+- [ ] Open the folders in Explorer and check them.
+- [ ] Never save a project inside `C:\AWCase` or `C:\AWGood`.
+
+If you ever need to regenerate the sources (this replaces the source folder; the
+generators refuse to run if a `.pbip` project is found inside it), from the
 repository folder in PowerShell:
 
 ```powershell
@@ -117,7 +127,7 @@ $raw = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW\AdventureWorks+Raw+Data\Adventur
    default; no preview feature needs to be switched on. You will check the
    saved format in Part D.
 3. Save both projects outside OneDrive (Microsoft warns that synced folders can
-   break PBIP saving). This guide uses `C:\AWCase\pbip` and `C:\AWGood\pbip`.
+   break PBIP saving): `C:\AWProjects\Mess` and `C:\AWProjects\Good` (A1).
 
 ### A6. Settings to apply at the start of each new file
 
@@ -345,9 +355,9 @@ Create the pages (right-click a page tab → Rename) and visuals:
 
 ### B7. Save
 
-- [ ] File → **Save as** → Browse this device → folder `C:\AWCase\pbip`
-      (create it) → file name `AW Mess` → Save as type **Power BI project files
-      (*.pbip)** → Save.
+- [ ] File → **Save as** → Browse this device → folder `C:\AWProjects\Mess`
+      → file name `AW Mess` → Save as type **Power BI project files
+      (*.pbip)** → Save. The model keeps reading its data from `C:\AWCase`.
 
 ---
 
@@ -552,19 +562,24 @@ Same pages as the Mess model, without the hidden page and without implicit measu
 
 ### C12. Save
 
-- [ ] File → Save as → `C:\AWGood\pbip\AW Good.pbip` (Power BI project files).
+- [ ] File → Save as → folder `C:\AWProjects\Good` → file name `AW Good` →
+      Power BI project files (*.pbip). The model finds its data only through
+      the `SourceFolder` and `DbServer`/`DbName` parameters.
 
 ---
 
 ## Part D. Check and hand back
 
-1. For each project, open its folder in Explorer and check the format:
+1. For each project folder (`C:\AWProjects\Mess`, `C:\AWProjects\Good`), check
+   the format in Explorer (shown for Mess; Good is the same with `AW Good`):
    - `AW Mess.SemanticModel\definition\tables\` contains `.tmdl` files (TMDL).
      If you see a `model.bim` file instead, tell me; the analyzer needs TMDL.
    - `AW Mess.Report\definition\pages\` exists (PBIR).
-2. Write any deviations into `C:\AWCase\pbip\NOTES.txt` / `C:\AWGood\pbip\NOTES.txt`.
-3. Tell me the two project paths. The projects stay on this PC: they contain
-   synthetic data only, but they are not committed to the repository.
+2. Write any deviations into `C:\AWProjects\Mess\NOTES.txt` /
+   `C:\AWProjects\Good\NOTES.txt`.
+3. Tell me when both are saved (the paths are fixed: `C:\AWProjects\Mess` and
+   `C:\AWProjects\Good`). The projects stay on this PC: they contain synthetic
+   data only, but they are not committed to the repository.
 
 I will then derive the ground truth independently from the saved files, run the
 analyzer, record the expectations as integration tests and investigate every
@@ -581,3 +596,4 @@ difference, starting with any `Likely unused` object in the Good model.
 | A relationship cannot be created (type mismatch) | Check both columns' types in Power Query; in Mess, `Sales[TerritoryKey]` must be Text. |
 | Folder combine picked `README.txt` as sample (Good) | Delete `Returns` and its helper queries and redo C6, filtering **before** combining. |
 | Save as offers no `.pbip` type | Update Power BI Desktop (A5). |
+| A generator says the folder "contains a Power BI project" | A `.pbip` was saved inside a source folder. Move that project folder to `C:\AWProjects\…` and run the generator again. |

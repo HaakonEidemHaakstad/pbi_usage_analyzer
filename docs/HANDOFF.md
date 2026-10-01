@@ -75,8 +75,12 @@ Windows machine state (verified 2026-10-01):
   `test_symlinks_are_rejected` now skips when the OS refuses (CI still runs it).
 - Case-study source packages generated on 2026-10-01: mess in `C:\AWCase` (the path
   its M steps hard-code), good twin in `C:\AWGood`. MariaDB is not installed yet;
-  the user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md and saves them to
-  `C:\AWCase\pbip\AW Mess.pbip` and `C:\AWGood\pbip\AW Good.pbip`.
+  the user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md. Layout (agreed
+  2026-10-01): sources and projects in separate folders. Projects go to
+  `C:\AWProjects\Mess\AW Mess.pbip` and `C:\AWProjects\Good\AW Good.pbip` (folders
+  created, empty), each with an optional `NOTES.txt` of deviations. Both
+  generators refuse to replace an output folder containing any `*.pbip`, even
+  with `--force` (`replace_output` in `adventureworks_mess.py`).
 - Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
   Write Python scripts with the Write tool (or use Edit) when text has backslashes.
 
@@ -566,7 +570,8 @@ other evidence proves usage. This is not full TMDL/DAX parsing.
 ## Next planned implementation
 
 Waiting on the user: build both case studies per docs/CASE_STUDY_BUILD_GUIDE.md
-(MariaDB setup, AW Mess, AW Good) and report the two PBIP paths. Then for each:
+(MariaDB setup, AW Mess, AW Good) into `C:\AWProjects\Mess` and
+`C:\AWProjects\Good`, and say when done. Then for each:
 check the saved format (TMDL `definition/tables`, PBIR pages), derive ground truth
 independently (subagent without analyzer output), run the analyzer, record
 expectations like `tests/integration/adventureworks_expected.json` (optional env

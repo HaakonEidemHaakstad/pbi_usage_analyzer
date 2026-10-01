@@ -26,7 +26,7 @@ import sys
 from openpyxl import Workbook
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from adventureworks_mess import RAW_FILES, load_raw, sql_literal
+from adventureworks_mess import RAW_FILES, load_raw, replace_output, sql_literal
 
 DATABASE = "aw_dw"
 BATCH = 500
@@ -192,11 +192,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="Replace an existing output folder")
     args = parser.parse_args(argv)
     out = (args.out or default_out()).expanduser().resolve()
-    if out.exists():
-        if not args.force:
-            print(f"{out} exists; pass --force to replace it.", file=sys.stderr)
-            return 2
-        shutil.rmtree(out)
+    if not replace_output(out, args.force):
+        return 2
     manifest = build(args.raw_dir.expanduser(), out)
     print(f"Wrote {out}")
     print(json.dumps(manifest, indent=2))

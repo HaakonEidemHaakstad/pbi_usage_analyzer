@@ -78,6 +78,22 @@ class GoodTwinSourceTests(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(good.main([str(self.raw_dir), '--out', str(self.out)]), 2)
 
+    def test_force_never_deletes_a_power_bi_project(self):
+        out = Path(self.tmp.name) / 'with_project'
+        project = out / 'pbip' / 'AW Good.pbip'
+        project.parent.mkdir(parents=True)
+        project.write_text('{}', encoding='utf-8')
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            self.assertEqual(good.main([str(self.raw_dir), '--out', str(out), '--force']), 2)
+        self.assertTrue(project.is_file())
+        self.assertIn('Power BI project', stderr.getvalue())
+        project.unlink()                                   # without the project, --force replaces
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(good.main([str(self.raw_dir), '--out', str(out), '--force']), 0)
+        self.assertFalse((out / 'pbip').exists())
+        self.assertTrue((out / 'manifest.json').is_file())
+
 
 if __name__ == '__main__':
     unittest.main()

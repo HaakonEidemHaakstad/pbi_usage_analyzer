@@ -149,8 +149,9 @@ Also add a **page-level filter** on Overview: `Categories[CategoryName]` is not
 `Components`, and a **report-level filter** `territories[continent]` (all selected).
 Create one bookmark that hides the implicit-measure card.
 
-Finally, *File → Save as* **Power BI project (.pbip)** as `C:\AWCase\pbip\AW Mess.pbip`
-(not inside OneDrive). The analyzer and an independent review will then produce
+Finally, *File → Save as* **Power BI project (.pbip)** as `C:\AWProjects\Mess\AW Mess.pbip`:
+outside OneDrive, and outside the regenerable source folder `C:\AWCase` (the
+generators refuse to replace a folder that contains a `.pbip`). The analyzer and an independent review will then produce
 the actual answer key.
 
 ## Answer key

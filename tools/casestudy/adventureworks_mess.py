@@ -364,6 +364,26 @@ def build(raw_dir: Path, out: Path) -> dict:
     return manifest
 
 
+def replace_output(out: Path, force: bool) -> bool:
+    """Clear an existing output folder for regeneration; False if it must be kept.
+
+    A hand-built Power BI project inside the folder is never deleted, even with
+    --force: projects belong in their own folder (C:\\AWProjects in the guide).
+    """
+    if not out.exists():
+        return True
+    projects = sorted(out.rglob("*.pbip"))
+    if projects:
+        print(f"{out} contains a Power BI project ({projects[0]}); refusing to replace it. "
+              "Move the project elsewhere first.", file=sys.stderr)
+        return False
+    if not force:
+        print(f"{out} exists; pass --force to replace it.", file=sys.stderr)
+        return False
+    shutil.rmtree(out)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("raw_dir", type=Path, help='The "AdventureWorks Raw Data" folder')
@@ -371,11 +391,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="Replace an existing output folder")
     args = parser.parse_args(argv)
     out = args.out.expanduser().resolve()
-    if out.exists():
-        if not args.force:
-            print(f"{out} exists; pass --force to replace it.", file=sys.stderr)
-            return 2
-        shutil.rmtree(out)
+    if not replace_output(out, args.force):
+        return 2
     manifest = build(args.raw_dir.expanduser(), out)
     print(f"Wrote {out}")
     print(json.dumps(manifest, indent=2))

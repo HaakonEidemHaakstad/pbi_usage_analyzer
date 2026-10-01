@@ -68,6 +68,7 @@ class CaseStudySourceTests(unittest.TestCase):
 
     def test_sql_executes_and_views_join(self):
         db = sqlite3.connect(':memory:')
+        self.addCleanup(db.close)
         db.executescript(case.schema_sql('sqlite'))
         db.executescript(case.data_sql(self.raw, 'sqlite'))
         db.executescript(case.views_sql('sqlite'))
