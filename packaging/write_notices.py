@@ -1,4 +1,4 @@
-"""Write README.txt, THIRD_PARTY_NOTICES.txt and LICENSES/ into a built app folder.
+"""Write README.txt, User manual.html, THIRD_PARTY_NOTICES.txt and LICENSES/ into a built app folder.
 
 Usage: python packaging/write_notices.py "dist/PBI Model Health"
 
@@ -58,7 +58,8 @@ def readme(version: str) -> str:
 
 Start "PBI Model Health.exe" and open a Power BI project folder (PBIP saved
 with the PBIR report format and TMDL semantic model format), or pass the
-folder or .pbip file on the command line.
+folder or .pbip file on the command line. "User manual.html" (also Help > User
+manual, F1) explains every screen.
 
 The analyzer only reads the project. It never changes or deletes anything.
 "Likely unused" marks a cleanup candidate, not proof that deletion is safe:
@@ -124,6 +125,10 @@ def main(app_folder: Path) -> None:
     # Notepad-friendly CRLF on every build host.
     (app_folder / "THIRD_PARTY_NOTICES.txt").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\r\n")
     (app_folder / "README.txt").write_text(readme(__version__), encoding="utf-8", newline="\r\n")
+    sys.path.insert(0, str(HERE))
+    from build_manual import build as build_manual  # packaging/build_manual.py
+
+    build_manual(app_folder / "User manual.html")
 
 
 if __name__ == "__main__":

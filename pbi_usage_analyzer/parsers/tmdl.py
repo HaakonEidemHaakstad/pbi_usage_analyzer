@@ -215,6 +215,12 @@ def parse_model(model_folder: Path) -> TmdlModel:
     definition = model_folder / "definition"
     tables_folder = definition / "tables"
     if not tables_folder.exists():
+        if (model_folder / "model.bim").exists():
+            raise FileNotFoundError(
+                f"The semantic model in {model_folder.name} is saved as model.bim, not in the TMDL "
+                "format the analyzer reads. In Power BI Desktop, turn on 'Store semantic model using "
+                "TMDL format' (Options > Preview features, if your version lists it) and save the "
+                "project again.")
         raise FileNotFoundError(f"TMDL tables folder not found: {tables_folder}")
 
     result = TmdlModel()

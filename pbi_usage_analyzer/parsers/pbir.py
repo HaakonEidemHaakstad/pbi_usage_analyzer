@@ -200,6 +200,29 @@ def parse_report(report_folder: Path, columns: dict[tuple[str, str], ObjectRef],
     texts: dict[Path, ReportText] = {}
     unreadable_text: dict[Path, str] = {}
 
+    # PBIR-Legacy keeps the whole report in one report.json (visual configs as
+    # embedded JSON strings) and has no definition folder. It is not parsed
+    # structurally, so its raw text feeds the conservative safety net instead:
+    # referenced fields get manual review rather than looking unused.
+    legacy = report_folder / "report.json"
+    if not files and legacy.exists():
+        result.diagnostics.append(Diagnostic(
+            "PBIR_LEGACY_FORMAT", DiagnosticSeverity.WARNING,
+            f"The report is saved in the legacy format ({legacy.name} without a definition folder). "
+            "Its visuals were not parsed; field names found in its text only give manual-review "
+            "evidence. Save the project with the PBIR report format for a reliable analysis.",
+            source_file=str(legacy)))
+        try:
+            unreadable_text[legacy] = read_source_text(legacy)[0].casefold()
+        except OSError:
+            pass
+    elif not files:
+        result.diagnostics.append(Diagnostic(
+            "PBIR_DEFINITION_MISSING", DiagnosticSeverity.WARNING,
+            f"No report definition files were found in {report_folder.name}; report usage could not "
+            "be analyzed, so objects used only by the report appear as Likely unused.",
+            source_file=str(report_folder)))
+
     for path, scope in files:
         try:
             data = load_json(path)

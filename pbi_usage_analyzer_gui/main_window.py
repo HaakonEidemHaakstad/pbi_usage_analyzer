@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +31,13 @@ MAX_RECENT = 8
 def project_folder(path: Path) -> Path:
     """A `.pbip` file stands for its folder."""
     return path.parent if path.suffix.casefold() == ".pbip" else path
+
+
+def manual_path() -> Path:
+    """The HTML manual shipped next to the Windows app, or the Markdown source."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent / "User manual.html"
+    return Path(__file__).resolve().parent.parent / "docs" / "manual" / "USER_MANUAL.md"
 
 
 def state_file(data_dir: Path, project_root: Path) -> Path:
@@ -172,6 +180,7 @@ class MainWindow(QMainWindow):
         review_menu.addSeparator()
         review_menu.addAction(self.prune_action)
         help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction(action("User manual", self.open_manual, "F1"))
         help_menu.addAction(action("About", self.about))
         toolbar = self.addToolBar("Main")
         toolbar.setObjectName("main-toolbar")
@@ -445,6 +454,13 @@ class MainWindow(QMainWindow):
             QApplication.restoreOverrideCursor()
         written = [files.text, files.excel] + ([files.json] if files.json else [])
         self.statusBar().showMessage("Wrote " + ", ".join(path.name for path in written))
+
+    def open_manual(self) -> None:
+        path = manual_path()
+        if not path.exists():
+            self.statusBar().showMessage(f"The user manual was not found: {path}")
+            return
+        self.open_file(str(path))
 
     def about(self) -> None:
         QMessageBox.about(self, f"About {APP_NAME}", (

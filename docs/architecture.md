@@ -336,6 +336,8 @@ are `None`; file-level diagnostics do not claim expression-level precision.
 | --- | --- | --- |
 | `TMDL_PARSE_FAILED` | Table parser failure | TMDL file |
 | `PBIR_READ_FAILED` | Report definition load failure; raw text still scanned | JSON file; line/column for JSON decoding errors |
+| `PBIR_LEGACY_FORMAT` | Report saved in the legacy format (root `report.json`, no `definition` folder); its raw text feeds the safety net (manual review only) | The legacy `report.json` |
+| `PBIR_DEFINITION_MISSING` | No report definition files at all; report usage not analyzed | Report folder |
 | `TMDL_DECODE_REPLACED` | Invalid UTF-8 in any definition TMDL file; bytes replaced | TMDL file |
 | `M_LINEAGE_INCOMPLETE` | Unsupported M lineage | TMDL file and owning query |
 | `AUTODATE_BACKING_COLUMN_UNRESOLVED` | Unresolved internal query projection | Referencing TMDL file and query |

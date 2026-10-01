@@ -344,5 +344,12 @@ across re-run and restart, acknowledgement persistence/hiding/removal, stale and
 unreadable state, reference links); native renderings of the Changes tab and an
 acknowledged object reviewed; the rebuilt Windows app passes its smoke test.
 
+User manual (2026-10-01): `docs/manual/USER_MANUAL.md` for Power BI users without
+a technical background, with nine screenshots; rendered into the Windows app as
+`User manual.html` and opened by Help > User manual (F1). Writing it exposed a
+safety gap, now fixed in the core: a legacy-format report was read as having no
+visuals, so every report-only field looked Likely unused (`PBIR_LEGACY_FORMAT`,
+scenario 43).
+
 Remaining ideas (not planned phases): open a file at a line in an editor, a drawn
 dependency graph, an app icon and version resource, code signing, an installer.

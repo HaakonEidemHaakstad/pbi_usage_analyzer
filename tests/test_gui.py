@@ -231,6 +231,11 @@ class GuiSmokeTests(unittest.TestCase):
         window.detail._clicked(QUrl(f'link:{index}'))
         self.assertEqual(window.cleanup.table.selected().name, 'Measure B')
 
+    def test_user_manual_is_found_from_source(self):
+        from pbi_usage_analyzer_gui.main_window import manual_path
+        self.assertTrue(manual_path().exists())
+        self.assertIn('F1', [a.shortcut().toString() for a in self.window.findChildren(type(self.window.rerun_action))])
+
     def test_pbip_file_stands_for_its_folder(self):
         pbip = next((SUITE / '02_dax_transitive').glob('*.pbip'))
         self.assertEqual(project_folder(pbip), SUITE / '02_dax_transitive')

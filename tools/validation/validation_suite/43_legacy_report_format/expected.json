@@ -1,0 +1,9 @@
+{
+  "expected_status": {
+    "Column|Sales|Amount": "Needs manual review",
+    "Column|Sales|Region": "Needs manual review",
+    "Column|Sales|Unused": "Likely unused",
+    "Measure|Sales|Total": "Needs manual review"
+  },
+  "notes": "A legacy-format report (root report.json, no definition folder) is not parsed structurally. Its raw text feeds the conservative safety net, so referenced fields get manual review instead of looking unused, and PBIR_LEGACY_FORMAT warns. Before, every field was Likely unused. Amount is reached only through the DAX of Total, which is itself only manual review."
+}

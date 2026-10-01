@@ -2,3 +2,4 @@
 # Windows application build (scripts\build_windows.ps1); not needed to run from source.
 pyinstaller>=6.10,<7
 packaging>=24
+markdown>=3.5,<4

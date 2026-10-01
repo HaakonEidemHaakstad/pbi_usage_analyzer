@@ -2139,6 +2139,46 @@ expression 'Orphan 2' = #"Raw 3"
        "no partition reaches, or named only in a comment, protect nothing.")
 
 
+def build_legacy_report_format(root: Path):
+    name = "43_legacy_report_format"
+    p = root / name
+    report, model = p / f"{name}.Report", p / f"{name}.SemanticModel"
+    write_json(p / f"{name}.pbip", {})
+    write(model / "definition" / "tables" / "Sales.tmdl", """
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Unused
+        sourceColumn: Unused
+
+    measure Total = SUM(Sales[Amount])
+""")
+    # PBIR-Legacy: one report.json, visual configs as embedded JSON strings, no definition folder.
+    visual = {"name": "v1", "singleVisual": {
+        "visualType": "card",
+        "projections": {"Values": [{"queryRef": "Sales.Total"}]},
+        "prototypeQuery": {"Version": 2, "From": [{"Name": "s", "Entity": "Sales", "Type": 0}],
+                           "Select": [{"Measure": {"Expression": {"SourceRef": {"Source": "s"}},
+                                                   "Property": "Total"}, "Name": "Sales.Total"},
+                                      {"Column": {"Expression": {"SourceRef": {"Source": "s"}},
+                                                  "Property": "Region"}, "Name": "Sales.Region"}]}}}
+    write_json(report / "report.json", {"config": json.dumps({"version": "5.43"}), "sections": [
+        {"name": "ReportSection", "displayName": "Page 1",
+         "visualContainers": [{"x": 0, "y": 0, "config": json.dumps(visual)}]}]})
+    write_json(report / "definition.pbir", {"version": "4.0", "datasetReference": {"byPath": {"path": f"../{name}.SemanticModel"}}})
+    save_expected(p, {
+        "Column|Sales|Amount": "Needs manual review",
+        "Column|Sales|Region": "Needs manual review",
+        "Column|Sales|Unused": "Likely unused",
+        "Measure|Sales|Total": "Needs manual review",
+    }, "A legacy-format report (root report.json, no definition folder) is not parsed structurally. "
+       "Its raw text feeds the conservative safety net, so referenced fields get manual review "
+       "instead of looking unused, and PBIR_LEGACY_FORMAT warns. Before, every field was Likely unused. "
+       "Amount is reached only through the DAX of Total, which is itself only manual review.")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="validation_suite")
@@ -2193,6 +2233,7 @@ def main():
         build_power_bi_desktop_shapes,
         build_m_usage_aware_lineage,
         build_m_shared_query_lineage,
+        build_legacy_report_format,
     ]
     for builder in builders:
         builder(root)

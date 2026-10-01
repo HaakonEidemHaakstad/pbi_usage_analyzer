@@ -41,7 +41,8 @@
     "39_text_key_relationships",
     "40_power_bi_desktop_shapes",
     "41_m_usage_aware_lineage",
-    "42_m_shared_query_lineage"
+    "42_m_shared_query_lineage",
+    "43_legacy_report_format"
   ],
   "purpose": "Synthetic PBIP/PBIR/TMDL fixtures with explicit ground truth for static analyzer validation."
 }

@@ -1,0 +1,16 @@
+{
+  "config": "{\"version\": \"5.43\"}",
+  "sections": [
+    {
+      "name": "ReportSection",
+      "displayName": "Page 1",
+      "visualContainers": [
+        {
+          "x": 0,
+          "y": 0,
+          "config": "{\"name\": \"v1\", \"singleVisual\": {\"visualType\": \"card\", \"projections\": {\"Values\": [{\"queryRef\": \"Sales.Total\"}]}, \"prototypeQuery\": {\"Version\": 2, \"From\": [{\"Name\": \"s\", \"Entity\": \"Sales\", \"Type\": 0}], \"Select\": [{\"Measure\": {\"Expression\": {\"SourceRef\": {\"Source\": \"s\"}}, \"Property\": \"Total\"}, \"Name\": \"Sales.Total\"}, {\"Column\": {\"Expression\": {\"SourceRef\": {\"Source\": \"s\"}}, \"Property\": \"Region\"}, \"Name\": \"Sales.Region\"}]}}}"
+        }
+      ]
+    }
+  ]
+}

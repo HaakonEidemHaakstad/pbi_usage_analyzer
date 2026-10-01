@@ -88,6 +88,10 @@ Alternatively, use the project's Python virtual environment:
 
 ### Desktop GUI (Windows)
 
+The [user manual](docs/manual/USER_MANUAL.md) explains the app for Power BI users
+without a technical background (also shipped as `User manual.html` in the Windows
+app and opened with Help > User manual, F1).
+
 A read-only desktop viewer shows the same results with filters, evidence paths and
 links between findings and objects. It needs the optional GUI dependencies
 (PySide6), installed into the project `.venv`:

@@ -1,0 +1,9 @@
+table Sales
+    column Amount
+        sourceColumn: Amount
+    column Region
+        sourceColumn: Region
+    column Unused
+        sourceColumn: Unused
+
+    measure Total = SUM(Sales[Amount])

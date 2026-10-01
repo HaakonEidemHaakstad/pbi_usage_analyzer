@@ -159,7 +159,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| GUI phase G2 | Latest change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
+| User manual | Latest change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
+| GUI phase G2 | Previous change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
 | GUI phase G3 | Previous change: standalone Windows app (`packaging/`, `scripts/build_windows.ps1`, `requirements-build.txt`, CI job "Windows application build"). Details below. |
 | GUI phase G1 | Previous change: `pbi_usage_analyzer_gui` read-only viewer; `requirements-gui.txt`, `scripts/gui.ps1`, `bootstrap.ps1 -Gui`; Windows CI runs offscreen GUI tests. Details below. |
 | GUI phase G0 | Previous change: `pbi_usage_analyzer.views` (catalog, explain, rows), `RULE_INFO`, `HealthFinding.object_ref`, `reporting.files.write_reports`, Excel evidence paths. Details below. |
@@ -187,7 +188,27 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: GUI phase G2, workflow aids (2026-10-01)
+## Latest change: user manual and legacy report format (2026-10-01)
+
+- User request: a user manual for a non-technical audience with Power BI
+  experience. `docs/manual/USER_MANUAL.md` (18 sections, nine light-mode
+  screenshots of AW Mess under a neutral `P:` path; how they were made:
+  docs/DEVELOPMENT.md). `packaging/build_manual.py` renders a self-contained HTML
+  (images embedded, print CSS; checked in headless Edge); `write_notices.py` puts it
+  in the app folder as `User manual.html`; Help > User manual (F1) opens it (the
+  Markdown when running from source). `markdown` added to `requirements-build.txt`.
+- Safety bug found while documenting the save formats: a report in the legacy
+  format (root `report.json`, no `definition` folder) produced no report evidence
+  and no warning, so every field used only by the report was Likely unused. Now
+  `PBIR_LEGACY_FORMAT` warns and the legacy text feeds the unreadable-file safety
+  net (manual review); an empty report folder gives `PBIR_DEFINITION_MISSING`; a
+  `model.bim` model's fatal error explains how to save as TMDL. Scenario 43 fails on
+  the previous commit (`Sales[Region]`, `Sales[Total]` Likely unused); no other
+  scenario or real project changed. Tests: `tests/test_report_formats.py`,
+  `tests/test_user_manual.py`.
+- The search boxes got a minimum width (squeezed at 1280 px).
+
+## Previous change: GUI phase G2, workflow aids (2026-10-01)
 
 - Details: GUI_DESIGN.md section 16. Core `views/history.py` (snapshot,
   `compare_runs`, `ProjectState`); `MainWindow(settings, data_dir)` loads/saves the

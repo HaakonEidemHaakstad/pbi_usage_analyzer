@@ -58,6 +58,14 @@ The frozen app accepts `--smoke-test PROJECT OUTPUT_FOLDER` (writes
 reviewing the UI without opening a window. CI job "Windows application build"
 runs the same script after the Windows checks and uploads the zip.
 
+User manual: `docs/manual/USER_MANUAL.md` with screenshots in `docs/manual/images/`.
+The build renders it to a self-contained `User manual.html` in the app folder
+(`packaging/build_manual.py`, `markdown` package from `requirements-build.txt`);
+`tests/test_user_manual.py` checks images and anchors. When the UI changes, refresh
+the screenshots: light colour scheme (`app.styleHints().setColorScheme(Qt.ColorScheme.Light)`),
+1280x780, a copy of AW Mess mapped to a neutral drive with `subst P: <folder>` and
+project discovery wrapped to report `P:` paths, so no personal paths appear.
+
 `.gitattributes` keeps text files LF and the fixture corpus byte-exact on Windows;
 the fixture generator writes LF on every OS. Always pass `encoding="utf-8"` for
 text I/O (Windows defaults to cp1252). CI runs the same checks on Windows.

@@ -36,6 +36,7 @@ def _search_box(placeholder: str) -> QLineEdit:
     box = QLineEdit()
     box.setPlaceholderText(placeholder)
     box.setClearButtonEnabled(True)
+    box.setMinimumWidth(180)  # keep the placeholder readable in narrow windows
     return box
 
 
