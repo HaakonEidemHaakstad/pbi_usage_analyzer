@@ -96,6 +96,10 @@ with the PBIR report format and TMDL semantic model format), or pass the
 folder or .pbip file on the command line. "User manual.html" (also Help > User
 manual, F1) explains every screen.
 
+"pbi-model-health-cli.exe" writes the text and Excel reports without a window:
+drop a project folder onto it, or run it from a command prompt with one or more
+project folders (--out FOLDER for one report folder, --help for all options).
+
 The analyzer only reads the project. It never changes or deletes anything.
 "Likely unused" marks a cleanup candidate, not proof that deletion is safe:
 static analysis cannot see other reports on the same semantic model, external

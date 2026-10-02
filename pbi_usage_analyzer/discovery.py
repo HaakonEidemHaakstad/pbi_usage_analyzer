@@ -7,6 +7,8 @@ from .model import ProjectPaths
 
 def discover_project(project_folder: Path) -> ProjectPaths:
     project_folder = project_folder.expanduser().resolve()
+    if project_folder.is_file() and project_folder.suffix.casefold() == ".pbip":
+        project_folder = project_folder.parent  # a .pbip file stands for its folder
     if not project_folder.is_dir():
         raise NotADirectoryError(f"The project folder does not exist or is not a directory: {project_folder}")
 

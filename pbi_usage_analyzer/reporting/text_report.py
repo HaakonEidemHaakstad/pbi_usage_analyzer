@@ -1,12 +1,80 @@
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
+from pathlib import Path
 
 from ..analysis.build_graph import AnalysisContext
-from ..health.model import HealthFinding
+from ..analysis.classify import MANUAL_REVIEW, OWNER_DEPENDENCY
+from ..health.engine import RULE_INFO
+from ..health.model import HealthFinding, HealthSeverity
 from ..health.filtering import HealthFilterScope
 from .health_scope import health_scope_rows
 from ..model import Finding, ObjectType, Status
+from ..views.catalog import STATUS_INFO
+from ..views.explain import Explainer, format_path
+from ..views.rows import relationship_labels
+
+WIDTH = 70
+# Health rules whose first evidence line adds nothing to the scope shown.
+_NO_DETAIL = {"MEASURE_DESCRIPTION_MISSING"}
+_REVIEW_CAUSES = MANUAL_REVIEW | OWNER_DEPENDENCY
+
+
+def _shorten(text: str, limit: int = 110) -> str:
+    return text if len(text) <= limit else text[:limit - 3] + "..."
+
+
+def _review_reason(explainer: Explainer, finding: Finding) -> str:
+    """Why an object is held for review: a lineage path, or its own evidence."""
+    explanation = explainer.explain(finding.ref)
+    if explanation.review_path:
+        return "via " + format_path(explanation.review_path)
+    reasons = []
+    for ev in explanation.evidence:
+        if ev.evidence_type not in _REVIEW_CAUSES:
+            continue
+        reason = ev.reason
+        owner = explainer.status_of(ev.source) if ev.source is not None else None
+        if owner is not None and owner != Status.USED:
+            reason += f" ({ev.source.label} is {STATUS_INFO[owner].label})"
+        if reason not in reasons:
+            reasons.append(reason)
+    return "; ".join(reasons) or " | ".join(finding.reasons) or "Unresolved dependency"
+
+
+def _health_lines(health_findings: tuple[HealthFinding, ...], ctx: AnalysisContext) -> list[str]:
+    """One compact block per rule; full explanations stay in the Excel report."""
+    # Plain ASCII: text reports are opened in many tools and code pages.
+    labels = {name: label.replace("→", "->") for name, label in relationship_labels(ctx.relationships).items()}
+    by_rule: dict[str, list[HealthFinding]] = defaultdict(list)
+    for finding in health_findings:
+        by_rule[finding.rule_id].append(finding)
+    order = list(RULE_INFO)
+    rules = sorted(by_rule, key=lambda rule: (by_rule[rule][0].severity != HealthSeverity.WARNING,
+                                              order.index(rule) if rule in order else len(order)))
+    lines = []
+    for rule in rules:
+        findings = by_rule[rule]
+        info = RULE_INFO.get(rule)
+        severity = "Warning" if findings[0].severity == HealthSeverity.WARNING else "Info"
+        name = info.name if info else findings[0].title
+        count = f"{len(findings)} finding" + ("s" if len(findings) != 1 else "")
+        lines += ["", f"[{severity}] {name} [{rule}] - {count}"]
+        lines.append(f"  {info.summary if info else findings[0].explanation}")
+        for finding in findings:
+            scope = labels.get(finding.scope, finding.scope) if finding.category == "relationships" else finding.scope
+            where = f"{Path(finding.source_file).name}:{finding.line}" if finding.source_file else ""
+            lines.append(f"  - {scope}" + (f"  ({where})" if where else ""))
+            if rule not in _NO_DETAIL and finding.category != "relationships" and finding.evidence:
+                # The location is already shown; drop repeated "line N: " prefixes.
+                # A duplicate-measure finding's DAX expression is too long for one line.
+                items = [re.sub(r"^line \d+: ", "", item) for item in finding.evidence
+                         if not item.startswith("Expression:")]
+                lines.append(f"      {_shorten('; '.join(items), 140)}")
+    lines += ["", "Explanations, evidence and recommendations for each finding are in the Excel report "
+                  "(sheet 'Model health')."]
+    return lines
 
 
 def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisContext, health_findings: tuple[HealthFinding, ...] = (), health_filter_scope: HealthFilterScope | None = None) -> str:
@@ -24,13 +92,16 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
 
     pct = (len(unused_cols) / len(columns) * 100) if columns else 0
     lines: list[str] = []
-    sep = "=" * 70
-    sub = "-" * 70
+    sep = "=" * WIDTH
+    sub = "-" * WIDTH
     lines += [sep, "POWER BI MODEL ANALYSIS V2", sep, "", f"Project: {project_name}", "", "SUMMARY", sub]
     lines.append(f"The semantic model contains {len(columns)} columns and {len(measures)} measures.")
     lines.append(f"{len(unused_cols)} of {len(columns)} columns ({pct:.1f} %) appear to be unused.")
     lines.append(f"In addition, {len(unused_measures)} of {len(measures)} measures appear to be unused.")
     lines.append(f"{len(manual_cols)} columns and {len(manual_measures)} measures are held for manual review.")
+    if health_findings:
+        warnings = sum(f.severity == HealthSeverity.WARNING for f in health_findings)
+        lines.append(f"Model health: {warnings} warnings and {len(health_findings) - warnings} informational findings.")
     lines.append("")
     lines.append("The analysis uses a dependency graph across PBIR, TMDL/DAX, relationships, hierarchies, sorting, and Power Query/M.")
     lines.append("'Likely unused' means no known usage or relevant dependency was found. These are cleanup candidates, not objects that are automatically safe to delete.")
@@ -39,12 +110,13 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
     if by_table:
         lines += ["", "CLEANUP CANDIDATES BY TABLE", sub]
         totals = Counter(f.ref.table for f in columns if f.status != Status.INTERNAL)
-        lines.append(f"{'Table':25} {'Likely unused':>14} {'Total':>8} {'Share':>10}")
-        lines.append("-" * 62)
+        name_width = max(len("Table"), *(len(table) for table in by_table))
+        lines.append(f"{'Table':{name_width}} {'Likely unused':>14} {'Total':>8} {'Share':>10}")
+        lines.append("-" * (name_width + 35))
         for table, count in by_table.most_common():
             total = totals[table]
             share = count / total * 100 if total else 0
-            lines.append(f"{table:25} {count:14d} {total:8d} {share:9.1f}%")
+            lines.append(f"{table:{name_width}} {count:14d} {total:8d} {share:9.1f}%")
 
     if ctx.powerquery and ctx.powerquery.dependencies:
         lines += ["", "POWER QUERY / M DEPENDENCIES", sub]
@@ -58,6 +130,8 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
 
     if unused_cols:
         lines += ["", "LIKELY UNUSED COLUMNS", sub]
+        if source_cols:
+            lines += ["[SOURCE] = loaded from the data source; removing it in Power Query also makes the refresh lighter.", ""]
         grouped = defaultdict(list)
         source_refs = {f.ref for f in source_cols}
         for f in unused_cols:
@@ -82,13 +156,13 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
             lines.append("")
 
     if manual_cols or manual_measures:
+        explainer = Explainer(ctx.graph, findings)
         lines += ["ITEMS REQUIRING REVIEW", sub]
         lines.append(f"- {len(manual_cols)} columns require manual review.")
         lines.append(f"- {len(manual_measures)} measures require manual review.")
         lines.append("")
-        for f in manual_cols:
-            reason = " | ".join(f.reasons) if f.reasons else "Unresolved dependency"
-            lines.append(f"  - {f.ref.label}: {reason}")
+        for f in manual_cols + manual_measures:
+            lines.append(f"  - {f.ref.label}: {_review_reason(explainer, f)}")
 
     if ctx.report:
         if ctx.report.stale:
@@ -102,14 +176,14 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
 
     if health_findings or health_filter_scope is not None:
         lines += ["", "MODEL HEALTH", sub]
-        lines.extend(f"{label}: {value}" for label, value in health_scope_rows(health_filter_scope))
+        unfiltered = (health_filter_scope is not None and health_filter_scope.rule_ids is None
+                      and health_filter_scope.severities is None)
+        if not unfiltered:
+            lines.extend(f"{label}: {value}" for label, value in health_scope_rows(health_filter_scope))
         if not health_findings:
             lines.append("No health findings included in this report.")
-        for finding in health_findings:
-            lines += [f"[{finding.rule_id}] {finding.scope}: {finding.title}",
-                      finding.explanation, "Evidence: " + " | ".join(finding.evidence),
-                      "Recommendation: " + finding.recommendation,
-                      f"Source: {finding.source_file}:{finding.line}"]
+        else:
+            lines.extend(_health_lines(health_findings, ctx))
 
     if ctx.warnings:
         lines += ["", "WARNINGS", sub, *ctx.warnings]

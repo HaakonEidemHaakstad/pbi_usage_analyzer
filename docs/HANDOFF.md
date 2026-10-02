@@ -159,7 +159,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| IT review hardening | Latest change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
+| Text reports | Latest change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
+| IT review hardening | Previous change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
 | User manual | Previous change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
 | GUI phase G2 | Previous change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
 | GUI phase G3 | Previous change: standalone Windows app (`packaging/`, `scripts/build_windows.ps1`, `requirements-build.txt`, CI job "Windows application build"). Details below. |
@@ -189,7 +190,35 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: IT review hardening (2026-10-01)
+## Latest change: plain-text reports (2026-10-02)
+
+- User asked whether plain-text reports like v1's are possible (v1's code and
+  samples are not in the repo; v2 already writes `<Project>_usage_summary_v2.txt` via
+  export and `run_analyzer.py`). Chosen: improve the report, run without the app,
+  write automatically.
+- `reporting/text_report.py`: cleanup table sized to the longest table name;
+  `[SOURCE]` explained; review list now includes measures (it silently listed only
+  columns) with the reason (lineage path, or evidence with the owner's status);
+  Model health as one block per rule (severity, name, `[RULE_ID]`, count, rule
+  summary, one line per finding with relationship endpoints or scope, `file:line`
+  and the evidence joined) and a pointer to the Excel sheet; filter lines only when a
+  filter is active or not recorded; plain ASCII punctuation (object names may still
+  be non-ASCII). AW Mess report 468 -> about 350 lines. `views.rows.relationship_labels`
+  is now public. Tests: `tests/test_text_report.py`.
+- `main.py`: several projects, `--out FOLDER`, failures per project (exit code 1),
+  summary also prints health findings and diagnostics; `run_analyzer.py` passes the
+  exit code. `discover_project` accepts a `.pbip` file. Tests: `tests/test_cli.py`.
+- Windows build: second executable `pbi-model-health-cli.exe` (console) from the
+  same analysis; `packaging/pbi_model_health.py` picks the mode by the executable
+  name, never loads Qt in console mode, and waits for Enter only when Windows
+  created the console for it (double-click or drag-and-drop; not with
+  `PBI_NO_PAUSE`, redirected stdin or a parent console). The build smoke-tests it
+  and lists it in `SHA256SUMS.txt`.
+- App: File > Write reports automatically (checkable, `autoReports` in QSettings,
+  off by default) writes text + Excel into the project folder after every analysis;
+  errors go to the status bar. Manual section 14 and the IT fact sheet updated.
+
+## Previous change: IT review hardening (2026-10-01)
 
 - User asked what to consider when convincing IT, then "yes please" to: an IT fact
   sheet, an exact dependency lock and SBOM, and removing the unused network library.

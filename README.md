@@ -108,7 +108,11 @@ The GUI never changes the project. Tabs: Overview (counts that open filtered
 lists), Cleanup, Health, Diagnostics and Queries; the detail panel explains each
 status with its evidence path and links to source files. F5 re-runs the analysis
 and keeps the selection; File > Export writes the text/Excel (and optionally JSON)
-reports to a chosen folder. The Changes tab lists every difference from the
+reports to a chosen folder; File > Write reports automatically writes them into the
+project folder after every analysis. `pbi-model-health-cli.exe` in the app folder
+writes the same reports without a window (drop a project folder onto it, or
+`pbi-model-health-cli.exe <project> [<project> …] [--out FOLDER] [--json]`; the
+same options as `run_analyzer.py`). The Changes tab lists every difference from the
 previous analysis of the same project (also across restarts), with the evidence
 path each object had before. Review > Acknowledge (Ctrl+K) marks a cleanup object
 or health finding as reviewed with an optional note; acknowledged rows are hidden

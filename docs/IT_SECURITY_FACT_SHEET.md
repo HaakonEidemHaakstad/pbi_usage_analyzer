@@ -19,7 +19,9 @@ never data.
   Python (PySide6).
 - Distributed as a zip with a self-contained folder (`PBI Model Health.exe` plus
   an `_internal` folder with the Python runtime and libraries). Packaged with
-  PyInstaller.
+  PyInstaller. `pbi-model-health-cli.exe` in the same folder is a console version
+  that writes the reports for projects given on its command line (or dropped onto
+  it), without a window; it behaves as described below.
 
 ## Behaviour on the PC
 
@@ -30,7 +32,7 @@ never data.
 | Network | Makes no network connections. The app's code contains no network, download or upload calls, no telemetry and no update check. The build removes Qt's network module, its TLS and network-information plugins, and Python's TLS support (`_ssl`, `libssl`), and fails if any of them reappear (`packaging/check_bundle.py`). Python's basic `socket` module remains as part of the runtime; the app does not use it. |
 | Data sources | Never connects to databases, files or services referenced by the Power BI model. Needs no credentials. |
 | Files read | Only the selected project folder: the report and semantic-model definition files. It does not read the local data cache (`.pbi\cache.abf`). |
-| Files written | Only (1) reports the user explicitly exports, to a folder the user chooses, and (2) one small JSON file per analyzed project with the last result and the user's review notes, in `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\projects\`. It never modifies the Power BI project. |
+| Files written | Only (1) reports the user explicitly exports, to a folder the user chooses, or, if the user turns on *Write reports automatically* or uses the console version, a text and an Excel report in the project folder or a folder given with `--out`; and (2) one small JSON file per project analyzed in the window, with the last result and the user's review notes, in `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\projects\`. It never modifies the Power BI project's own files. |
 | Registry | Recent-projects list and window settings under `HKEY_CURRENT_USER\Software\pbi-usage-analyzer`. Nothing machine-wide. |
 | Other programs | Starts no processes. When the user clicks a file link, Windows opens that file with its default application (for example a `.tmdl` file in a text editor). |
 | Code execution | Does not execute DAX, M or any code from the project; it parses text. No plug-ins, no scripting, no `eval`. |

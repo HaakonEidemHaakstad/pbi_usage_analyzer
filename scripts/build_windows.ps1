@@ -56,6 +56,20 @@ try {
         }
         Write-Host "Smoke test passed:"
         Get-Content $summary | Write-Host
+
+        # Console companion: reports for the same project, no window.
+        $cliOutput = Join-Path $work "cli"
+        $env:PBI_NO_PAUSE = "1"
+        try {
+            & (Join-Path $app "pbi-model-health-cli.exe") $project --out $cliOutput | Write-Host
+            $cliExit = $LASTEXITCODE
+        } finally {
+            Remove-Item Env:PBI_NO_PAUSE
+        }
+        if ($cliExit -ne 0 -or -not (Get-ChildItem $cliOutput -Filter "*_usage_summary_v2.txt" -ErrorAction SilentlyContinue)) {
+            throw "Console smoke test failed (exit code $cliExit)."
+        }
+        Write-Host "Console smoke test passed."
         Remove-Item -Recurse -Force $work
     }
 
@@ -65,7 +79,7 @@ try {
     $size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
     # Checksums for verifying a download (sha256sum format).
     $sums = Join-Path $OutDir "SHA256SUMS.txt"
-    $lines = foreach ($file in @($zip, (Join-Path $app "PBI Model Health.exe"))) {
+    $lines = foreach ($file in @($zip, (Join-Path $app "PBI Model Health.exe"), (Join-Path $app "pbi-model-health-cli.exe"))) {
         "{0}  {1}" -f (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant(), (Split-Path -Leaf $file)
     }
     Set-Content -Path $sums -Value $lines -Encoding ascii

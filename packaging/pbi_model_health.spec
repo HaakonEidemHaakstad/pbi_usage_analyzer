@@ -41,8 +41,20 @@ exe = EXE(  # noqa: F821
     console=False,
     upx=False,
 )
+# Console companion from the same analysis: writes reports without a window. The
+# entry script chooses the mode by the executable's name ("-cli").
+cli_exe = EXE(  # noqa: F821
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name="pbi-model-health-cli",
+    console=True,
+    upx=False,
+)
 coll = COLLECT(  # noqa: F821
     exe,
+    cli_exe,
     a.binaries,
     a.datas,
     name="PBI Model Health",

@@ -116,9 +116,10 @@ def object_rows(result: AnalysisResult) -> tuple[ObjectRow, ...]:
     return tuple(rows)
 
 
-def _relationship_labels(result: AnalysisResult) -> dict[str, str]:
+def relationship_labels(relationships) -> dict[str, str]:
+    """Relationship name -> `From[col] → To[col]` (names are usually GUIDs)."""
     labels = {}
-    for relationship in result.context.relationships:
+    for relationship in relationships:
         if relationship.from_column and relationship.to_column:
             (from_table, from_column), (to_table, to_column) = relationship.from_column, relationship.to_column
             labels[relationship.name] = f"{from_table}[{from_column}] → {to_table}[{to_column}]"
@@ -127,7 +128,7 @@ def _relationship_labels(result: AnalysisResult) -> dict[str, str]:
 
 def health_rows(result: AnalysisResult) -> tuple[HealthRow, ...]:
     root = result.project.root
-    relationships = _relationship_labels(result)
+    relationships = relationship_labels(result.context.relationships)
 
     def scope_label(finding: HealthFinding) -> str:
         if finding.category == "relationships":

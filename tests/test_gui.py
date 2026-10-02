@@ -231,6 +231,21 @@ class GuiSmokeTests(unittest.TestCase):
         window.detail._clicked(QUrl(f'link:{index}'))
         self.assertEqual(window.cleanup.table.selected().name, 'Measure B')
 
+    def test_reports_are_written_automatically_when_enabled(self):
+        project = Path(self.tmp.name) / 'project'
+        shutil.copytree(SUITE / '02_dax_transitive', project)
+        self.run_analysis(project)
+        self.assertFalse(list(project.glob('*_usage_*')))  # off by default
+        self.window.auto_reports_action.setChecked(True)  # writes for the current result at once
+        self.assertEqual(sorted(p.suffix for p in project.glob('*_usage_*')), ['.txt', '.xlsx'])
+        self.assertTrue(self.window.settings.value('autoReports', type=bool))
+        for path in project.glob('*_usage_*'):
+            path.unlink()
+        self.window.rerun_action.trigger()
+        self.wait_for_analysis()
+        self.assertEqual(len(list(project.glob('*_usage_*'))), 2)
+        self.assertIn('Reports written to', self.window.statusBar().currentMessage())
+
     def test_user_manual_is_found_from_source(self):
         from pbi_usage_analyzer_gui.main_window import manual_path
         self.assertTrue(manual_path().exists())

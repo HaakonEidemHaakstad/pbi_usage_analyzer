@@ -164,12 +164,19 @@ class MainWindow(QMainWindow):
         self.rerun_action = action("Re-run analysis", self.rerun, "F5")
         self.export_action = action("Export reports…", lambda: self.export(json=False), "Ctrl+E")
         self.export_json_action = action("Export reports with JSON…", lambda: self.export(json=True))
+        self.auto_reports_action = QAction("Write reports automatically", self)
+        self.auto_reports_action.setCheckable(True)
+        self.auto_reports_action.setChecked(self.settings.value("autoReports", False, type=bool))
+        self.auto_reports_action.setToolTip("After every analysis, write the text and Excel reports into the "
+                                            "project folder (as the command line does)")
+        self.auto_reports_action.toggled.connect(self._auto_reports_toggled)
         self.quit_action = action("Quit", self.close, QKeySequence.StandardKey.Quit)
         file_menu = self.menuBar().addMenu("&File")
         file_menu.addActions([self.open_folder_action, self.open_pbip_action])
         self.recent_menu = file_menu.addMenu("Recent projects")
         file_menu.addSeparator()
-        file_menu.addActions([self.rerun_action, self.export_action, self.export_json_action])
+        file_menu.addActions([self.rerun_action, self.export_action, self.export_json_action,
+                              self.auto_reports_action])
         file_menu.addSeparator()
         file_menu.addAction(self.quit_action)
         self.acknowledge_action = action("Acknowledge selected…", self._acknowledge_selected, "Ctrl+K")
@@ -298,6 +305,8 @@ class MainWindow(QMainWindow):
             f"Needs manual review, {columns.likely_unused + measures.likely_unused} Likely unused · "
             f"{len(health)} health findings · {len(diagnostics)} diagnostics"
             + (f" · {len(self.changes)} changes since last run" if self.changes else ""))
+        if self.auto_reports_action.isChecked():
+            self._write_automatic_reports(result)
         if selected is None or not self._restore(selected):
             self.detail.clear_detail()
 
@@ -461,6 +470,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"The user manual was not found: {path}")
             return
         self.open_file(str(path))
+
+    def _auto_reports_toggled(self, enabled: bool) -> None:
+        self.settings.setValue("autoReports", enabled)
+        if enabled and self.result is not None:
+            self._write_automatic_reports(self.result)
+
+    def _write_automatic_reports(self, result: AnalysisResult) -> None:
+        """Text and Excel reports into the project folder; failures only reach the status bar."""
+        try:
+            files = write_reports(result)
+        except OSError as exc:
+            self.statusBar().showMessage(f"Automatic reports not written ({exc}). Is a report open in Excel?")
+            return
+        self.statusBar().showMessage(f"Reports written to {files.text.parent}: {files.text.name}, {files.excel.name}")
 
     def about(self) -> None:
         QMessageBox.about(self, f"About {APP_NAME}", (

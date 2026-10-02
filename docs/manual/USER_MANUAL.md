@@ -361,6 +361,38 @@ not loaded into the model, that path is shown too.
 contains file paths and your model's DAX and Power Query code; share it only with
 people who may see that.
 
+The text summary lists the cleanup candidates by table, the Likely unused columns
+and measures, every object that needs review with the reason, and the health
+findings grouped by rule (one line per finding). The Excel workbook has the full
+explanations and recommendations.
+
+### Writing reports automatically
+
+Tick **File > Write reports automatically** to have the app write the text summary
+and the Excel workbook into the project folder (next to the `.pbip` file) every
+time it analyzes the project, including each re-run with **F5**. The setting is
+remembered. If a report file is open in Excel, the status bar says the reports
+could not be written; close the file and press F5.
+
+### Reports without opening the app
+
+The app folder also contains **pbi-model-health-cli.exe**, which writes the same
+reports without opening a window:
+
+- **Drag and drop:** drag a project folder (or its `.pbip` file) onto
+  `pbi-model-health-cli.exe`. A window shows a short summary, the reports are
+  written into the project folder, and you press **Enter** to close the window.
+- **Command prompt:** for one or several projects at once, optionally into one
+  folder:
+
+  ```
+  "C:\Tools\PBI Model Health\pbi-model-health-cli.exe" "C:\Reports\Sales" "C:\Reports\Finance" --out "C:\Reports\Health checks"
+  ```
+
+  Add `--json` for the JSON file too. Run it with `--help` for all options. It
+  also works in a scheduled task or a batch file; it finishes with exit code 0 when
+  every project was analyzed and 1 otherwise.
+
 ## 15. What the analyzer cannot see
 
 The analyzer works from the saved project files of one report. It cannot see:
