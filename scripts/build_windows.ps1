@@ -70,6 +70,24 @@ try {
             throw "Console smoke test failed (exit code $cliExit)."
         }
         Write-Host "Console smoke test passed."
+
+        # MCP server for Claude Desktop: handshake, tool list and one analysis over stdio.
+        $pathJson = ($project | ConvertTo-Json)
+        $requests = @(
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}',
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
+            ('{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"analyze_model","arguments":{"project_path":' + $pathJson + ',"sections":["project"]}}}')
+        )
+        $replies = @($requests | & (Join-Path $app "pbi-model-health-cli.exe") --mcp --data-dir (Join-Path $work "mcp-state"))
+        $mcpExit = $LASTEXITCODE
+        $ids = @($replies | ForEach-Object { ($_ | ConvertFrom-Json).id })
+        $analysis = ($replies[2] | ConvertFrom-Json).result
+        if ($mcpExit -ne 0 -or ($ids -join ",") -ne "1,2,3" -or $analysis.isError -or
+                -not $analysis.content[0].text.Contains("<analysis>")) {
+            throw "MCP smoke test failed (exit code $mcpExit): $($replies -join ' | ')"
+        }
+        Write-Host "MCP smoke test passed."
         Remove-Item -Recurse -Force $work
     }
 

@@ -13,3 +13,5 @@ validation_output/
 integration/mariadb/.env
 *.secret
 *.secrets
+# Machine-specific notes (paths, local tools); template: LOCAL.example.md
+LOCAL.md

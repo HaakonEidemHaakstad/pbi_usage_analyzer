@@ -64,65 +64,35 @@ Not on GitHub (local to the Ubuntu machine, by design):
 - The optional MariaDB/Docker integration environment was never started (Docker
   is not installed on the Ubuntu machine).
 
-Windows machine state (verified 2026-10-01):
+Windows machine state: paths, installed tools and test-project locations are in
+`LOCAL.md` (git-ignored; template `LOCAL.example.md`). Lessons that apply anywhere:
 
-- Clone: `C:\Users\hehaa\OneDrive\Desktop\USBL\pbi_usage_analyzer` (inside OneDrive).
-  Only Python 3.14 is installed (`py -0`); `.venv` was created from it with
-  `scripts/bootstrap.ps1`. CI still uses 3.12; both pass.
-- AdventureWorks PBIP: `C:\Users\hehaa\OneDrive\Desktop\USBL\AW` (raw data under
-  `AdventureWorks+Raw+Data\AdventureWorks Raw Data`). Run the integration test with
-  `$env:PBI_AW_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW"`; it passes.
-- No `make`; Docker not checked. Symlinks need Developer Mode/admin, so
-  `test_symlinks_are_rejected` now skips when the OS refuses (CI still runs it).
-- Case-study folders, all in `C:\Users\hehaa\OneDrive\Desktop\USBL` (moved there
-  from `C:\` at the user's request on 2026-10-01, before any PBIP existed):
-  `USBL\AWCase` (mess sources; its M steps hard-code this path), `USBL\AWGood`
-  (good-twin sources), `USBL\AWProjects\Mess` and `USBL\AWProjects\Good` (the
-  user's hand-built PBIPs, `AW Mess.pbip` / `AW Good.pbip`, each with an optional
-  `NOTES.txt` of deviations; currently empty). Sources and projects are kept
-  apart; both generators refuse to replace an output folder containing any
-  `*.pbip`, even with `--force` (`replace_output` in `adventureworks_mess.py`).
-  `USBL` is synced by OneDrive: the guide has the user set *Always keep on this
-  device* on `AWProjects` and pause syncing if a PBIP save fails. OneDrive marks
-  synced folders `ReadOnly` + `ReparsePoint`; plain `shutil.rmtree` then fails
-  with WinError 5 (found when regenerating after the move), so `replace_output`
-  clears the read-only flag per failing path and retries briefly. Mess-model path
-  findings will therefore also carry the user-profile/OneDrive evidence note.
-  The user builds both PBIPs from docs/CASE_STUDY_BUILD_GUIDE.md.
-- Database environment (2026-10-01): MariaDB 12.2 (service `MariaDB`, client
-  `C:\Program Files\MariaDB 12.2\bin\mysql.exe`, not on PATH); MariaDB
-  Connector/ODBC 3.1.23 64-bit installed (registers "MariaDB ODBC 3.1 Driver";
-  3.1.23's MSI is on dlm.mariadb.com, signed by MariaDB USA, Inc.; the community
-  REST API lists sources only). `aw_ops` and `aw_dw` are loaded by
-  `tools/casestudy/setup_mariadb.ps1`, which the user runs in their own window: it
-  prompts for the root and `pbi_reader` passwords (SecureString, passed via the
-  process-local `MYSQL_PWD`; never seen by the agent), loads all SQL with
-  `--abort-source-on-error`, and checks every table's row count against both
-  `manifest.json` files, logging counts only to `%TEMP%\aw_mariadb_setup.log`.
-- Lesson from the first load: `source` skips failing statements and exits 0, and
-  SQLite-based tests ignore column lengths. Raw customers have `Gender = 'NA'`
-  (130 rows) and the staging footer text exceeded `VARCHAR(20)`, so strict-mode
-  MariaDB rejected whole 500-row batches (`dim_customer` held 1000 of 18148 rows).
-  Fixed: mess `gender VARCHAR(2)`, staging `CUSTOMERKEY VARCHAR(40)`, good
-  warehouse stores unknown gender as NULL; `check_rows` (shared by both
-  generators) rejects any value strict mode would reject, and any row whose width
-  differs from its column list, before writing SQL.
-- Shell caution: in the Bash tool, heredocs collapse `\\` to `\` on this machine.
-  Write Python scripts with the Write tool (or use Edit) when text has backslashes.
-  Also: never append a comment to a Python line that holds several tuples; it twice
+- The clone may live in OneDrive. OneDrive marks synced folders `ReadOnly` +
+  `ReparsePoint`; plain `shutil.rmtree` then fails with WinError 5, so
+  `replace_output` (case-study generators) clears the read-only flag per failing
+  path and retries. Both generators refuse to replace an output folder containing
+  any `*.pbip`, even with `--force`. Keep build output outside OneDrive.
+- MariaDB loading: `tools/casestudy/setup_mariadb.ps1` is run by the user in their
+  own window (it prompts for passwords; never seen by the agent), loads SQL with
+  `--abort-source-on-error` and checks row counts against both `manifest.json`
+  files. Lesson from the first load: `source` skips failing statements and exits 0,
+  and SQLite-based tests ignore column lengths, so strict-mode MariaDB rejected
+  whole batches; `check_rows` (shared by both generators) now rejects any value
+  strict mode would reject, and any row whose width differs from its column list.
+- Never append a comment to a Python line that holds several tuples; it twice
   silently removed column definitions in the generators (caught by `check_rows`).
-- **AW Mess is built and scored** (2026-10-01; 2 manual reviews left after usage-aware lineage): `USBL\AWProjects\Mess\AW Mess.pbip`,
-  TMDL + PBIR, deviations in its `NOTES.txt` (Norwegian step names; M pasted via
-  Advanced Editor; relationships/measures/role applied as TMDL scripts; no auto-date
-  hierarchy used in the report). Result and bugs: docs/CASE_STUDY_ADVENTUREWORKS.md
-  "Scored result". Expectations: `tests/integration/aw_mess_expected.json`, run with
-  `$env:PBI_AW_MESS_PROJECT = "C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess"`.
-- **AW Good is built and scored** (2026-10-01): `USBL\AWProjects\Good\AW Good.pbip`
-  (`_Measures` because `Measures` is reserved; parameters load-disabled; Norwegian
-  helper names). 40/40 objects agree with the independent ground truth (all Used),
-  no health findings, all nine look-alikes genuine and silent. Result:
-  docs/CASE_STUDY_GOOD_TWIN.md "Scored result". Expectations:
-  `tests/integration/aw_good_expected.json`, env var `PBI_AW_GOOD_PROJECT`.
+- **AW Mess is built and scored** (2026-10-01; 2 manual reviews left after
+  usage-aware lineage): TMDL + PBIR, deviations in its `NOTES.txt` (Norwegian step
+  names; M pasted via Advanced Editor; relationships/measures/role applied as TMDL
+  scripts; no auto-date hierarchy used in the report). Result and bugs:
+  docs/CASE_STUDY_ADVENTUREWORKS.md "Scored result". Expectations:
+  `tests/integration/aw_mess_expected.json`, env var `PBI_AW_MESS_PROJECT`.
+- **AW Good is built and scored** (2026-10-01): `_Measures` because `Measures` is
+  reserved; parameters load-disabled; Norwegian helper names. 40/40 objects agree
+  with the independent ground truth (all Used), no health findings, all nine
+  look-alikes genuine and silent. Result: docs/CASE_STUDY_GOOD_TWIN.md "Scored
+  result". Expectations: `tests/integration/aw_good_expected.json`, env var
+  `PBI_AW_GOOD_PROJECT`.
 
 Latest user requests (2026-10-01, Windows): familiarize and keep this handoff
 current; use `..\AW` as dummy data; commits and pushes are now allowed (AGENTS.md);
@@ -161,7 +131,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| AI assistant A0 | Latest change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
+| AI assistant A1 | Latest change: `pbi_usage_analyzer_mcp`, MCP server for Claude Desktop. Details below. |
+| AI assistant A0 | Previous change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
 | Text reports | Previous change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
 | IT review hardening | Previous change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
 | User manual | Previous change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
@@ -193,7 +164,38 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: AI assistant phase A0 (2026-10-05)
+## Latest change: AI assistant phase A1, Claude Desktop MCP server (2026-10-05)
+
+- User: the Claude Desktop app is approved in their organization; "assume it is
+  allowed for now" (local MCP servers); their personal Claude Desktop on this PC may
+  be used for testing. This replaced the planned copy-and-paste/API phases.
+- `pbi_usage_analyzer_mcp/` (stdlib only): `protocol.py` dual-era MCP server (legacy
+  `initialize` 2024-11-05..2025-11-25; modern 2026-07-28 per-request `_meta`,
+  `server/discover`, `resultType`, -32022), `tools.py` (`analyze_model`,
+  `explain_object`, `save_baseline`, `compare_with_baseline`; prompts `interpret`,
+  `next_steps`, `evaluate`; instructions = A0 system prompt + tool guide),
+  `server.py` (`--config`, `--data-dir`). Console exe: `pbi-model-health-cli.exe
+  --mcp`; build script smoke-tests it. `state_file` moved to `views.history` (kind
+  `projects` or `assistant`). Docs: design sections 7, 10, 14; IT fact sheet row.
+- Tests: `tests/test_mcp_server.py` (15). Protocol facts checked against the spec
+  website on 2026-10-05.
+- Tested with the user's personal Claude Desktop; its config location, the entry
+  and log paths are in `LOCAL.md`. Claude Desktop must be fully quit and restarted
+  to load a config change, and may rewrite the file while running.
+- Live result (2026-10-05): works. Claude Desktop chose the legacy era
+  (`initialize`), listed tools and prompts, answered a tool call in 0.3 s; the user
+  confirmed it worked. Logs: `%LOCALAPPDATA%\Claude\logs\mcp-server-pbi-model-health.log`.
+- Also in this change: `LOCAL.md` (git-ignored machine notes) with the committed
+  template `LOCAL.example.md` and an AGENTS.md rule; the machine section of this
+  handoff moved there; case-study guides use a `<WORK>` placeholder instead of the
+  user's absolute paths; the build spec excludes `lxml` (present in this machine's
+  venv via `python-docx`, not in the build lock); the installed app copy was
+  replaced with the new build. Zip 57.7 MB locally.
+- Next (A2): `.mcpb` one-click extension for non-technical users (bundling the
+  frozen console exe as a `binary` server), tune tool output and prompts from real
+  use, user-manual section, Changes tab showing assessment effects.
+
+## Previous change: AI assistant phase A0 (2026-10-05)
 
 - User request: start the integrated AI assistant, to (1) interpret results, (2)
   suggest next steps towards best practice, (3) evaluate improvement attempts;
@@ -213,10 +215,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
   integration tests (AW, AW Mess, AW Good) and offscreen GUI tests, synthetic
   validation 365/365, runtime smoke test. No status or finding changed (no analysis
   code touched).
-- Next (A1): GUI Assistant panel/CLI option to build and copy a prompt per task,
-  Changes tab showing assessment effects, paste an answer back. Before A2: ask the
-  user which Claude platform and authentication their organization uses, and
-  whether IT accepts a network-enabled build variant.
+- The next step planned then (copy-and-paste panel, API transport) was superseded
+  by the Claude Desktop route (A1 above).
 
 ## Previous change: plain-text reports (2026-10-02)
 

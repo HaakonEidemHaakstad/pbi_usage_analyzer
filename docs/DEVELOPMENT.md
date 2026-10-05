@@ -32,7 +32,7 @@ Windows has no `make` by default. Equivalents, from the repository root in Power
 
 | Make target | PowerShell |
 | --- | --- |
-| `make compile` | `.\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer pbi_usage_analyzer_gui tests tools` |
+| `make compile` | `.\.venv\Scripts\python.exe -m compileall -q pbi_usage_analyzer pbi_usage_analyzer_gui pbi_usage_analyzer_mcp tests tools` |
 | `make test` | `.\.venv\Scripts\python.exe -m unittest discover -s tests -v` |
 | `make validate` | `.\.venv\Scripts\python.exe tools\validation\validate_analyzer.py . tools\validation\validation_suite` |
 | `make check-fixtures` | `.\.venv\Scripts\python.exe tools\validation\check_fixture_drift.py` |

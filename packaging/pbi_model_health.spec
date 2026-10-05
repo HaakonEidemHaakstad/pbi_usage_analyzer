@@ -14,8 +14,10 @@ a = Analysis(  # noqa: F821
     # Not used at run time: development/validation tools and other GUI toolkits.
     # No network stack either: the app makes no connections, so Qt's network module
     # and Python's TLS support are left out (see the binary filter below).
+    # lxml: optional for openpyxl/pandas, not in the build lock; a development venv
+    # may have it through other packages, which would make local builds differ from CI.
     excludes=["tkinter", "jsonschema", "PyQt5", "PyQt6", "IPython", "matplotlib", "pytest",
-              "PySide6.QtNetwork", "ssl", "_ssl"],
+              "PySide6.QtNetwork", "ssl", "_ssl", "lxml"],
     noarchive=False,
 )
 # A Qt Widgets app needs neither Mesa's software OpenGL renderer (20 MB, own

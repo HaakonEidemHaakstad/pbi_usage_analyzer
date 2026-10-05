@@ -87,10 +87,13 @@ Core analysis must remain fully usable offline and without API credentials.
 
 Design: [AI_ASSISTANT_DESIGN.md](AI_ASSISTANT_DESIGN.md). Owner decisions
 (2026-10-05): interpret results, suggest next steps, evaluate improvement attempts;
-Claude (Anthropic) as provider; everything in the analysis may be sent. Phase A0 is
-done: the offline `pbi_usage_analyzer.assistant` package (briefing, deterministic
-attempt assessment, prompts). Next: A1 copy-and-paste in the GUI/CLI (no network),
-then A2 Claude transport in a separate optional package and build.
+Claude (Anthropic) as provider; everything in the analysis may be sent; Claude
+Desktop is the approved route. Phase A0 is done: the offline
+`pbi_usage_analyzer.assistant` package (briefing, deterministic attempt assessment,
+prompts). Phase A1 is done: `pbi_usage_analyzer_mcp`, a local MCP server that Claude
+Desktop starts (`pbi-model-health-cli.exe --mcp`), with tools to analyze, explain an
+object, save a baseline and compare with it, and prompt templates for the three
+tasks. Next: polish from real use (A2), then stored plans and an eval set (A3).
 
 
 ## Cross-cutting validation — Database-backed integration validation

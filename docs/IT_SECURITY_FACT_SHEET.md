@@ -34,6 +34,7 @@ never data.
 | Files read | Only the selected project folder: the report and semantic-model definition files. It does not read the local data cache (`.pbi\cache.abf`). |
 | Files written | Only (1) reports the user explicitly exports, to a folder the user chooses, or, if the user turns on *Write reports automatically* or uses the console version, a text and an Excel report in the project folder or a folder given with `--out`; and (2) one small JSON file per project analyzed in the window, with the last result and the user's review notes, in `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\projects\`. It never modifies the Power BI project's own files. |
 | Registry | Recent-projects list and window settings under `HKEY_CURRENT_USER\Software\pbi-usage-analyzer`. Nothing machine-wide. |
+| Claude Desktop (optional) | Only if the user adds it to Claude Desktop's configuration: Claude Desktop starts `pbi-model-health-cli.exe --mcp` and exchanges JSON messages with it over standard input/output (Model Context Protocol). The analyzer still makes no network connections; it answers tool calls the user approves in Claude Desktop (analyze a project, explain an object, save a baseline, compare with it). Its only extra file is one baseline per project in `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\assistant\`. Organizations can disable local MCP servers with Claude Desktop's `isLocalDevMcpEnabled` policy. |
 | Other programs | Starts no processes. When the user clicks a file link, Windows opens that file with its default application (for example a `.tmdl` file in a text editor). |
 | Code execution | Does not execute DAX, M or any code from the project; it parses text. No plug-ins, no scripting, no `eval`. |
 | Removal | Delete the app folder, the `%APPDATA%\pbi-usage-analyzer` folder and the registry key above. |
@@ -43,7 +44,10 @@ never data.
 Power BI project files contain metadata, not data rows: table and column names,
 business logic (DAX, M), server and database names and file paths used by
 queries. They do not contain passwords; Power BI stores data-source credentials
-separately. The app keeps all of this on the PC.
+separately. The app keeps all of this on the PC. Exception: when the user connects
+it to Claude Desktop, the tool results the user approves (briefings with names,
+findings, paths, server names and, by default, DAX and M) go to Claude through
+Claude Desktop, under the organization's agreement for that app.
 
 Exports: the text and Excel reports contain object names, statuses and findings
 (which can quote paths and server names). The optional JSON export also contains
@@ -115,6 +119,7 @@ VM with Process Monitor and a network monitor while analyzing a sample project.
 | --- | --- |
 | No network or process calls in the app code | `pbi_usage_analyzer/`, `pbi_usage_analyzer_gui/` (search for `socket`, `urllib`, `http`, `subprocess`) |
 | Network components removed from the bundle | `packaging/pbi_model_health.spec`, `packaging/check_bundle.py` |
-| Files and registry written | `pbi_usage_analyzer/reporting/files.py`, `pbi_usage_analyzer/views/history.py`, `pbi_usage_analyzer_gui/main_window.py` |
+| Files and registry written | `pbi_usage_analyzer/reporting/files.py`, `pbi_usage_analyzer/views/history.py`, `pbi_usage_analyzer_gui/main_window.py`, `pbi_usage_analyzer_mcp/tools.py` (baseline) |
+| Claude Desktop connection is stdio only | `pbi_usage_analyzer_mcp/protocol.py`; import guard in `tests/test_mcp_server.py` |
 | Pinned, hash-checked build dependencies | `requirements-build.lock`, `.github/workflows/ci.yml` |
 | SBOM and manifest | `packaging/write_notices.py`; `sbom.cdx.json`, `MANIFEST-SHA256.txt` in the app folder |

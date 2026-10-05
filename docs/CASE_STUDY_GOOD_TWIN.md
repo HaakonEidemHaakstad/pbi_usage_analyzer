@@ -1,5 +1,10 @@
 # Case study: AdventureWorks, the good twin
 
+> Paths: `<WORK>` stands for your case-study base folder, the folder that holds
+> `AW`, the source packages and the PBIP projects (this computer's value is in
+> `LOCAL.md`, which is not in git). The Mess model's M hard-codes the real path,
+> so build it with the folder you will keep.
+
 The counterpart of [the inherited mess](CASE_STUDY_ADVENTUREWORKS.md): the same
 AdventureWorks business data, the same four source types (MariaDB, Excel, CSV
 folder, JSON) and nearly the same report, built with good practice. It measures
@@ -15,7 +20,7 @@ Click-by-click instructions for both models: [build guide](CASE_STUDY_BUILD_GUID
 ## Source package
 
 ```powershell
-.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py "<...>\AdventureWorks Raw Data" --out C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py "<...>\AdventureWorks Raw Data" --out <WORK>\AWGood
 ```
 
 | Folder | Contents | Good practice shown |
@@ -29,7 +34,7 @@ Click-by-click instructions for both models: [build guide](CASE_STUDY_BUILD_GUID
 ## Model specification
 
 **Settings.** Auto date/time **off** for the file. Paths and server come from three
-text parameters: `SourceFolder` (`C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood`), `DbServer` (`localhost`), `DbName`
+text parameters: `SourceFolder` (`<WORK>\AWGood`), `DbServer` (`localhost`), `DbName`
 (`aw_dw`).
 
 **Queries** (load enabled unless stated):

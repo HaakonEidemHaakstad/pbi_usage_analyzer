@@ -1,5 +1,10 @@
 # Case study: AdventureWorks, the inherited mess
 
+> Paths: `<WORK>` stands for your case-study base folder, the folder that holds
+> `AW`, the source packages and the PBIP projects (this computer's value is in
+> `LOCAL.md`, which is not in git). The Mess model's M hard-codes the real path,
+> so build it with the folder you will keep.
+
 A Power BI project that is deliberately built badly, from the same AdventureWorks
 data spread across MariaDB, Excel, CSV and JSON. Once saved as PBIP it becomes a
 scored test case for the analyzer: every bad practice has an ID, and the
@@ -24,7 +29,7 @@ On the Windows PC, generate straight into the expected location (skips the copy
 in section 2, step 1):
 
 ```powershell
-.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py "<...>\AdventureWorks+Raw+Data\AdventureWorks Raw Data" --out C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py "<...>\AdventureWorks+Raw+Data\AdventureWorks Raw Data" --out <WORK>\AWCase
 ```
 
 | Folder | Contents | Built-in traps |
@@ -41,7 +46,7 @@ in section 2, step 1):
 Click-by-click instructions for this section and for building the model and
 report: [build guide](CASE_STUDY_BUILD_GUIDE.md) (Parts A and B).
 
-1. The package must be at `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase` (the steps below hard-code that path;
+1. The package must be at `<WORK>\AWCase` (the steps below hard-code that path;
    that is bad practice BP-11).
 2. Install MariaDB Server and load the database:
    `mysql -u root -p < mariadb\01_schema.sql`, then `02_data.sql`, then `03_views.sql`.
@@ -60,7 +65,7 @@ helper queries is part of the mess.
 
 | # | Query name | Source and steps | Bad practice |
 | --- | --- | --- | --- |
-| Q1 | `Sales 2020` | *Folder* `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\csv\sales_archive` → *Combine & Transform* | BP-02, BP-11 |
+| Q1 | `Sales 2020` | *Folder* `<WORK>\AWCase\csv\sales_archive` → *Combine & Transform* | BP-02, BP-11 |
 | Q2 | `sales_2021` | *MariaDB* `localhost` / `aw_ops`, table `sales_2021`; rename columns to match the CSV (`order_date` → `OrderDate`, …) | BP-01, BP-04 |
 | Q3 | `sales_2022` | Same for `sales_2022`, renaming again by hand | BP-01, BP-04 |
 | Q4 | `Sales` | *Append Queries as New*: Q1, Q2, Q3 | BP-01 |
@@ -149,8 +154,8 @@ Also add a **page-level filter** on Overview: `Categories[CategoryName]` is not
 `Components`, and a **report-level filter** `territories[continent]` (all selected).
 Create one bookmark that hides the implicit-measure card.
 
-Finally, *File → Save as* **Power BI project (.pbip)** as `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess\AW Mess.pbip`:
-outside the regenerable source folder `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase` (the
+Finally, *File → Save as* **Power BI project (.pbip)** as `<WORK>\AWProjects\Mess\AW Mess.pbip`:
+outside the regenerable source folder `<WORK>\AWCase` (the
 generators refuse to replace a folder that contains a `.pbip`). `USBL` is synced
 by OneDrive; see the build guide (A1, A5) for keeping the project folder local. The analyzer and an independent review will then produce
 the actual answer key.
@@ -204,7 +209,7 @@ investigate every difference.
 | BP-08 | Many-to-many relationship at month grain | `RELATIONSHIP_MANY_TO_MANY` (warning) | Detected (after fixing cardinality defaults; see Scored result) |
 | BP-09 | Auto date/time on | `LocalDateTable_*`/`DateTableTemplate_*` reported as **Internal**, not cleanup candidates; the auto-date hierarchy on `Sales[OrderDate]` protects `Sales[OrderDate]` | Internal objects detected (140). The built report did not use the hierarchy (NOTES.txt), so `PropertyVariationSource` remains unverified on a real file; automatic auto-date links no longer protect date columns. No "many auto-date tables" rule yet |
 | BP-10 | Measures without descriptions, scattered | `MEASURE_DESCRIPTION_MISSING` (info) for every measure | Detected (descriptions); display folders not checked |
-| BP-11 | Hard-coded file paths and server | `POWERQUERY_HARDCODED_PATH` (warning) for each query reading from `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\...` (evidence also flags the user-profile/OneDrive location); `POWERQUERY_LOCAL_SERVER` (warning) for each MariaDB query on `localhost` | Detected, assuming Power BI writes the server as a `localhost` literal (verify in the saved PBIP) |
+| BP-11 | Hard-coded file paths and server | `POWERQUERY_HARDCODED_PATH` (warning) for each query reading from `<WORK>\AWCase\...` (evidence also flags the user-profile/OneDrive location); `POWERQUERY_LOCAL_SERVER` (warning) for each MariaDB query on `localhost` | Detected, assuming Power BI writes the server as a `localhost` literal (verify in the saved PBIP) |
 | BP-12 | Calculated column that belongs in Power Query (`Age`) | `customers[Age]` Likely unused (unused), `customers[birth_date]` Needs manual review | Cleanup detected; no rule for the practice itself |
 | BP-13 | Totals row imported as data (`Returns`) | — | Not yet (needs data inspection) |
 | BP-14 | Unrelated/technical tables loaded (`Largest companies`, `etl_log`) | All columns **Likely unused** | Detected (cleanup) |

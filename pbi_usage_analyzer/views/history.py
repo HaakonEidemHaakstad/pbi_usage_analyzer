@@ -7,7 +7,9 @@ a small versioned JSON document; where it is stored is the front end's choice.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -42,6 +44,13 @@ class RunSnapshot:
     analyzer_version: str
     objects: dict[str, ObjectState]
     findings: dict[str, FindingState]
+
+
+def state_file(data_dir: Path, project_root: Path, kind: str = "projects") -> Path:
+    """Per-user state file of one project, outside the project folder: `projects`
+    for the GUI's review state, `assistant` for the assistant's saved baseline."""
+    identity = os.path.normcase(str(project_root.resolve()))
+    return data_dir / kind / (hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24] + ".json")
 
 
 def snapshot(result: AnalysisResult, analyzed_at: datetime | None = None) -> RunSnapshot:

@@ -316,8 +316,14 @@ sectioned text (relative paths, no timestamps), `attempt` classifies the
 differences between two `RunSnapshot`s (risk, attention, improvement, cleanup,
 neutral) without AI, and `prompts` builds a `Prompt` (fixed system prompt, briefing
 in `<analysis>` tags, then the task) for interpretation, next steps or evaluation.
-It contains no network code and no AI SDK (import guard in `tests/test_assistant.py`);
-transports belong in a separate optional package.
+It contains no network code and no AI SDK (import guard in `tests/test_assistant.py`).
+
+`pbi_usage_analyzer_mcp` is a front end like the GUI: a standard-library Model Context
+Protocol server on stdio that Claude Desktop starts. Its tools call `analyze_project`
+afresh and render `assistant`/`views` output; the only state it writes is a per-project
+baseline in the user's analyzer data folder (`views.history.state_file`). It never
+writes to the project and makes no network connections (import guard in
+`tests/test_mcp_server.py`).
 
 ### Public application API
 

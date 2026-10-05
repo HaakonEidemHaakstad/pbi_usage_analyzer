@@ -8,6 +8,11 @@ to replace reliance on prior chat history. Inspect `git status` as well: substan
 completed work may be uncommitted or untracked. Preserve it. Update the handoff
 after material changes, and verify its dated claims against the current files.
 
+If `LOCAL.md` exists, read it too: it describes this computer (absolute paths of
+test projects, the installed app, build output, local tools). It is ignored by git.
+Put machine-specific facts there, never in committed files; keep `LOCAL.example.md`
+(the committed template) in step when the structure changes.
+
 ## Project stage
 
 This repository has moved beyond the scope of a one-off script.

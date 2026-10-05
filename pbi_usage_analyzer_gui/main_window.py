@@ -1,8 +1,6 @@
 """Main window: start page, result tabs, detail panel, re-run, export and review state."""
 from __future__ import annotations
 
-import hashlib
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +17,7 @@ from pbi_usage_analyzer.model import ObjectType
 from pbi_usage_analyzer.reporting.files import write_reports
 from pbi_usage_analyzer.views import (Change, Explainer, ProjectState, compare_runs, diagnostic_rows,
                                       health_rows, object_key, object_rows, query_dependency_rows, snapshot)
+from pbi_usage_analyzer.views.history import state_file
 
 from .detail import (DetailPanel, change_html, diagnostic_html, health_html, object_html, query_html)
 from .tabs import ChangesTab, CleanupTab, DiagnosticsTab, HealthTab, OverviewTab, QueriesTab
@@ -38,12 +37,6 @@ def manual_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent / "User manual.html"
     return Path(__file__).resolve().parent.parent / "docs" / "manual" / "USER_MANUAL.md"
-
-
-def state_file(data_dir: Path, project_root: Path) -> Path:
-    """Per-user review state of one project (outside the project folder)."""
-    identity = os.path.normcase(str(project_root.resolve()))
-    return data_dir / "projects" / (hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24] + ".json")
 
 
 class StartPage(QWidget):

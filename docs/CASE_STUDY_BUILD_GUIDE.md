@@ -1,5 +1,10 @@
 # Build guide: the two AdventureWorks case studies in Power BI Desktop
 
+> Paths: `<WORK>` stands for your case-study base folder, the folder that holds
+> `AW`, the source packages and the PBIP projects (this computer's value is in
+> `LOCAL.md`, which is not in git). The Mess model's M hard-codes the real path,
+> so build it with the folder you will keep.
+
 Step-by-step instructions for building both case-study models on this Windows PC:
 
 - **AW Mess**: deliberately bad practice. Specification and answer key:
@@ -13,8 +18,8 @@ Part C (Good) in either order, and finish with Part D. Tick the boxes as you go.
 **Build the mistakes faithfully.** In the Mess model, Power BI will sometimes
 offer to fix things (detect relationships, promote headers, fix types). Follow
 this guide rather than the suggestions. If you deviate anywhere, note it in a
-`NOTES.txt` next to the `.pbip` file (in `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess` or
-`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`); deviations are fine as long as they are written down.
+`NOTES.txt` next to the `.pbip` file (in `<WORK>\AWProjects\Mess` or
+`<WORK>\AWProjects\Good`); deviations are fine as long as they are written down.
 
 **Menu names** below are the English ones. Your Power BI Desktop appears to run
 in Norwegian (your existing M steps are named `Kilde`, `Fjernede kolonner`).
@@ -35,7 +40,7 @@ Each case has two folders: generated **sources** (replaceable at any time) and
 your hand-built **project** (the thing being tested). Keep them apart.
 
 All of them live in your `USBL` folder,
-`C:\Users\hehaa\OneDrive\Desktop\USBL`, next to `AW` and the analyzer repository:
+`<WORK>`, next to `AW` and the analyzer repository:
 
 ```
 USBL\AWCase\              sources for the Mess model (generated)
@@ -58,9 +63,9 @@ generators refuse to run if a `.pbip` project is found inside it), from the
 repository folder in PowerShell:
 
 ```powershell
-$raw = "C:\Users\hehaa\OneDrive\Desktop\USBL\AW\AdventureWorks+Raw+Data\AdventureWorks Raw Data"
-.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py $raw --out C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase --force
-.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py $raw --out C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood --force
+$raw = "<WORK>\AW\AdventureWorks+Raw+Data\AdventureWorks Raw Data"
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_mess.py $raw --out <WORK>\AWCase --force
+.\.venv\Scripts\python.exe tools\casestudy\adventureworks_good.py $raw --out <WORK>\AWGood --force
 ```
 
 ### A2. Install MariaDB Server
@@ -90,7 +95,7 @@ loads all five SQL files, creates the login, prints the row counts read as
 it is safe.
 
 ```powershell
-$u = "C:\Users\hehaa\OneDrive\Desktop\USBL"
+$u = "<WORK>"
 powershell -ExecutionPolicy Bypass -File tools\casestudy\setup_mariadb.ps1 `
     -MessFolder "$u\AWCase" -GoodFolder "$u\AWGood" -OdbcMsi "<path to the downloaded .msi>"
 ```
@@ -105,7 +110,7 @@ Manual steps, if you prefer:
    second file is large and takes up to a minute):
 
    ```bat
-   cd /d C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\mariadb
+   cd /d <WORK>\AWCase\mariadb
    mysql -u root -p < 01_schema.sql
    mysql -u root -p < 02_data.sql
    mysql -u root -p < 03_views.sql
@@ -114,7 +119,7 @@ Manual steps, if you prefer:
 3. Load the Good database:
 
    ```bat
-   cd /d C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\mariadb
+   cd /d <WORK>\AWGood\mariadb
    mysql -u root -p < 01_schema.sql
    mysql -u root -p < 02_data.sql
    ```
@@ -228,7 +233,7 @@ Specification: [CASE_STUDY_ADVENTUREWORKS.md](CASE_STUDY_ADVENTUREWORKS.md).
 ### B3. Power Query: folder and append (Q1, Q4)
 
 1. **Sales 2020** (Q1): Home → New source → **Folder** → Browse to
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\csv\sales_archive` → OK. In the preview dialog click
+   `<WORK>\AWCase\csv\sales_archive` → OK. In the preview dialog click
    **Combine & Transform Data** (the duplicate `- Copy` file is meant to be
    included). In *Combine Files*: Sample file **First file**, Delimiter
    **Comma** → OK. Rename the new main query (named `sales_archive`) to
@@ -240,12 +245,12 @@ Specification: [CASE_STUDY_ADVENTUREWORKS.md](CASE_STUDY_ADVENTUREWORKS.md).
 ### B4. Power Query: files (Q8, Q10, Q12–Q14, Q16–Q21)
 
 1. **Customer Lookup (latin1)** (Q8): New source → **Text/CSV** →
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\csv\Customer Lookup (latin1).csv`. Leave *File origin* at
+   `<WORK>\AWCase\csv\Customer Lookup (latin1).csv`. Leave *File origin* at
    **65001: Unicode (UTF-8)** even though accented names look broken
    (BP-16) → **Transform Data**. Rename the query to `Customer Lookup (latin1)`.
    Do not remove the junk rows at the bottom.
 2. **Excel product master**: New source → **Excel workbook** →
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\excel\Product Master.xlsx`. In the Navigator tick the **sheets**
+   `<WORK>\AWCase\excel\Product Master.xlsx`. In the Navigator tick the **sheets**
    `Products`, `Subcategories`, `Categories` → **Transform Data**.
    - **Products** (Q10): if *Applied steps* show *Promoted Headers* or *Changed
      Type* after *Navigation*, delete them. Then Home → Remove rows → **Remove
@@ -255,33 +260,33 @@ Specification: [CASE_STUDY_ADVENTUREWORKS.md](CASE_STUDY_ADVENTUREWORKS.md).
    - **Subcategories** (Q12) and **Categories** (Q13): check that the first row
      is the header (otherwise *Use first row as headers*).
 3. **product_categories** (Q14): New source → **JSON** →
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\json\product_categories.json`. It opens as a list: List tools →
+   `<WORK>\AWCase\json\product_categories.json`. It opens as a list: List tools →
    **To table** → OK. Click the expand icon on `Column1`, keep `id` and `name`,
    untick *Use original column name as prefix* → OK. Rename the query to
    `product_categories`.
 4. **territories json** (Q16): New source → **JSON** →
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\json\territories.json`. In the record, click the **List** link
+   `<WORK>\AWCase\json\territories.json`. In the record, click the **List** link
    next to `continents` → **To table** → OK. Expand `Column1` (keep `name`,
    `countries`, untick the prefix). Expand `countries` → **Expand to new rows**,
    then expand it again (keep `name`, `regions`). Expand `regions` → *Expand to
    new rows*, then expand (`key`, `region`). Rename duplicate `name` columns if
    asked. Rename the query to `territories json`.
 5. **Returns 2020 / 2021 / 2022** (Q17): New source → **Excel workbook** →
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\excel\Returns by Year.xlsx`. Tick sheets `2020`, `2021`, `2022` →
+   `<WORK>\AWCase\excel\Returns by Year.xlsx`. Tick sheets `2020`, `2021`, `2022` →
    **Transform Data**. In each of the three queries: delete any auto *Promoted
    Headers*/*Changed Type* steps; Remove top rows → `2`; **Use first row as
    headers**. Do **not** remove the `TOTAL` row at the bottom (BP-13). Rename
    the queries `Returns 2020`, `Returns 2021`, `Returns 2022`.
 6. **Returns** (Q18): Append queries **as new** → three tables → `Returns 2020`,
    `Returns 2021`, `Returns 2022`. Rename to `Returns`.
-7. **Calendar** (Q19): New source → Text/CSV → `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\csv\Calendar Lookup.csv`
+7. **Calendar** (Q19): New source → Text/CSV → `<WORK>\AWCase\csv\Calendar Lookup.csv`
    → Transform Data. Rename to `Calendar`. With `Date` selected:
    Add Column → Date → Year → **Year**; Add Column → Date → Month → **Month**
    (rename the column to `Month Number`); Add Column → Date → Month → **Name of
    month** (rename to `Month Name`). Then Add Column → Custom column, name
    `YearMonth`, formula `[Year] * 100 + [Month Number]`, type **Whole number**.
 8. **Largest companies** (Q20) and **Product Category Sales (Unpivot Demo)** (Q21):
-   New source → Text/CSV for each file in `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase\csv`. Do not unpivot.
+   New source → Text/CSV for each file in `<WORK>\AWCase\csv`. Do not unpivot.
 9. Every query keeps **Enable load** on (loading helpers is part of the mess),
    except the folder helper queries Power BI created in B3 (leave them as they are).
 
@@ -382,9 +387,9 @@ Create the pages (right-click a page tab → Rename) and visuals:
 
 ### B7. Save
 
-- [ ] File → **Save as** → Browse this device → folder `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess`
+- [ ] File → **Save as** → Browse this device → folder `<WORK>\AWProjects\Mess`
       → file name `AW Mess` → Save as type **Power BI project files
-      (*.pbip)** → Save. The model keeps reading its data from `C:\Users\hehaa\OneDrive\Desktop\USBL\AWCase`.
+      (*.pbip)** → Save. The model keeps reading its data from `<WORK>\AWCase`.
 
 ---
 
@@ -403,7 +408,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
 
 | Name | Required | Type | Suggested values | Current value |
 | --- | --- | --- | --- | --- |
-| `SourceFolder` | yes | Text | Any value | `C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood` |
+| `SourceFolder` | yes | Text | Any value | `<WORK>\AWGood` |
 | `DbServer` | yes | Text | Any value | `localhost` |
 | `DbName` | yes | Text | Any value | `aw_dw` |
 
@@ -432,7 +437,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
 
 ### C4. Excel and JSON queries
 
-1. New source → **Excel workbook** → `C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\excel\Products.xlsx`. In the
+1. New source → **Excel workbook** → `<WORK>\AWGood\excel\Products.xlsx`. In the
    Navigator tick the **tables** `Products` and `Subcategories` (table icons,
    not the sheets `ProductData`/`SubcategoryData`) → Transform Data.
 2. In both queries select **Source** and change the path in the formula bar:
@@ -442,7 +447,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
    ```
 
    (keep whatever arguments follow the path as Power BI generated them).
-3. New source → **JSON** → `C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\json\categories.json` → List tools →
+3. New source → **JSON** → `<WORK>\AWGood\json\categories.json` → List tools →
    **To table** → OK → expand `Column1` (`CategoryKey`, `CategoryName`, untick
    the prefix) → set types: `CategoryKey` Whole number, `CategoryName` Text.
    Rename the query `Categories`. Edit its **Source** step:
@@ -466,7 +471,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
 
 ### C6. Returns: one filtered folder query
 
-1. New source → **Folder** → `C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\csv\returns` → OK. In the preview
+1. New source → **Folder** → `<WORK>\AWGood\csv\returns` → OK. In the preview
    dialog click **Transform Data** (not *Combine*): the folder also contains
    `README.txt`, which must be filtered out first.
 2. Filter the file list: on `Extension`, Text filters → **Equals** `.csv`; on
@@ -479,7 +484,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
 5. Make the folder path a parameter in **two** places: the `Returns` query's
    **Source** step and the generated helper query **Sample File** (in the
    *Transform File from returns* / *Helper Queries* group). In both, change
-   `Folder.Files("C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\csv\returns")` to:
+   `Folder.Files("<WORK>\AWGood\csv\returns")` to:
 
    ```m
    = Folder.Files(SourceFolder & "\csv\returns")
@@ -491,7 +496,7 @@ Home → Transform data, then Home → Manage parameters → **New parameter**, 
 
 ### C7. Date table
 
-1. New source → Text/CSV → `C:\Users\hehaa\OneDrive\Desktop\USBL\AWGood\csv\calendar.csv` → Transform Data.
+1. New source → Text/CSV → `<WORK>\AWGood\csv\calendar.csv` → Transform Data.
    Rename to `Date`; edit **Source** to read the path from the parameter:
 
    ```m
@@ -589,7 +594,7 @@ Same pages as the Mess model, without the hidden page and without implicit measu
 
 ### C12. Save
 
-- [ ] File → Save as → folder `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good` → file name `AW Good` →
+- [ ] File → Save as → folder `<WORK>\AWProjects\Good` → file name `AW Good` →
       Power BI project files (*.pbip). The model finds its data only through
       the `SourceFolder` and `DbServer`/`DbName` parameters.
 
@@ -597,15 +602,15 @@ Same pages as the Mess model, without the hidden page and without implicit measu
 
 ## Part D. Check and hand back
 
-1. For each project folder (`C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess`, `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`), check
+1. For each project folder (`<WORK>\AWProjects\Mess`, `<WORK>\AWProjects\Good`), check
    the format in Explorer (shown for Mess; Good is the same with `AW Good`):
    - `AW Mess.SemanticModel\definition\tables\` contains `.tmdl` files (TMDL).
      If you see a `model.bim` file instead, tell me; the analyzer needs TMDL.
    - `AW Mess.Report\definition\pages\` exists (PBIR).
-2. Write any deviations into `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess\NOTES.txt` /
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good\NOTES.txt`.
-3. Tell me when both are saved (the paths are fixed: `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Mess` and
-   `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\Good`). The projects stay on this PC: they contain synthetic
+2. Write any deviations into `<WORK>\AWProjects\Mess\NOTES.txt` /
+   `<WORK>\AWProjects\Good\NOTES.txt`.
+3. Tell me when both are saved (the paths are fixed: `<WORK>\AWProjects\Mess` and
+   `<WORK>\AWProjects\Good`). The projects stay on this PC: they contain synthetic
    data only, but they are not committed to the repository.
 
 I will then derive the ground truth independently from the saved files, run the
@@ -624,4 +629,4 @@ difference, starting with any `Likely unused` object in the Good model.
 | Folder combine picked `README.txt` as sample (Good) | Delete `Returns` and its helper queries and redo C6, filtering **before** combining. |
 | Save as offers no `.pbip` type | Update Power BI Desktop (A5). |
 | Save fails, or a file is "in use" | OneDrive is syncing the project folder: pause syncing, save, resume (A5). |
-| A generator says the folder "contains a Power BI project" | A `.pbip` was saved inside a source folder. Move that project folder to `C:\Users\hehaa\OneDrive\Desktop\USBL\AWProjects\…` and run the generator again. |
+| A generator says the folder "contains a Power BI project" | A `.pbip` was saved inside a source folder. Move that project folder to `<WORK>\AWProjects\…` and run the generator again. |

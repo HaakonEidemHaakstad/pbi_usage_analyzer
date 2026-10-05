@@ -1,7 +1,7 @@
 # AI assistant design — Power BI Model Health Analyzer
 
-Status: proposed 2026-10-05; phase A0 (core briefing, attempt assessment, prompts)
-implemented. This document fixes the architecture and scope of the optional AI
+Status: accepted 2026-10-05. Phase A0 (core briefing, attempt assessment, prompts)
+and phase A1 (MCP server for Claude Desktop) are implemented; sections 13–14. This document fixes the architecture and scope of the optional AI
 layer (AGENTS.md, "Future AI layer"; ROADMAP Phase 5).
 
 Owner decisions (2026-10-05):
@@ -15,6 +15,10 @@ Owner decisions (2026-10-05):
 - Data scope: **everything in the analysis** may be sent, including DAX and M
   expressions, file names and server names.
 - First iteration: this design plus an offline, tested core (phase A0).
+- Later the same day: **the Claude Desktop app is approved** in the user's
+  organization. The analyzer therefore connects to Claude through Claude Desktop as a
+  local MCP server (phase A1, section 7). Local MCP servers are assumed to be allowed
+  by the organization's Claude Desktop policy until IT confirms.
 
 ## 1. Goal
 
@@ -54,9 +58,10 @@ BI Desktop, re-running the analyzer after each change.
    from the user's files and may contain text that looks like an instruction. The
    briefing is wrapped in `<analysis>` tags and the system prompt says to treat it
    as data.
-6. **The core stays offline.** `pbi_usage_analyzer.assistant` builds text; it has no
-   network code and no SDK dependency (tested by an import guard). Network access
-   lives only in an optional transport package and a separate app build (section 7).
+6. **The analyzer stays offline.** `pbi_usage_analyzer.assistant` builds text and
+   the MCP server talks to Claude Desktop over stdio only; neither has network code
+   or an SDK dependency (tested by import guards). Claude Desktop, already approved,
+   is what sends content to Anthropic.
 7. **Read-only.** The assistant never edits the project. Changes are made in Power BI
    Desktop and verified by re-running the analysis.
 
@@ -69,9 +74,18 @@ pbi_usage_analyzer/                core, no network (unchanged rule)
     briefing.py                    AnalysisResult (+ previous run, acknowledgements) -> Briefing
     attempt.py                     previous run + current run -> AttemptAssessment
     prompts.py                     Task, system prompt, build_prompt() -> Prompt
-pbi_usage_analyzer_ai/             A2: optional transport (anthropic SDK)
-  claude.py                        Prompt -> streamed answer
-pbi_usage_analyzer_gui/            A1/A3: Assistant panel (copy prompt, then live answers)
+  views/history.py                 state_file(): per-user state (GUI review state, baselines)
+pbi_usage_analyzer_mcp/            A1: MCP server for Claude Desktop (stdlib only)
+  protocol.py                      JSON-RPC over stdio, tools and prompts, both MCP eras
+  tools.py                         analyzer tools and prompt templates
+  server.py                        entry point, --config
+pbi_usage_analyzer_gui/            optional later: copy prompt, show assessment effects
+```
+
+```
+Claude Desktop  --stdio-->  pbi_usage_analyzer_mcp  -->  analyze_project(), assistant, views
+      |                                                       |
+      +--> Anthropic (approved app)                           +--> reads PBIP files, per-user state
 ```
 
 Flow:
@@ -143,12 +157,54 @@ facts to explain instead of a diff to interpret.
 
 ## 7. Transport
 
-**A1, copy and paste (no network in the app).** The app shows the prompt and copies
-it to the clipboard; the user pastes it into Claude under the organization's
-agreement and can paste the answer back to keep it with the run. This works with the
-current network-free build and IT fact sheet unchanged.
+**A1, Claude Desktop through MCP (chosen).** Claude Desktop starts the analyzer as a
+local [Model Context Protocol](https://modelcontextprotocol.io) server and talks to
+it over stdin/stdout. The user chats in Claude Desktop; Claude calls the analyzer's
+tools when it needs facts, and the user approves each call. No API key, no network
+code in the analyzer, no second build: the console executable serves MCP with
+`--mcp`. The tools never write to the project.
 
-**A2, Claude API (optional package and separate build).**
+| Tool | Purpose | Writes |
+| --- | --- | --- |
+| `analyze_model` | Briefing (all or selected sections, expressions optional), wrapped in `<analysis>` tags; includes acknowledgements made in the desktop app. | nothing |
+| `explain_object` | One column or measure (`Table[Name]`, matched like the analyzer: trimmed, case-insensitive): status, evidence path or review reason, evidence, dependencies, properties, DAX, related findings. A table name alone lists its objects. Unknown names get similar-name suggestions. | nothing |
+| `save_baseline` | Records the current analysis as the project's baseline. | the analyzer's per-user data folder only |
+| `compare_with_baseline` | Re-analyzes and returns the counts and every change with its deterministic assessment. | nothing |
+
+Prompt templates `interpret`, `next_steps` and `evaluate` (arguments: project path,
+optional question, optional previous advice for `evaluate`) return the A0 prompt,
+including the briefing, as one user message. The server's `instructions` are the A0
+system prompt plus a short guide to the tools, so free-form chat follows the same
+rules.
+
+Protocol: standard library only (the official Python SDK would add HTTP libraries
+that `check_bundle.py` rejects). The server is *dual-era*: it answers the legacy
+`initialize` handshake (revisions 2024-11-05 to 2025-11-25) and modern per-request
+`_meta` requests with `server/discover` (revision 2026-07-28), so it works whichever
+era the installed Claude Desktop speaks. Each call analyzes afresh (well under a
+second), so results always match the saved files; the only state is the baseline.
+
+State: `views.history.state_file(data_dir, root, kind)` names per-project files in the
+desktop app's data folder (`%APPDATA%\pbi-usage-analyzer\Power BI Model Health
+Analyzer`): `projects\` (the GUI's review state, read for acknowledgements) and
+`assistant\` (baselines). The Microsoft Store build of Claude Desktop may virtualize
+its child processes' `%APPDATA%` writes into its package folder; baselines still
+work (the server reads them back from the same view).
+
+Setup: `pbi-model-health-cli.exe --mcp --config` (or `python -m
+pbi_usage_analyzer_mcp --config` from source) prints the `mcpServers` entry for
+`claude_desktop_config.json` (Settings > Developer > Edit Config). A one-click
+`.mcpb` extension is possible later.
+
+Organizational controls: Claude Desktop policies `isLocalDevMcpEnabled`,
+`isDesktopExtensionEnabled` and the Team/Enterprise extension allowlist can disable
+this route; then the copy-and-paste fallback below remains.
+
+**Fallback, copy and paste.** `Prompt.text()` is a complete document for pasting into
+any Claude chat. A GUI button can offer it if local MCP servers are not allowed.
+
+**Not planned now, Claude API (optional package and separate build).** Kept for
+reference in case a server-side or automated use appears:
 
 - Package `pbi_usage_analyzer_ai` with the official `anthropic` Python SDK as an
   optional extra (`pip install .[ai]`). The core never imports it.
@@ -199,9 +255,9 @@ current network-free build and IT fact sheet unchanged.
 | Phase | Content |
 | --- | --- |
 | A0 | This document; `assistant` package: briefing, attempt assessment, prompts; tests. **Done.** |
-| A1 | GUI Assistant panel and CLI option: choose a task, optional question, show and copy the prompt; Changes tab shows assessment effects; paste an answer back and keep it with the run. No network. |
-| A2 | `pbi_usage_analyzer_ai` Claude transport, settings for model/effort/credentials, streamed answers in the panel, separate build variant and IT documentation. Needs the platform decision. |
-| A3 | Follow-up questions per run, stored plans with deterministic expected-effect checks, answer post-check, eval set from the case studies. |
+| A1 | MCP server for Claude Desktop (`pbi_usage_analyzer_mcp`, `--mcp` in the console exe), tools and prompt templates, tests, build smoke test. **Done; works in Claude Desktop.** |
+| A2 | Polish from real use: tune tool output and prompts, `.mcpb` packaging, GUI shows assessment effects in the Changes tab and offers the copy-and-paste fallback, user-manual section, IT fact-sheet section. |
+| A3 | Stored plans with deterministic expected-effect checks, answer post-check, eval set from the case studies. |
 
 ## 11. Non-goals
 
@@ -212,11 +268,10 @@ current network-free build and IT fact sheet unchanged.
 
 ## 12. Open questions
 
-1. Claude platform and authentication (Anthropic API key, Bedrock, Vertex, Foundry)
-   and whether the organization's agreement covers project metadata, DAX and M.
-2. Will IT accept a network-enabled build variant, or should A1 copy-and-paste remain
-   the only route on managed PCs?
-3. Answer language: English by default (the interface language); the assistant
+1. Does the organization's Claude Desktop policy allow local MCP servers or
+   extensions (assumed yes for now), and does its agreement cover project metadata,
+   DAX and M?
+2. Answer language: English by default (the interface language); the assistant
    follows the language of the user's question.
 
 ## 13. A0 result
@@ -250,3 +305,24 @@ acknowledgements, changes section, prompt order and safety text, evaluation need
 previous run, offline import guard). No analysis change, no GUI change, no network
 code. Not yet tried against a live model: the prompts' wording is a first draft
 to be tuned with the A3 eval set.
+
+## 14. A1 result
+
+Implemented 2026-10-05 in `pbi_usage_analyzer_mcp/` (`protocol.py`, `tools.py`,
+`server.py`, `__main__.py`); console script `pbi-model-health-mcp`; frozen build:
+`pbi-model-health-cli.exe --mcp`. `state_file` moved from the GUI to
+`views.history` (same names; GUI unchanged in behaviour).
+
+Protocol facts were taken from the specification on 2026-10-05 (stdio framing,
+2026-07-28 per-request `_meta`, `server/discover`, `resultType`, error -32022,
+legacy `initialize`). Tests: `tests/test_mcp_server.py` (15: both eras, version and
+metadata errors, JSON-RPC edge cases, a stdio subprocess run, tools, baseline flow,
+acknowledgements from the app state, prompts, offline import guard). The Windows
+build smoke test drives `--mcp` over stdio.
+
+Live test (2026-10-05): the user's personal Claude Desktop (Microsoft Store build,
+whose config lives under `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`
+instead of `%APPDATA%\Claude`; its logs are in `%LOCALAPPDATA%\Claude\logs`) started
+the server, chose the legacy era ("Era probe verdict: legacy"; `initialize`, then
+`tools/list` and `prompts/list`), and answered a `tools/call` in 0.3 s. The user
+reports it worked as expected. No errors in the server log.
