@@ -45,7 +45,7 @@ BI Desktop, re-running the analyzer after each change.
    `AnalysisResult`; it never parses PBIP files and never decides a status.
 2. **Deterministic first.** Anything that can be computed is computed in the core
    and given to the AI as fact: run comparison and the risk classification of each
-   change (`assistant.attempt`) work without AI and can be shown by any front end.
+   change (`views.assessment`) work without AI; the desktop app shows them too.
 3. **Conservatism survives the AI.** The system prompt carries the status
    semantics and the Likely-unused caveat. The assistant must never call an object
    safe to delete, must keep Needs manual review as a human decision, and must
@@ -69,12 +69,11 @@ BI Desktop, re-running the analyzer after each change.
 
 ```
 pbi_usage_analyzer/                core, no network (unchanged rule)
-  views/history.py                 snapshot(), compare_runs()  (existing)
+  views/history.py                 snapshot(), compare_runs(), state_file() (per-user state)
+  views/assessment.py              previous run + current run -> AttemptAssessment (also GUI)
   assistant/                       A0: UI- and provider-agnostic
     briefing.py                    AnalysisResult (+ previous run, acknowledgements) -> Briefing
-    attempt.py                     previous run + current run -> AttemptAssessment
     prompts.py                     Task, system prompt, build_prompt() -> Prompt
-  views/history.py                 state_file(): per-user state (GUI review state, baselines)
 pbi_usage_analyzer_mcp/            A1: MCP server for Claude Desktop (stdlib only)
   protocol.py                      JSON-RPC over stdio, tools and prompts, both MCP eras
   tools.py                         analyzer tools and prompt templates
@@ -152,8 +151,10 @@ gives each change an effect and a note:
 | Anything else (now used, new used object, auto-generated object added/removed) | Neutral. |
 
 The assessment also carries status counts and findings per rule for both runs. It
-is useful without AI (the GUI's Changes tab can show the effects) and gives the AI
-facts to explain instead of a diff to interpret.
+lives in `pbi_usage_analyzer.views.assessment` (moved from `assistant` on
+2026-10-05, names re-exported there): the desktop app's Changes tab shows the same
+ratings (GUI_DESIGN.md section 16), and the AI gets facts to explain instead of a
+diff to interpret.
 
 ## 7. Transport
 

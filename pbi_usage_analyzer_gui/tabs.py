@@ -11,10 +11,12 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QGridLayout, QGroupBox, QHB
 
 from pbi_usage_analyzer.health.model import HealthSeverity
 from pbi_usage_analyzer.model import ObjectType, Status
-from pbi_usage_analyzer.views import (CHANGE_LABELS, LIKELY_UNUSED_CAVEAT, SEVERITY_LABELS, STATUS_INFO,
-                                      Acknowledgement, Change, DiagnosticRow, HealthRow, ObjectRow,
-                                      QueryDependencyRow, filter_health, filter_objects, unused_by_table)
+from pbi_usage_analyzer.views import (CHANGE_LABELS, EFFECT_LABELS, EFFECT_SUMMARIES, LIKELY_UNUSED_CAVEAT,
+                                      SEVERITY_LABELS, STATUS_INFO, Acknowledgement, AssessedChange,
+                                      DiagnosticRow, Effect, HealthRow, ObjectRow, QueryDependencyRow,
+                                      effect_summary, filter_health, filter_objects, unused_by_table)
 
+from .detail import effect_colour
 from .models import Column, RowTable
 
 BUSINESS_STATUSES = (Status.USED, Status.MANUAL_REVIEW, Status.LIKELY_UNUSED)
@@ -68,7 +70,7 @@ class OverviewTab(QWidget):
     show_objects = Signal(object, object, object)  # status | None, ObjectType | None, table | None
     show_health = Signal(object)  # HealthSeverity | None
     show_diagnostics = Signal()
-    show_changes = Signal()
+    show_changes = Signal(object)  # Effect | None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,7 +79,7 @@ class OverviewTab(QWidget):
 
     def set_result(self, objects: tuple[ObjectRow, ...], health: tuple[HealthRow, ...],
                    diagnostics: tuple[DiagnosticRow, ...], acknowledged: frozenset[str] = frozenset(),
-                   changes: tuple[Change, ...] | None = None) -> None:
+                   changes: tuple[AssessedChange, ...] | None = None) -> None:
         if self._content is not None:
             self._content.deleteLater()
         self._content = QWidget()
@@ -122,8 +124,15 @@ class OverviewTab(QWidget):
         changes_text = ("Changes: first run" if changes is None
                         else f"Changes since last run: {len(changes)}")
         changes_button = QPushButton(changes_text)
-        changes_button.clicked.connect(self.show_changes.emit)
+        changes_button.clicked.connect(lambda: self.show_changes.emit(None))
         health_layout.addWidget(changes_button)
+        risks = sum(item.effect == Effect.RISK for item in changes or ())
+        if risks:
+            risk_button = QPushButton(f"Risks among the changes: {risks}")
+            risk_button.setStyleSheet(f"color: {effect_colour(Effect.RISK)}; font-weight: bold")
+            risk_button.setToolTip(EFFECT_SUMMARIES[Effect.RISK])
+            risk_button.clicked.connect(lambda: self.show_changes.emit(Effect.RISK))
+            health_layout.addWidget(risk_button)
         health_layout.addStretch()
         middle.addWidget(health_box)
 
@@ -421,22 +430,67 @@ class QueriesTab(_ListTab):
         return self.table.select(lambda row: name in (row.query, row.depends_on))
 
 
-class ChangesTab(_ListTab):
-    """Differences from the previous analysis of the same project."""
+class ChangesTab(QWidget):
+    """Differences from the previous analysis, each with the analyzer's rating
+    (risk first). Ratings come from `pbi_usage_analyzer.views.assess_attempt`."""
+    row_selected = Signal(object)  # AssessedChange
 
     def __init__(self, parent=None):
-        super().__init__([
-            Column("Change", lambda c: CHANGE_LABELS[c.kind.value]), Column("Item", lambda c: c.label),
-            Column("Before", lambda c: c.before), Column("After", lambda c: c.after),
-        ], "", parent)
+        super().__init__(parent)
+        self._changes: tuple[AssessedChange, ...] = ()
+        self.message = QLabel()
+        self.message.setWordWrap(True)
+        self.effect = _combo([("All ratings", None)] + [(EFFECT_LABELS[e], e) for e in Effect])
+        for number, effect in enumerate(Effect, start=1):
+            self.effect.setItemData(number, EFFECT_SUMMARIES[effect], Qt.ItemDataRole.ToolTipRole)
+        self.count = QLabel()
+        filters = QHBoxLayout()
+        filters.addWidget(self.effect)
+        filters.addWidget(self.count)
+        filters.addStretch()
+        order = list(Effect)
+        self.table = RowTable([
+            # The rating's tooltip is this change's own explanation (also in the detail panel).
+            Column("Rating", lambda c: EFFECT_LABELS[c.effect], sort=lambda c: order.index(c.effect),
+                   foreground=lambda c: effect_colour(c.effect), tooltip=lambda c: c.note),
+            Column("Change", lambda c: CHANGE_LABELS[c.change.kind.value]),
+            Column("Item", lambda c: c.change.label),
+            Column("Before", lambda c: c.change.before), Column("After", lambda c: c.change.after),
+        ], self)
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.message)
+        layout.addLayout(filters)
+        layout.addWidget(self.table.view)
+        self.effect.currentIndexChanged.connect(self.apply)
+        self.table.view.selectionModel().selectionChanged.connect(self._selection_changed)
 
-    def set_changes(self, changes: tuple[Change, ...] | None, baseline: str | None) -> None:
-        self.set_rows(changes or ())
+    def set_changes(self, changes: tuple[AssessedChange, ...] | None, baseline: str | None) -> None:
+        self._changes = changes or ()
         if changes is None:
-            self.empty.setText("First analysis of this project on this computer: nothing to compare yet. "
-                               "Re-run after changing the model to see what changed.")
+            self.message.setText("First analysis of this project on this computer: nothing to compare yet. "
+                                 "Re-run after changing the model to see what changed.")
         elif not changes:
-            self.empty.setText(f"No changes since the previous analysis ({baseline}).")
+            self.message.setText(f"No changes since the previous analysis ({baseline}).")
         else:
-            self.empty.setText(f"{len(changes)} changes since the previous analysis ({baseline}).")
-        self.empty.setVisible(True)
+            self.message.setText(f"{len(changes)} changes since the previous analysis ({baseline}): "
+                                 f"{effect_summary(changes)}. Risks are listed first. Select a change "
+                                 "(or hover over its rating) to see why it got its rating.")
+        for widget in (self.effect, self.count, self.table.view):
+            widget.setVisible(bool(changes))
+        self.apply()
+
+    def set_filter(self, effect: Effect | None) -> None:
+        _set_combo(self.effect, effect)
+        self.apply()
+
+    def apply(self) -> None:
+        effect = self.effect.currentData()
+        rows = tuple(c for c in self._changes if effect is None or c.effect == effect)
+        self.table.set_rows(rows)
+        self.count.setText(f"{len(rows)} of {len(self._changes)}")
+        self._selection_changed()
+
+    def _selection_changed(self) -> None:
+        row = self.table.selected()
+        if row is not None:
+            self.row_selected.emit(row)

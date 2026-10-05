@@ -1,18 +1,18 @@
 """Deterministic assessment of an attempt to improve a model: what changed between
 two runs and whether each change is an improvement, a cleanup or a risk.
 
-Useful without AI (a front end can show the effects next to the changes) and
-given to the assistant as fact, so the AI explains changes instead of guessing
-what a diff means.
+Shown next to the changes by the desktop app's Changes tab and given to the AI
+assistant as fact, so the AI explains changes instead of guessing what a diff means.
 """
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
 from ..model import ObjectType, Status
-from ..views.history import Change, ChangeKind, RunSnapshot, compare_runs
+from .history import Change, ChangeKind, RunSnapshot, compare_runs
 
 
 class Effect(str, Enum):
@@ -30,6 +30,31 @@ EFFECT_LABELS = {
     Effect.CLEANUP: "Cleanup",
     Effect.NEUTRAL: "Neutral",
 }
+
+# One line per rating, for legends and tooltips.
+EFFECT_SUMMARIES = {
+    Effect.RISK: "Something that was in use was removed or now refers to a missing object. Check it first.",
+    Effect.ATTENTION: "Possibly unintended, for example an object that lost its use or a new finding.",
+    Effect.IMPROVEMENT: "A model-health finding no longer occurs.",
+    Effect.CLEANUP: "A Likely unused object was removed. Validate refresh and visuals.",
+    Effect.NEUTRAL: "No action needed, for example a new object that is used.",
+}
+
+# Plural phrases for summaries such as "2 risks · 1 needs attention".
+_COUNT_PHRASES = {
+    Effect.RISK: ("risk", "risks"),
+    Effect.ATTENTION: ("needs attention", "need attention"),
+    Effect.IMPROVEMENT: ("improvement", "improvements"),
+    Effect.CLEANUP: ("cleanup", "cleanups"),
+    Effect.NEUTRAL: ("neutral", "neutral"),
+}
+
+
+def effect_summary(changes: Iterable[AssessedChange]) -> str:
+    """`2 risks · 1 needs attention · 3 improvements`, most serious first; empty if none."""
+    counts = Counter(item.effect for item in changes)
+    return " · ".join(f"{counts[effect]} {_COUNT_PHRASES[effect][counts[effect] != 1]}"
+                      for effect in Effect if counts[effect])
 
 
 @dataclass(frozen=True)

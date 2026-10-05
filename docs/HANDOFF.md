@@ -131,7 +131,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Claude Desktop extension | Latest change: one-click `.mcpb` extension with its own small server build; manual section 15. Details below. |
+| Change ratings in the app | Latest change: the Changes tab rates each change (risk first). Details below. |
+| Claude Desktop extension | Previous change: one-click `.mcpb` extension with its own small server build; manual section 15. Details below. |
 | AI assistant A1 | Previous change: `pbi_usage_analyzer_mcp`, MCP server for Claude Desktop. Details below. |
 | AI assistant A0 | Previous change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
 | Text reports | Previous change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
@@ -165,7 +166,27 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: one-click Claude Desktop extension (2026-10-05)
+## Latest change: change ratings in the desktop app (2026-10-05)
+
+- User request: "Show the risk ratings in the desktop app". Details: GUI_DESIGN.md
+  section 16 ("Change ratings").
+- Core: `assistant/attempt.py` moved to `views/assessment.py` (`git mv`; names still
+  exported by `pbi_usage_analyzer.assistant`); new `EFFECT_SUMMARIES` and
+  `effect_summary()`; all exported from `pbi_usage_analyzer.views`.
+- GUI: `MainWindow.changes` is now a tuple of `AssessedChange` (from
+  `assess_attempt`); `ChangesTab` rebuilt (Rating column, filter, summary,
+  `set_filter`); `change_html(AssessedChange, ...)`; Overview risk button
+  (`show_changes` now carries an `Effect | None`); status bar summary; `Column`
+  gained `sort`/`foreground`/`tooltip`; `_SelectionAwareDelegate` keeps selected
+  text readable.
+- Manual section 12 rewritten with a rating table; screenshot 08 regenerated with
+  the DEVELOPMENT.md recipe (light scheme, 1280x780, copy of AW Mess on `subst P:`,
+  discovery wrapped to report `P:` paths; drive removed afterwards).
+- Tests: GUI test for ratings/sort/filter/colour/tooltip/overview link; the
+  existing changes test checks the rating in the detail panel; core test for
+  `effect_summary`.
+
+## Previous change: one-click Claude Desktop extension (2026-10-05)
 
 - User asked whether connector setup is a problem for non-technical users (yes:
   hand-editing `claude_desktop_config.json`), then "proceed" with the `.mcpb`

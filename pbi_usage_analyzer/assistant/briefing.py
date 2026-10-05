@@ -22,7 +22,7 @@ from ..views.explain import Explainer, review_reason
 from ..views.history import Acknowledgement, RunSnapshot, snapshot
 from ..views.rows import ObjectRow, diagnostic_rows, health_rows, object_rows, query_dependency_rows, \
     relationship_labels
-from .attempt import EFFECT_LABELS, AttemptAssessment, RunCounts, assess_attempt
+from ..views.assessment import EFFECT_LABELS, AttemptAssessment, RunCounts, assess_attempt
 
 BRIEFING_FORMAT = 1
 

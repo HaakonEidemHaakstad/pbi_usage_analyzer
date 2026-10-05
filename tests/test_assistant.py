@@ -91,6 +91,18 @@ class AttemptAssessmentTests(unittest.TestCase):
         self.assertEqual((assessment.before.findings, assessment.after.findings), (1, 0))
         self.assertEqual(run_counts(after).columns, {status: 0 for status in Status})
 
+    def test_effect_summary_counts_most_serious_first(self):
+        from pbi_usage_analyzer.views import effect_summary
+        before = _run([('Column|T|A', 'T[A]', Status.USED, ''), ('Column|T|B', 'T[B]', Status.USED, ''),
+                       ('Column|T|C', 'T[C]', Status.LIKELY_UNUSED, '')],
+                      [('R|s|f', 'MEASURE_DESCRIPTION_MISSING', 's', 't')])
+        assessment = assess_attempt(before, _run())
+        self.assertEqual(effect_summary(assessment.changes), '2 risks · 1 improvement · 1 cleanup')
+        self.assertEqual(effect_summary(()), '')
+        one = assess_attempt(_run([('Column|T|A', 'T[A]', Status.USED, '')]),
+                             _run([('Column|T|A', 'T[A]', Status.LIKELY_UNUSED, '')]))
+        self.assertEqual(effect_summary(one.changes), '1 needs attention')
+
     def test_removing_a_used_measure_is_a_risk_end_to_end(self):
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / 'p'

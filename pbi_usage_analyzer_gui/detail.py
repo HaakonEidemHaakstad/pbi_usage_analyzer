@@ -9,9 +9,9 @@ from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QApplication, QTextBrowser
 
 from pbi_usage_analyzer.model import ObjectRef, ObjectType, Status
-from pbi_usage_analyzer.views import (CHANGE_LABELS, EVIDENCE_LABELS, SEVERITY_LABELS, STATUS_INFO,
-                                      Acknowledgement, Change, ChangeKind, DiagnosticRow, Explanation,
-                                      HealthRow, ObjectRow, QueryDependencyRow, format_path)
+from pbi_usage_analyzer.views import (CHANGE_LABELS, EFFECT_LABELS, EVIDENCE_LABELS, SEVERITY_LABELS, STATUS_INFO,
+                                      Acknowledgement, AssessedChange, ChangeKind, DiagnosticRow, Effect,
+                                      Explanation, HealthRow, ObjectRow, QueryDependencyRow, format_path)
 
 # Objects the user can jump to from the detail panel.
 LINKABLE = {ObjectType.COLUMN, ObjectType.MEASURE, ObjectType.QUERY}
@@ -26,9 +26,26 @@ STATUS_COLOURS = {
 }
 
 
+# Ratings of changes between runs, same convention (hint only; the label carries it).
+EFFECT_COLOURS = {
+    Effect.RISK: ("#c62828", "#ef9a9a"),
+    Effect.ATTENTION: ("#b26a00", "#ffb74d"),
+    Effect.IMPROVEMENT: ("#2e7d32", "#81c784"),
+    Effect.CLEANUP: ("#1565c0", "#90caf9"),
+    Effect.NEUTRAL: ("#616161", "#bdbdbd"),
+}
+
+
+def _dark() -> bool:
+    return QApplication.palette().color(QPalette.ColorRole.Base).lightness() < 128
+
+
 def status_colour(status: Status) -> str:
-    dark = QApplication.palette().color(QPalette.ColorRole.Base).lightness() < 128
-    return STATUS_COLOURS[status][1 if dark else 0]
+    return STATUS_COLOURS[status][1 if _dark() else 0]
+
+
+def effect_colour(effect: Effect) -> str:
+    return EFFECT_COLOURS[effect][1 if _dark() else 0]
 
 
 class _Html:
@@ -168,11 +185,14 @@ def query_html(row: QueryDependencyRow) -> _Html:
     return out
 
 
-def change_html(change: Change, current: ObjectRef | None) -> _Html:
-    """A change between runs; `current` is the object if it still exists."""
+def change_html(item: AssessedChange, current: ObjectRef | None) -> _Html:
+    """A change between runs with its rating; `current` is the object if it still exists."""
+    change = item.change
     out = _Html()
     out.add(f"<h2>{escape(change.label)}</h2>")
     out.add(f"<p style='color:gray'>{escape(CHANGE_LABELS[change.kind.value])}</p>")
+    out.add(f"<p><b style='color:{effect_colour(item.effect)}'>{escape(EFFECT_LABELS[item.effect])}</b>: "
+            f"{escape(item.note)}</p>")
     if change.kind in (ChangeKind.FINDING_ADDED, ChangeKind.FINDING_RESOLVED):
         out.paragraph(change.after or change.before)
         out.paragraph("New findings appear in the Health tab." if change.kind == ChangeKind.FINDING_ADDED

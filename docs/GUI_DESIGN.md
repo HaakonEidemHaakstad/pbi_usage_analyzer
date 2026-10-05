@@ -358,5 +358,16 @@ safety gap, now fixed in the core: a legacy-format report was read as having no
 visuals, so every report-only field looked Likely unused (`PBIR_LEGACY_FORMAT`,
 scenario 43).
 
+Change ratings (2026-10-05): the Changes tab shows the deterministic assessment
+of each change (`views.assessment`, shared with the AI assistant; rules in
+AI_ASSISTANT_DESIGN.md section 6): a Rating column (Risk, Attention, Improvement,
+Cleanup, Neutral; coloured, sorted by severity, tooltip = the change's own note),
+a rating filter, a summary line (`effect_summary`), the rating and note at the top
+of the detail panel, a "Risks among the changes" button on the Overview that opens
+the tab filtered to risks, and the summary in the status bar. `Column` in
+`models.py` gained optional `sort`, `foreground` and `tooltip`; a delegate shows
+selected cells in the highlight text colour (red on the selection blue was
+unreadable in the light scheme). Manual section 12 and screenshot 08 updated.
+
 Remaining ideas (not planned phases): open a file at a line in an editor, a drawn
 dependency graph, an app icon and version resource, code signing, an installer.

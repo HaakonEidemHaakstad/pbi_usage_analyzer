@@ -5,7 +5,8 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import Any, NamedTuple
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
-from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QTableView
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QStyle, QStyledItemDelegate, QTableView
 
 SORT_ROLE = Qt.ItemDataRole.UserRole
 
@@ -13,6 +14,12 @@ SORT_ROLE = Qt.ItemDataRole.UserRole
 class Column(NamedTuple):
     header: str
     value: Callable[[Any], Any]
+    # Optional: sort by this key instead of the displayed value (e.g. severity order).
+    sort: Callable[[Any], Any] | None = None
+    # Optional: text colour (a colour name such as "#c62828"), or None for the default.
+    foreground: Callable[[Any], str | None] | None = None
+    # Optional: tooltip text instead of the displayed value.
+    tooltip: Callable[[Any], str] | None = None
 
 
 def _display(value: Any) -> str:
@@ -59,17 +66,32 @@ class RowTableModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
-        value = self._columns[index.column()].value(self._rows[index.row()])
-        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.ToolTipRole):
-            return _display(value)
+        column, row = self._columns[index.column()], self._rows[index.row()]
+        if role == Qt.ItemDataRole.DisplayRole:
+            return _display(column.value(row))
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return column.tooltip(row) if column.tooltip else _display(column.value(row))
         if role == SORT_ROLE:
-            return _sort_key(value)
+            return _sort_key(column.sort(row) if column.sort else column.value(row))
+        if role == Qt.ItemDataRole.ForegroundRole and column.foreground:
+            colour = column.foreground(row)
+            return QColor(colour) if colour else None
         return None
 
     def headerData(self, section: int, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self._columns[section].header
         return None
+
+
+class _SelectionAwareDelegate(QStyledItemDelegate):
+    """Coloured text (Column.foreground) would be unreadable on the selection
+    highlight, so selected cells use the palette's highlighted-text colour."""
+
+    def initStyleOption(self, option, index) -> None:  # noqa: N802 (Qt API)
+        super().initStyleOption(option, index)
+        if option.state & QStyle.StateFlag.State_Selected:
+            option.palette.setBrush(QPalette.ColorRole.Text, option.palette.brush(QPalette.ColorRole.HighlightedText))
 
 
 class _SortProxy(QSortFilterProxyModel):
@@ -86,6 +108,7 @@ class RowTable:
         self.proxy.setSourceModel(self.model)
         self.view = QTableView(parent)
         self.view.setModel(self.proxy)
+        self.view.setItemDelegate(_SelectionAwareDelegate(self.view))
         self.view.setSortingEnabled(True)
         self.view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)

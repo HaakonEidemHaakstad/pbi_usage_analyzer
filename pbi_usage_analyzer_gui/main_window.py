@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QInputDia
 from pbi_usage_analyzer import AnalysisResult, __version__
 from pbi_usage_analyzer.model import ObjectType
 from pbi_usage_analyzer.reporting.files import write_reports
-from pbi_usage_analyzer.views import (Change, Explainer, ProjectState, compare_runs, diagnostic_rows,
+from pbi_usage_analyzer.views import (AssessedChange, Effect, Explainer, ProjectState, assess_attempt,
+                                      diagnostic_rows, effect_summary,
                                       health_rows, object_key, object_rows, query_dependency_rows, snapshot)
 from pbi_usage_analyzer.views.history import state_file
 
@@ -84,7 +85,7 @@ class MainWindow(QMainWindow):
         self.data_dir = data_dir or Path(QStandardPaths.writableLocation(
             QStandardPaths.StandardLocation.AppDataLocation))
         self.state: ProjectState | None = None
-        self.changes: tuple[Change, ...] | None = None
+        self.changes: tuple[AssessedChange, ...] | None = None
         self.result: AnalysisResult | None = None
         self.project: Path | None = None
         self.explainer: Explainer | None = None
@@ -127,7 +128,7 @@ class MainWindow(QMainWindow):
         self.overview.show_objects.connect(self._show_objects)
         self.overview.show_health.connect(self._show_health)
         self.overview.show_diagnostics.connect(lambda: self.tabs.setCurrentWidget(self.diagnostics))
-        self.overview.show_changes.connect(lambda: self.tabs.setCurrentWidget(self.changes_tab))
+        self.overview.show_changes.connect(self._show_changes)
         self.cleanup.object_selected.connect(self._object_selected)
         self.health.finding_selected.connect(self._finding_selected)
         self.changes_tab.row_selected.connect(self._change_selected)
@@ -269,7 +270,7 @@ class MainWindow(QMainWindow):
             self.state = self._load_state(result.project.root)
         current = snapshot(result)
         previous = self.state.last_run
-        self.changes = compare_runs(previous, current) if previous is not None else None
+        self.changes = assess_attempt(previous, current).changes if previous is not None else None
         self.state.last_run = current
         self._save_state()
         acknowledgements = self.state.acknowledgements
@@ -297,7 +298,8 @@ class MainWindow(QMainWindow):
             f"{columns.used + measures.used} Used, {columns.manual_review + measures.manual_review} "
             f"Needs manual review, {columns.likely_unused + measures.likely_unused} Likely unused · "
             f"{len(health)} health findings · {len(diagnostics)} diagnostics"
-            + (f" · {len(self.changes)} changes since last run" if self.changes else ""))
+            + (f" · {len(self.changes)} changes since last run ({effect_summary(self.changes)})"
+               if self.changes else ""))
         if self.auto_reports_action.isChecked():
             self._write_automatic_reports(result)
         if selected is None or not self._restore(selected):
@@ -324,11 +326,15 @@ class MainWindow(QMainWindow):
     def _finding_selected(self, row) -> None:
         self.detail.show_html(health_html(row, self._acknowledgement(row.key)))
 
-    def _change_selected(self, change: Change) -> None:
+    def _show_changes(self, effect: Effect | None) -> None:
+        self.changes_tab.set_filter(effect)
+        self.tabs.setCurrentWidget(self.changes_tab)
+
+    def _change_selected(self, item: AssessedChange) -> None:
         current = None
         if self.result is not None:
-            current = next((f.ref for f in self.result.findings if object_key(f.ref) == change.key), None)
-        self.detail.show_html(change_html(change, current))
+            current = next((f.ref for f in self.result.findings if object_key(f.ref) == item.change.key), None)
+        self.detail.show_html(change_html(item, current))
 
     # Review state: acknowledgements and the last run, per user and project
 

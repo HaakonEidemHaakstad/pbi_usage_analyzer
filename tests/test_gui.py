@@ -12,12 +12,12 @@ SUITE = Path(__file__).resolve().parents[1] / 'tools/validation/validation_suite
 
 if HAS_QT:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QSettings
+    from PySide6.QtCore import QSettings, Qt
     from PySide6.QtWidgets import QApplication, QMessageBox
 
     from pbi_usage_analyzer import analyze_project
     from pbi_usage_analyzer.model import ObjectRef, ObjectType, Status
-    from pbi_usage_analyzer.views import filter_objects, health_rows, object_rows
+    from pbi_usage_analyzer.views import Effect, filter_objects, health_rows, object_rows
     from pbi_usage_analyzer_gui.main_window import MainWindow, project_folder
 
 
@@ -155,21 +155,53 @@ class GuiSmokeTests(unittest.TestCase):
         shutil.copytree(SUITE / '41_m_usage_aware_lineage', project)
         self.run_analysis(project)
         self.assertIsNone(self.window.changes)
-        self.assertIn('First analysis', self.window.changes_tab.empty.text())
+        self.assertIn('First analysis', self.window.changes_tab.message.text())
         (next(project.rglob('Visual2')) / 'visual.json').unlink()
         self.window.rerun_action.trigger()
         self.wait_for_analysis()
         rows = self.window.changes_tab.table.model.rows
-        self.assertIn(('Budget[Note]', 'Used', 'Likely unused'), [(c.label, c.before, c.after) for c in rows])
-        self.assertTrue(self.window.changes_tab.table.select(lambda c: c.label == 'Budget[Note]'))
+        self.assertIn(('Budget[Note]', 'Used', 'Likely unused', Effect.ATTENTION),
+                      [(c.change.label, c.change.before, c.change.after, c.effect) for c in rows])
+        self.assertTrue(self.window.changes_tab.table.select(lambda c: c.change.label == 'Budget[Note]'))
         text = self.window.detail.toPlainText()
         self.assertIn('Report -> Budget[Note]', text)  # the evidence path it had before
+        self.assertIn('Attention: No known use any more', text)
         # The comparison survives a restart: a new window compares with the last run.
         again = MainWindow(QSettings(str(Path(self.tmp.name) / "s2.ini"), QSettings.Format.IniFormat), self.data_dir)
         self.addCleanup(again.close)
         self.window = again
         self.run_analysis(project)
         self.assertEqual(again.changes, ())
+
+    def test_change_ratings_risk_first_filter_and_overview_link(self):
+        project = Path(self.tmp.name) / 'project'
+        shutil.copytree(SUITE / '02_dax_transitive', project)
+        self.run_analysis(project)
+        sales = next(project.rglob('Sales.tmdl'))
+        text = sales.read_text(encoding='utf-8')
+        # Remove a used column: a Risk (removed while Used) and a Risk (DAX now unresolved).
+        sales.write_text(text.replace("    column Amount\n        dataType: double\n        sourceColumn: Amount\n\n",
+                                      ''), encoding='utf-8')
+        self.window.rerun_action.trigger()
+        self.wait_for_analysis()
+        tab = self.window.changes_tab
+        effects = [c.effect for c in tab.table.model.rows]
+        self.assertEqual(effects[:2], [Effect.RISK, Effect.RISK])
+        self.assertEqual(effects, sorted(effects, key=list(Effect).index))
+        self.assertIn('2 risks', tab.message.text())
+        model = tab.table.model
+        self.assertEqual(model.data(model.index(0, 0)), 'Risk')
+        self.assertIsNotNone(model.data(model.index(0, 0), Qt.ItemDataRole.ForegroundRole))
+        self.assertIn('The previous analysis proved this object used',
+                      model.data(model.index(0, 0), Qt.ItemDataRole.ToolTipRole))
+        self.assertIn('Check it first', tab.effect.itemData(1, Qt.ItemDataRole.ToolTipRole))
+        # The overview's risk button opens the tab filtered to risks.
+        self.window._show_changes(Effect.IMPROVEMENT)
+        self.assertTrue(all(c.effect == Effect.IMPROVEMENT for c in tab.table.model.rows))
+        self.window._show_changes(Effect.RISK)
+        self.assertIs(self.window.tabs.currentWidget(), tab)
+        self.assertEqual({c.change.label for c in tab.table.model.rows}, {'Sales[Amount]', 'Sales[Measure B]'})
+        self.assertIn('risks', self.window.statusBar().currentMessage())
 
     def test_acknowledgements_persist_hide_and_can_be_removed(self):
         project = Path(self.tmp.name) / 'project'

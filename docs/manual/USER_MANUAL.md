@@ -318,7 +318,7 @@ are not saved in the project and not shared with colleagues.
 
 ## 12. The Changes tab
 
-![The Changes tab after a visual was removed](images/08-changes.png)
+![The Changes tab after a cleanup round, with a risk listed first](images/08-changes.png)
 
 Every time you analyze a project, the analyzer remembers the result. The
 **Changes** tab compares the current result with the previous analysis of the
@@ -328,12 +328,26 @@ same project, even if you closed the app in between. It lists:
 - **new** and **removed** objects;
 - health findings that are **new** or **resolved**.
 
-Select a change to see the evidence the object had before, for example
-`Report -> customers[first_name]`. In the screenshot, a table visual was removed
-from the report, so the two columns it showed lost their only use.
+Each change gets a **rating**, and the most serious ones are listed first:
+
+| Rating | Meaning | Examples |
+| --- | --- | --- |
+| **Risk** | Something that was in use was removed, or now refers to a missing object. Check it first. | You deleted a column the report uses; a measure now refers to a column that no longer exists. |
+| **Attention** | Possibly unintended. | An object lost its last use; a new health finding; a removed object that needed manual review. |
+| **Improvement** | A health finding no longer occurs. | You consolidated duplicate measures. |
+| **Cleanup** | A Likely unused object was removed. | Still refresh and check your visuals. |
+| **Neutral** | No action needed. | A new measure that the report already uses. |
+
+The line above the table counts the ratings, and the list next to it shows only
+one rating at a time. Select a change to see why it got its rating and the
+evidence the object had before, for example `Report -> customers[first_name]`. In
+the screenshot, a duplicate measure was removed (a cleanup that also resolved two
+health findings), but so was a column a visual still shows: that is a risk.
+If the Overview tab shows **Risks among the changes**, click it to list just those.
 
 Use the Changes tab after each cleanup round (section 9) to confirm that only
-what you expected changed.
+what you expected changed. If you use Claude Desktop (section 15), Claude sees the
+same ratings when you ask it to evaluate your changes.
 
 ## 13. The Diagnostics and Queries tabs
 
