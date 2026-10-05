@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from ..analysis.classify import MANUAL_REVIEW, OWNER_DEPENDENCY, PROPAGATING_EVIDENCE, ROOT_EVIDENCE, propagate_used
 from ..model import DependencyGraph, Evidence, EvidenceType, Finding, ObjectRef, Status
-from .catalog import EVIDENCE_LABELS
+from .catalog import EVIDENCE_LABELS, STATUS_INFO
 
 Path = tuple[Evidence, ...]
 
@@ -112,6 +112,25 @@ class Explainer:
             chain.append(edge)
             node = edge.target
         return chain
+
+
+def review_reason(explainer: Explainer, finding: Finding) -> str:
+    """Why an object is held for review: a lineage path, or its own evidence with
+    the owner's status when the owner is not Used."""
+    explanation = explainer.explain(finding.ref)
+    if explanation.review_path:
+        return "via " + format_path(explanation.review_path)
+    reasons = []
+    for ev in explanation.evidence:
+        if ev.evidence_type not in _REVIEW_CAUSES:
+            continue
+        reason = ev.reason
+        owner = explainer.status_of(ev.source) if ev.source is not None else None
+        if owner is not None and owner != Status.USED:
+            reason += f" ({ev.source.label} is {STATUS_INFO[owner].label})"
+        if reason not in reasons:
+            reasons.append(reason)
+    return "; ".join(reasons) or " | ".join(finding.reasons) or "Unresolved dependency"
 
 
 def format_path(path: Path) -> str:

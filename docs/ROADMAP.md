@@ -85,6 +85,13 @@ Possible use:
 
 Core analysis must remain fully usable offline and without API credentials.
 
+Design: [AI_ASSISTANT_DESIGN.md](AI_ASSISTANT_DESIGN.md). Owner decisions
+(2026-10-05): interpret results, suggest next steps, evaluate improvement attempts;
+Claude (Anthropic) as provider; everything in the analysis may be sent. Phase A0 is
+done: the offline `pbi_usage_analyzer.assistant` package (briefing, deterministic
+attempt assessment, prompts). Next: A1 copy-and-paste in the GUI/CLI (no network),
+then A2 Claude transport in a separate optional package and build.
+
 
 ## Cross-cutting validation — Database-backed integration validation
 

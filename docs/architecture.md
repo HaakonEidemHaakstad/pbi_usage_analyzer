@@ -307,6 +307,18 @@ Design and phases: [GUI_DESIGN.md](GUI_DESIGN.md). The desktop viewer lives in t
 separate package `pbi_usage_analyzer_gui` (optional PySide6 dependency); it renders
 `views` rows and calls the API and `write_reports`, nothing else.
 
+### AI assistant core (`assistant`)
+
+`pbi_usage_analyzer.assistant` is the provider-agnostic core of the optional AI
+layer ([AI_ASSISTANT_DESIGN.md](AI_ASSISTANT_DESIGN.md)). It reads an
+`AnalysisResult` only through `views`: `briefing` renders a deterministic,
+sectioned text (relative paths, no timestamps), `attempt` classifies the
+differences between two `RunSnapshot`s (risk, attention, improvement, cleanup,
+neutral) without AI, and `prompts` builds a `Prompt` (fixed system prompt, briefing
+in `<analysis>` tags, then the task) for interpretation, next steps or evaluation.
+It contains no network code and no AI SDK (import guard in `tests/test_assistant.py`);
+transports belong in a separate optional package.
+
 ### Public application API
 
 `pbi_usage_analyzer.analyze_project(path)` owns discovery, graph construction,

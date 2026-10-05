@@ -1,6 +1,6 @@
 # Agent handoff — current working state
 
-Last updated: 2026-10-01. This file is intended to let a new agent continue without
+Last updated: 2026-10-05. This file is intended to let a new agent continue without
 chat history. Treat source files and a fresh `git status` as authoritative if this
 snapshot becomes stale. Update this handoff after material changes.
 
@@ -17,8 +17,9 @@ snapshot becomes stale. Update this handoff after material changes.
 
 The product is a supervised engineering alpha: a deterministic Power BI PBIP/PBIR
 usage and model-health analyzer. It has a graph-based core, CLI, library API,
-text/Excel/JSON exports, synthetic fixtures, and advisory rules. No GUI or AI
-service is implemented. Correctness and evidence-based conservatism take priority;
+text/Excel/JSON exports, synthetic fixtures, advisory rules, and a PySide6 Windows
+app. The AI assistant has an offline core (briefing, attempt assessment, prompts);
+no AI service is called yet. Correctness and evidence-based conservatism take priority;
 `Likely unused` never means safe to delete.
 
 ## Repository and publication state
@@ -139,7 +140,8 @@ queries, done), then option 4 because no other real project is available (GUI
 design document, done; no code), then "go with the toolkit you think is best. build
 windows app. interface language english, start G0 now" (G0 done), then "proceed"
 (G1 read-only viewer, done), then "proceed with 3" (G3 Windows build, done), then
-"proceed" (G2 workflow aids, done).
+"proceed" (G2 workflow aids, done). Later (2026-10-02/05): plain-text reports
+(done); "start working on the integrated AI assistant" (A0 done, see below).
 
 ## Implemented work in the current tree
 
@@ -159,7 +161,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Text reports | Latest change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
+| AI assistant A0 | Latest change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
+| Text reports | Previous change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
 | IT review hardening | Previous change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
 | User manual | Previous change: `docs/manual/` manual + screenshots, `User manual.html` in the app (Help > User manual, F1); legacy report format safety fix (`PBIR_LEGACY_FORMAT`, scenario 43). Details below. |
 | GUI phase G2 | Previous change: run comparison, acknowledgements, dependency links (`views/history.py`, Changes tab, Review menu). Details below. |
@@ -190,7 +193,32 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: plain-text reports (2026-10-02)
+## Latest change: AI assistant phase A0 (2026-10-05)
+
+- User request: start the integrated AI assistant, to (1) interpret results, (2)
+  suggest next steps towards best practice, (3) evaluate improvement attempts;
+  iterative development. Owner decisions (asked): provider **Claude (Anthropic)**
+  under the organization's agreement (platform/auth still open); **everything in
+  the analysis** may be sent (DAX, M, paths); first iteration = design + offline core.
+- docs/AI_ASSISTANT_DESIGN.md: principles (advisory, deterministic first,
+  conservatism in the system prompt, project text is data not instructions, core
+  offline), briefing sections, attempt-assessment table, transports (A1 copy and
+  paste with no network; A2 `pbi_usage_analyzer_ai` with the `anthropic` SDK in a
+  separate build variant so the standard app and IT fact sheet stay network-free),
+  phases A0–A3, open questions, A0 result with measured sizes.
+- Code: `pbi_usage_analyzer/assistant/` (`briefing.py`, `attempt.py`, `prompts.py`).
+  `views.explain.review_reason` moved from `reporting/text_report.py` (identical
+  body; the text report now imports it). Tests: `tests/test_assistant.py` (21).
+- Verified: compile, fixture drift, 323 tests with the three real-project
+  integration tests (AW, AW Mess, AW Good) and offscreen GUI tests, synthetic
+  validation 365/365, runtime smoke test. No status or finding changed (no analysis
+  code touched).
+- Next (A1): GUI Assistant panel/CLI option to build and copy a prompt per task,
+  Changes tab showing assessment effects, paste an answer back. Before A2: ask the
+  user which Claude platform and authentication their organization uses, and
+  whether IT accepts a network-enabled build variant.
+
+## Previous change: plain-text reports (2026-10-02)
 
 - User asked whether plain-text reports like v1's are possible (v1's code and
   samples are not in the repo; v2 already writes `<Project>_usage_summary_v2.txt` via

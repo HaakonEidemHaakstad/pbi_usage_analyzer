@@ -5,42 +5,21 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..analysis.build_graph import AnalysisContext
-from ..analysis.classify import MANUAL_REVIEW, OWNER_DEPENDENCY
 from ..health.engine import RULE_INFO
 from ..health.model import HealthFinding, HealthSeverity
 from ..health.filtering import HealthFilterScope
 from .health_scope import health_scope_rows
 from ..model import Finding, ObjectType, Status
-from ..views.catalog import STATUS_INFO
-from ..views.explain import Explainer, format_path
+from ..views.explain import Explainer, review_reason
 from ..views.rows import relationship_labels
 
 WIDTH = 70
 # Health rules whose first evidence line adds nothing to the scope shown.
 _NO_DETAIL = {"MEASURE_DESCRIPTION_MISSING"}
-_REVIEW_CAUSES = MANUAL_REVIEW | OWNER_DEPENDENCY
 
 
 def _shorten(text: str, limit: int = 110) -> str:
     return text if len(text) <= limit else text[:limit - 3] + "..."
-
-
-def _review_reason(explainer: Explainer, finding: Finding) -> str:
-    """Why an object is held for review: a lineage path, or its own evidence."""
-    explanation = explainer.explain(finding.ref)
-    if explanation.review_path:
-        return "via " + format_path(explanation.review_path)
-    reasons = []
-    for ev in explanation.evidence:
-        if ev.evidence_type not in _REVIEW_CAUSES:
-            continue
-        reason = ev.reason
-        owner = explainer.status_of(ev.source) if ev.source is not None else None
-        if owner is not None and owner != Status.USED:
-            reason += f" ({ev.source.label} is {STATUS_INFO[owner].label})"
-        if reason not in reasons:
-            reasons.append(reason)
-    return "; ".join(reasons) or " | ".join(finding.reasons) or "Unresolved dependency"
 
 
 def _health_lines(health_findings: tuple[HealthFinding, ...], ctx: AnalysisContext) -> list[str]:
@@ -162,7 +141,7 @@ def generate_text(project_name: str, findings: list[Finding], ctx: AnalysisConte
         lines.append(f"- {len(manual_measures)} measures require manual review.")
         lines.append("")
         for f in manual_cols + manual_measures:
-            lines.append(f"  - {f.ref.label}: {_review_reason(explainer, f)}")
+            lines.append(f"  - {f.ref.label}: {review_reason(explainer, f)}")
 
     if ctx.report:
         if ctx.report.stale:

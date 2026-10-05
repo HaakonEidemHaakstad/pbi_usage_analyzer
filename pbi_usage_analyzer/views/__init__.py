@@ -4,7 +4,7 @@ Shared by the reports and future front ends; contains no analysis and no GUI cod
 """
 from .catalog import (CATEGORY_LABELS, CHANGE_LABELS, EVIDENCE_LABELS, LIKELY_UNUSED_CAVEAT, SEVERITY_LABELS,
                       STATUS_INFO, StatusInfo, category_label, rule_info)
-from .explain import Explainer, Explanation, format_path
+from .explain import Explainer, Explanation, format_path, review_reason
 from .history import (Acknowledgement, Change, ChangeKind, ProjectState, RunSnapshot, compare_runs,
                       snapshot)
 from .rows import (DiagnosticRow, HealthRow, ObjectRow, QueryDependencyRow, diagnostic_rows,
@@ -14,7 +14,7 @@ from .rows import (DiagnosticRow, HealthRow, ObjectRow, QueryDependencyRow, diag
 __all__ = [
     "CATEGORY_LABELS", "CHANGE_LABELS", "EVIDENCE_LABELS", "LIKELY_UNUSED_CAVEAT", "SEVERITY_LABELS", "STATUS_INFO",
     "StatusInfo", "category_label", "rule_info",
-    "Explainer", "Explanation", "format_path",
+    "Explainer", "Explanation", "format_path", "review_reason",
     "Acknowledgement", "Change", "ChangeKind", "ProjectState", "RunSnapshot", "compare_runs", "snapshot",
     "DiagnosticRow", "HealthRow", "ObjectRow", "QueryDependencyRow", "diagnostic_rows",
     "filter_health", "filter_objects", "health_key", "health_rows", "object_key", "object_rows",
