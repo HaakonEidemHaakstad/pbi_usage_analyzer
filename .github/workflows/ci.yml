@@ -111,12 +111,13 @@ jobs:
           .\.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-build.lock
       - name: Build, smoke-test and zip the application
         run: .\scripts\build_windows.ps1 -OutDir dist
-      - name: Upload the application zip
+      - name: Upload the application zip and Claude Desktop extension
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pbi-model-health-windows
           path: |
             dist/*.zip
+            dist/*.mcpb
             dist/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

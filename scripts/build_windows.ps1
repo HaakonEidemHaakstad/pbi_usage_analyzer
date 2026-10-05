@@ -9,6 +9,25 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Drive an MCP server executable over stdio: handshake, tool list, one analysis.
+function Test-McpServer([string]$Executable, [string[]]$Arguments, [string]$Project, [string]$StateDir) {
+    $pathJson = ($Project | ConvertTo-Json)
+    $requests = @(
+        '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}',
+        '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+        '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
+        ('{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"analyze_model","arguments":{"project_path":' + $pathJson + ',"sections":["project"]}}}')
+    )
+    $replies = @($requests | & $Executable @Arguments --data-dir $StateDir)
+    $exitCode = $LASTEXITCODE
+    $ids = @($replies | ForEach-Object { ($_ | ConvertFrom-Json).id })
+    $analysis = ($replies[2] | ConvertFrom-Json).result
+    if ($exitCode -ne 0 -or ($ids -join ",") -ne "1,2,3" -or $analysis.isError -or
+            -not $analysis.content[0].text.Contains("<analysis>")) {
+        throw "MCP smoke test of $Executable failed (exit code $exitCode): $($replies -join ' | ')"
+    }
+}
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $OutDir) { $OutDir = Join-Path $root "dist" }
 $OutDir = [System.IO.Path]::GetFullPath($OutDir)
@@ -33,6 +52,16 @@ try {
     # No network components, no missing DLL dependencies.
     & $python packaging\check_bundle.py $app
     if ($LASTEXITCODE -ne 0) { throw "Bundle check failed." }
+
+    # Claude Desktop extension: a separate, Qt-free build of the MCP server.
+    & $python -m PyInstaller packaging\pbi_model_health_mcp.spec --noconfirm --clean `
+        --distpath $OutDir --workpath (Join-Path $OutDir ".build-mcp")
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed for the MCP server." }
+    $server = Join-Path $OutDir "pbi-model-health-mcp"
+    & $python packaging\write_notices.py --server $server
+    if ($LASTEXITCODE -ne 0) { throw "Writing the server's notices failed." }
+    & $python packaging\check_bundle.py $server
+    if ($LASTEXITCODE -ne 0) { throw "Bundle check of the MCP server failed." }
 
     if (-not $SkipSmokeTest) {
         # Run the frozen app headless on a synthetic project: analysis, main window, export.
@@ -71,23 +100,10 @@ try {
         }
         Write-Host "Console smoke test passed."
 
-        # MCP server for Claude Desktop: handshake, tool list and one analysis over stdio.
-        $pathJson = ($project | ConvertTo-Json)
-        $requests = @(
-            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25"}}',
-            '{"jsonrpc":"2.0","method":"notifications/initialized"}',
-            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
-            ('{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"analyze_model","arguments":{"project_path":' + $pathJson + ',"sections":["project"]}}}')
-        )
-        $replies = @($requests | & (Join-Path $app "pbi-model-health-cli.exe") --mcp --data-dir (Join-Path $work "mcp-state"))
-        $mcpExit = $LASTEXITCODE
-        $ids = @($replies | ForEach-Object { ($_ | ConvertFrom-Json).id })
-        $analysis = ($replies[2] | ConvertFrom-Json).result
-        if ($mcpExit -ne 0 -or ($ids -join ",") -ne "1,2,3" -or $analysis.isError -or
-                -not $analysis.content[0].text.Contains("<analysis>")) {
-            throw "MCP smoke test failed (exit code $mcpExit): $($replies -join ' | ')"
-        }
-        Write-Host "MCP smoke test passed."
+        # MCP server for Claude Desktop, in the app and in the extension's own build.
+        Test-McpServer (Join-Path $app "pbi-model-health-cli.exe") @("--mcp") $project (Join-Path $work "mcp-state")
+        Test-McpServer (Join-Path $server "pbi-model-health-mcp.exe") @() $project (Join-Path $work "mcp-state")
+        Write-Host "MCP smoke tests passed."
         Remove-Item -Recurse -Force $work
     }
 
@@ -95,14 +111,18 @@ try {
     if (Test-Path $zip) { Remove-Item -Force $zip }
     Compress-Archive -Path $app -DestinationPath $zip
     $size = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+    $extension = Join-Path $OutDir "PBI-Model-Health-$version.mcpb"
+    & $python packaging\build_mcpb.py $server $extension
+    if ($LASTEXITCODE -ne 0) { throw "Packing the Claude Desktop extension failed." }
     # Checksums for verifying a download (sha256sum format).
     $sums = Join-Path $OutDir "SHA256SUMS.txt"
-    $lines = foreach ($file in @($zip, (Join-Path $app "PBI Model Health.exe"), (Join-Path $app "pbi-model-health-cli.exe"))) {
+    $lines = foreach ($file in @($zip, $extension, (Join-Path $app "PBI Model Health.exe"), (Join-Path $app "pbi-model-health-cli.exe"))) {
         "{0}  {1}" -f (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant(), (Split-Path -Leaf $file)
     }
     Set-Content -Path $sums -Value $lines -Encoding ascii
     Write-Host "Application folder: $app"
     Write-Host "Zip ($size MB): $zip"
+    Write-Host "Claude Desktop extension: $extension"
     Get-Content $sums | Write-Host
 } finally {
     Pop-Location

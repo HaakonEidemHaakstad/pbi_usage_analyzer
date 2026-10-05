@@ -2,9 +2,12 @@
 (sbom.cdx.json) and a SHA-256 manifest of every file into a built app folder.
 
 Usage: python packaging/write_notices.py "dist/PBI Model Health"
+       python packaging/write_notices.py --server "dist/pbi-model-health-mcp"
 
 Run with the same environment that built the app: the bundled distributions are
 the transitive runtime requirements of pandas, openpyxl and PySide6-Essentials.
+`--server` is for the Claude Desktop extension's server, which bundles only the
+Python runtime and the analyzer (no third-party distributions).
 """
 from __future__ import annotations
 
@@ -57,7 +60,7 @@ def license_text(dist: metadata.Distribution) -> str:
     return ", ".join(classifiers) or "see the license files"
 
 
-def sbom(version: str, dists: list[metadata.Distribution]) -> dict:
+def sbom(version: str, dists: list[metadata.Distribution], name: str = "PBI Model Health") -> dict:
     """CycloneDX 1.5 SBOM of the bundled runtime: Python and its distributions."""
     def licenses(dist: metadata.Distribution) -> list[dict]:
         expression = dist.metadata.get("License-Expression")
@@ -74,7 +77,7 @@ def sbom(version: str, dists: list[metadata.Distribution]) -> dict:
         "bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1,
         "serialNumber": f"urn:uuid:{uuid.uuid4()}",
         "metadata": {"timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                     "component": {"type": "application", "name": "PBI Model Health", "version": version}},
+                     "component": {"type": "application", "name": name, "version": version}},
         "components": components,
     }
 
@@ -174,7 +177,49 @@ def main(app_folder: Path) -> None:
     write_manifest(app_folder)  # last: covers every file written above
 
 
+def server_readme(version: str) -> str:
+    return f"""Power BI Model Health Analyzer {version}: server for Claude Desktop
+==================================================================
+
+Claude Desktop starts "pbi-model-health-mcp.exe" when this extension is enabled
+and talks to it over standard input/output (Model Context Protocol). It reads the
+Power BI projects you name in the chat and never changes them. It makes no network
+connections; Claude Desktop sends the results you approve to Claude.
+
+Its only file output is one baseline per project (save_baseline) in
+%APPDATA%\\pbi-usage-analyzer\\Power BI Model Health Analyzer\\assistant\\.
+
+"Likely unused" marks a cleanup candidate, not proof that deletion is safe.
+
+The Python runtime is listed in THIRD_PARTY_NOTICES.txt with its license under
+LICENSES\\. Packaged with PyInstaller, whose bootloader is licensed under the GPL
+with an exception that permits this kind of distribution.
+"""
+
+
+def main_server(folder: Path) -> None:
+    """Notices for the extension's server folder: Python runtime only."""
+    sys.path.insert(0, str(HERE.parent))
+    from pbi_usage_analyzer import __version__
+
+    licenses = folder / "LICENSES"
+    if licenses.exists():
+        shutil.rmtree(licenses)
+    (licenses / "Python").mkdir(parents=True)
+    shutil.copyfile(Path(sys.base_prefix) / "LICENSE.txt", licenses / "Python" / "LICENSE.txt")
+    lines = ["Third-party software included in this extension", "=" * 48, "",
+             f"Python {sys.version.split()[0]} - PSF License - LICENSES\\Python\\LICENSE.txt", ""]
+    (folder / "THIRD_PARTY_NOTICES.txt").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\r\n")
+    (folder / "README.txt").write_text(server_readme(__version__), encoding="utf-8", newline="\r\n")
+    (folder / "sbom.cdx.json").write_text(
+        json.dumps(sbom(__version__, [], "PBI Model Health MCP server"), indent=2), encoding="utf-8")
+    write_manifest(folder)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2 or not Path(sys.argv[1]).is_dir():
-        sys.exit("usage: python packaging/write_notices.py <built app folder>")
-    main(Path(sys.argv[1]))
+    arguments = sys.argv[1:]
+    server = arguments[:1] == ["--server"]
+    arguments = arguments[1:] if server else arguments
+    if len(arguments) != 1 or not Path(arguments[0]).is_dir():
+        sys.exit("usage: python packaging/write_notices.py [--server] <built folder>")
+    (main_server if server else main)(Path(arguments[0]))

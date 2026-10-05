@@ -20,10 +20,11 @@ Desktop: tables, columns, measures, relationships, Power Query and visuals.
 12. [The Changes tab](#12-the-changes-tab)
 13. [The Diagnostics and Queries tabs](#13-the-diagnostics-and-queries-tabs)
 14. [Exporting reports](#14-exporting-reports)
-15. [What the analyzer cannot see](#15-what-the-analyzer-cannot-see)
-16. [Privacy](#16-privacy)
-17. [Troubleshooting](#17-troubleshooting)
-18. [Glossary](#18-glossary)
+15. [Ask Claude about your model](#15-ask-claude-about-your-model)
+16. [What the analyzer cannot see](#16-what-the-analyzer-cannot-see)
+17. [Privacy](#17-privacy)
+18. [Troubleshooting](#18-troubleshooting)
+19. [Glossary](#19-glossary)
 
 ---
 
@@ -85,7 +86,7 @@ If your version still lists these as preview features (**File > Options and
 settings > Options > Preview features**), turn on *Store semantic model using TMDL
 format* and *Store reports using enhanced metadata format (PBIR)*, then save the
 project again. The analyzer tells you if it finds an older format (see
-[Troubleshooting](#17-troubleshooting)).
+[Troubleshooting](#18-troubleshooting)).
 
 > **Tip:** If the project is in a OneDrive or SharePoint folder that syncs,
 > Power BI can occasionally fail to save while files are uploading. Pause
@@ -393,7 +394,68 @@ reports without opening a window:
   also works in a scheduled task or a batch file; it finishes with exit code 0 when
   every project was analyzed and 1 otherwise.
 
-## 15. What the analyzer cannot see
+## 15. Ask Claude about your model
+
+If you use the **Claude Desktop** app, you can connect the analyzer to it and talk
+about your model in plain language: what the findings mean, what to do first, and
+whether your changes made the model better. Claude reads the analyzer's results;
+the analyzer still decides every status and finding.
+
+You need Claude Desktop on the same PC, and your organization must allow
+extensions in it. If you are unsure, ask your IT department.
+
+### Install the extension (once)
+
+1. Start Claude Desktop.
+2. Double-click **PBI-Model-Health-*version*.mcpb** (it comes with the app), or
+   drag it into the Claude Desktop window.
+3. Check the details in the dialog and click **Install**.
+
+The extension contains its own copy of the analyzer, so it works even if the app
+folder is somewhere else. To switch it off or remove it, open Claude Desktop's
+**Settings > Extensions**.
+
+### Ask about a project
+
+Tell Claude where the project is, for example:
+
+> Analyze my Power BI project at C:\Reports\Sales and tell me what matters most.
+
+Claude asks your permission each time it wants to use one of the analyzer's tools;
+you can allow it once or for the whole chat. Good follow-up questions:
+
+- *Why is Sales[Discount] Likely unused?*
+- *Which three changes would improve this model most?*
+- *Explain the Power Query findings for someone new to the model.*
+
+Ready-made requests are in the **+** menu of the chat box, under **Power BI Model
+Health Analyzer**: **Interpret the analysis**, **Suggest next steps** and
+**Evaluate my changes**. Choose one, enter the project's folder in
+**project_path** (and, if you like, a question), and send.
+
+### Check your changes
+
+1. Before you change the model, ask Claude to **save a baseline** for the project.
+2. Make your changes in Power BI Desktop and **save** the project (**Ctrl+S**); the
+   analyzer reads the saved files.
+3. Ask Claude to **compare with the baseline**, or choose **Evaluate my changes**.
+
+The comparison marks each change as a *risk*, something that needs your
+*attention*, an *improvement*, a *cleanup* or *neutral*. Risks come first, for
+example a removed column that the report was using.
+
+### Keep in mind
+
+- Claude's suggestions are advice. Never delete an object only because Claude
+  suggested it: the rules in [section 9](#9-a-safe-way-to-clean-up-a-model) still
+  apply.
+- What Claude receives: the analyzer's results, which include table, column and
+  measure names, findings, file paths, server names and your DAX and Power Query
+  code. They are sent to Claude as part of your conversation, under your
+  organization's agreement for Claude.
+- The analyzer itself only reads the project and never changes it.
+
+## 16. What the analyzer cannot see
 
 The analyzer works from the saved project files of one report. It cannot see:
 
@@ -408,18 +470,20 @@ The analyzer works from the saved project files of one report. It cannot see:
 It is a helpful assistant, not a guarantee. Always refresh and test after
 removing objects.
 
-## 16. Privacy
+## 17. Privacy
 
 - The app works **offline**. It does not send your project, results or usage data
-  anywhere.
+  anywhere. If you connect it to Claude Desktop, the results you let Claude use
+  are sent to Claude by Claude Desktop (see [section 15](#15-ask-claude-about-your-model)).
 - It does not connect to your data sources and needs no passwords.
 - It writes files only when you export reports, plus a small file per project
   with your acknowledgements and the last result (for the Changes tab). That file
   is stored for your Windows user in
   `%APPDATA%\pbi-usage-analyzer\Power BI Model Health Analyzer\projects`. Delete
-  that folder to forget all saved review information.
+  that folder to forget all saved review information. Baselines saved through
+  Claude Desktop are in the `assistant` folder next to it.
 
-## 17. Troubleshooting
+## 18. Troubleshooting
 
 **"Could not analyze the project".** Make sure you chose the folder that contains
 the `.pbip` file and its `.Report` and `.SemanticModel` folders, or the `.pbip`
@@ -450,7 +514,7 @@ have downloaded the files yet. Right-click the project folder and choose
 **Windows blocks the app.** See the SmartScreen note in
 [section 3](#3-install-and-start-the-app).
 
-## 18. Glossary
+## 19. Glossary
 
 | Term | Meaning |
 | --- | --- |

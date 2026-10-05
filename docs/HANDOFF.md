@@ -131,7 +131,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| AI assistant A1 | Latest change: `pbi_usage_analyzer_mcp`, MCP server for Claude Desktop. Details below. |
+| Claude Desktop extension | Latest change: one-click `.mcpb` extension with its own small server build; manual section 15. Details below. |
+| AI assistant A1 | Previous change: `pbi_usage_analyzer_mcp`, MCP server for Claude Desktop. Details below. |
 | AI assistant A0 | Previous change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
 | Text reports | Previous change: compact text report, console exe `pbi-model-health-cli.exe`, automatic reports option, multi-project CLI. Details below. |
 | IT review hardening | Previous change: IT security fact sheet, hash-pinned build lock, SBOM and file manifest, network components removed and checked. Details below. |
@@ -164,7 +165,28 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: AI assistant phase A1, Claude Desktop MCP server (2026-10-05)
+## Latest change: one-click Claude Desktop extension (2026-10-05)
+
+- User asked whether connector setup is a problem for non-technical users (yes:
+  hand-editing `claude_desktop_config.json`), then "proceed" with the `.mcpb`
+  extension. Details and facts: docs/AI_ASSISTANT_DESIGN.md section 15.
+- New: `packaging/pbi_model_health_mcp.py` + `.spec` (Qt/pandas-free one-folder
+  `pbi-model-health-mcp.exe`, about 20 MB), `packaging/build_mcpb.py` (manifest 0.3,
+  binary server, tools from the server, zip), `write_notices.py --server`.
+  `scripts/build_windows.ps1` builds both, `Test-McpServer` smoke-tests the app's
+  `--mcp` and the extension's server, writes `PBI-Model-Health-<version>.mcpb`
+  (9.0 MB) and adds it to `SHA256SUMS.txt`; CI uploads `dist/*.mcpb`.
+- Manifest validated with `npx @anthropic-ai/mcpb validate` (passes). Tests:
+  `tests/test_mcpb.py` (6). User manual section 15 "Ask Claude about your model"
+  (sections 15-18 renumbered 16-19; privacy section mentions Claude Desktop).
+  IT fact sheet: extension, policies, unsigned.
+- Live: installed by double-click in the user's Claude Desktop (unsigned-extension
+  warning in the log), tools and ready-made requests work (user confirmed).
+  The earlier manual config entry was removed first (duplicate tools otherwise).
+- Next options: signing (needs a certificate), an icon, tuning tool output and
+  prompts from real use, GUI Changes tab showing assessment effects.
+
+## Previous change: AI assistant phase A1, Claude Desktop MCP server (2026-10-05)
 
 - User: the Claude Desktop app is approved in their organization; "assume it is
   allowed for now" (local MCP servers); their personal Claude Desktop on this PC may

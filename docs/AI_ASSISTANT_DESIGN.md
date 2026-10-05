@@ -191,10 +191,12 @@ Analyzer`): `projects\` (the GUI's review state, read for acknowledgements) and
 its child processes' `%APPDATA%` writes into its package folder; baselines still
 work (the server reads them back from the same view).
 
-Setup: `pbi-model-health-cli.exe --mcp --config` (or `python -m
-pbi_usage_analyzer_mcp --config` from source) prints the `mcpServers` entry for
-`claude_desktop_config.json` (Settings > Developer > Edit Config). A one-click
-`.mcpb` extension is possible later.
+Setup for users: the one-click Claude Desktop extension
+`PBI-Model-Health-<version>.mcpb` (section 15). Setup for developers:
+`pbi-model-health-cli.exe --mcp --config` (or `python -m pbi_usage_analyzer_mcp
+--config` from source) prints the `mcpServers` entry for
+`claude_desktop_config.json` (Settings > Developer > Edit Config). Do not register
+both: the tools would appear twice.
 
 Organizational controls: Claude Desktop policies `isLocalDevMcpEnabled`,
 `isDesktopExtensionEnabled` and the Team/Enterprise extension allowlist can disable
@@ -256,7 +258,7 @@ reference in case a server-side or automated use appears:
 | --- | --- |
 | A0 | This document; `assistant` package: briefing, attempt assessment, prompts; tests. **Done.** |
 | A1 | MCP server for Claude Desktop (`pbi_usage_analyzer_mcp`, `--mcp` in the console exe), tools and prompt templates, tests, build smoke test. **Done; works in Claude Desktop.** |
-| A2 | Polish from real use: tune tool output and prompts, `.mcpb` packaging, GUI shows assessment effects in the Changes tab and offers the copy-and-paste fallback, user-manual section, IT fact-sheet section. |
+| A2 | One-click `.mcpb` extension, user-manual section, IT fact-sheet entry (**done**, section 15). Still open: tune tool output and prompts from real use; GUI shows assessment effects in the Changes tab and offers the copy-and-paste fallback; signing the extension. |
 | A3 | Stored plans with deterministic expected-effect checks, answer post-check, eval set from the case studies. |
 
 ## 11. Non-goals
@@ -326,3 +328,41 @@ instead of `%APPDATA%\Claude`; its logs are in `%LOCALAPPDATA%\Claude\logs`) sta
 the server, chose the legacy era ("Era probe verdict: legacy"; `initialize`, then
 `tools/list` and `prompts/list`), and answered a `tools/call` in 0.3 s. The user
 reports it worked as expected. No errors in the server log.
+
+## 15. One-click extension (A2, first part)
+
+Editing `claude_desktop_config.json` by hand is too fragile for non-technical users
+(a Store install even keeps it in a different folder). Claude Desktop installs
+extensions from `.mcpb` files (MCP Bundles, manifest specification 0.3,
+https://github.com/modelcontextprotocol/mcpb): a zip with `manifest.json` at the
+root. The user double-clicks the file, reviews a dialog and clicks Install; Claude
+Desktop manages enabling, updates and removal (Settings > Extensions). On Team and
+Enterprise plans, admins can allowlist it and deploy it with their usual tools.
+
+- `packaging/pbi_model_health_mcp.spec` builds a separate one-folder console
+  executable `pbi-model-health-mcp.exe` from `packaging/pbi_model_health_mcp.py`.
+  It excludes Qt, pandas, numpy, openpyxl, lxml, TLS, asyncio, http, email and
+  xmlrpc (a full tool session was checked to load none of them): about 20 MB
+  unpacked instead of the app's 130 MB, and no Python needed on the user's PC.
+- `packaging/write_notices.py --server` writes its README, Python licence,
+  SBOM and SHA-256 manifest; `check_bundle.py` checks it like the app.
+- `packaging/build_mcpb.py` writes the manifest (binary server, command
+  `${__dirname}/server/pbi-model-health-mcp.exe`, platform `win32`; tool names and
+  descriptions taken from the server; `prompts_generated` because prompt text
+  contains a fresh analysis) and zips it with the server under `server/`.
+- `scripts/build_windows.ps1` builds both, smoke-tests both MCP servers over stdio,
+  writes `PBI-Model-Health-<version>.mcpb` (9.0 MB) next to the app zip and lists it
+  in `SHA256SUMS.txt`; CI uploads it with the zip.
+- The manifest was checked with Anthropic's CLI (`npx @anthropic-ai/mcpb validate`:
+  "Manifest schema validation passes!"). `tests/test_mcpb.py` pins the required
+  fields, the binary entry point, tools equal to the server's, and the zip layout.
+- User manual section 15 ("Ask Claude about your model"); IT fact sheet updated.
+- Not done: signing (`mcpb sign`, needs a certificate; the executables are unsigned
+  like the app), an icon.
+
+Live test (2026-10-05, the user's Claude Desktop 2.19675, Store build): installed by
+double-click with a log warning "Installing unsigned extension"; Claude Desktop
+unpacked it under `%APPDATA%\Claude\Claude Extensions\local.mcpb.pbi-usage-analyzer.pbi-model-health\`,
+started the binary directly ("server.type is binary"), listed 4 tools and the
+prompts under the display name "Power BI Model Health Analyzer", and answered a tool
+call in 0.2 s. The user confirmed that questions and the ready-made requests work.
