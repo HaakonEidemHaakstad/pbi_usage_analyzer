@@ -39,7 +39,10 @@ def manifest() -> dict:
             "Runs the Power BI Model Health Analyzer on your computer. Ask Claude to analyze a Power BI "
             "project (a PBIP folder saved with the PBIR report and TMDL model formats): it explains the "
             "findings, suggests next steps towards best practice, and compares the model before and after "
-            "your changes.\n\nThe analyzer only reads the project files you name and never changes them. "
+            "your changes. It can also make metadata improvements (descriptions, display folders, format "
+            "strings, hidden fields) for you in a working copy.\n\nThe analyzer never changes your original "
+            "project: changes go only to a working copy it creates next to the project, are checked by "
+            "re-analysis, rolled back automatically if anything else changed, and can be undone. "
             "It makes no network connections itself; results you approve are sent to Claude as part of "
             "the conversation. \"Likely unused\" marks a cleanup candidate, not proof that deletion is "
             "safe."),

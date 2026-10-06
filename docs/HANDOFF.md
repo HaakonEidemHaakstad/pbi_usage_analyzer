@@ -1,6 +1,6 @@
 # Agent handoff — current working state
 
-Last updated: 2026-10-05. This file is intended to let a new agent continue without
+Last updated: 2026-10-06. This file is intended to let a new agent continue without
 chat history. Treat source files and a fresh `git status` as authoritative if this
 snapshot becomes stale. Update this handoff after material changes.
 
@@ -18,8 +18,9 @@ snapshot becomes stale. Update this handoff after material changes.
 The product is a supervised engineering alpha: a deterministic Power BI PBIP/PBIR
 usage and model-health analyzer. It has a graph-based core, CLI, library API,
 text/Excel/JSON exports, synthetic fixtures, advisory rules, and a PySide6 Windows
-app. The AI assistant has an offline core (briefing, attempt assessment, prompts);
-no AI service is called yet. Correctness and evidence-based conservatism take priority;
+app. The AI assistant has an offline core (briefing, attempt assessment, prompts)
+and a Claude Desktop extension (MCP server) that can also make metadata changes in a
+checked working copy; the analyzer itself calls no AI service. Correctness and evidence-based conservatism take priority;
 `Likely unused` never means safe to delete.
 
 ## Repository and publication state
@@ -112,6 +113,10 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 (G1 read-only viewer, done), then "proceed with 3" (G3 Windows build, done), then
 "proceed" (G2 workflow aids, done). Later (2026-10-02/05): plain-text reports
 (done); "start working on the integrated AI assistant" (A0 done, see below).
+Then (2026-10-05/06): A1 MCP server, one-click extension, change ratings in the app;
+then asked whether Claude Desktop can change the model automatically and for a
+procedure (copy, change, check, revise), and "proceed" with the recommended design:
+A4 assisted changes, tier 1 (see below).
 
 ## Implemented work in the current tree
 
@@ -131,7 +136,8 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | Reproducibility | `check_fixture_drift.py` generates in a temporary directory and compares paths/bytes without rewriting the corpus. `check_runtime.py` creates a disposable venv containing only runtime requirements and tests API/CLI and exports. |
 | CI | `.github/workflows/ci.yml`: Ubuntu 24.04, Python 3.12, commit-pinned actions, read-only permissions, compilation, drift check, tests, synthetic validation and runtime smoke test. |
 | Special DAX | `parsers/special_dax.py` replaces file-wide marker scanning with bounded declaration/expression extraction. Details below. |
-| Change ratings in the app | Latest change: the Changes tab rates each change (risk first). Details below. |
+| Assisted changes (A4) | Latest change: Claude Desktop makes metadata changes in a checked working copy. Details below. |
+| Change ratings in the app | Previous change: the Changes tab rates each change (risk first). Details below. |
 | Claude Desktop extension | Previous change: one-click `.mcpb` extension with its own small server build; manual section 15. Details below. |
 | AI assistant A1 | Previous change: `pbi_usage_analyzer_mcp`, MCP server for Claude Desktop. Details below. |
 | AI assistant A0 | Previous change: docs/AI_ASSISTANT_DESIGN.md and the offline `pbi_usage_analyzer.assistant` package. Details below. |
@@ -166,7 +172,47 @@ windows app. interface language english, start G0 now" (G0 done), then "proceed"
 | TMDL expressions | Previous fix: multiline expression boundaries in `parsers/tmdl.py`. Details below. |
 | DAX lexing | Previous feature: `parsers/dax_lexer.py` (`mask_dax`, `mask_dax_literals`) shared by ordinary and special DAX. Details below. |
 
-## Latest change: change ratings in the desktop app (2026-10-05)
+## Latest change: assisted changes in a working copy, A4 tier 1 (2026-10-06)
+
+- User asked whether Claude Desktop could change the model automatically from the
+  analysis, with a procedure such as copy, change, check, revise. Agreed design
+  (user: "proceed"): Claude proposes, the analyzer's deterministic editor applies,
+  the user verifies in Power BI Desktop; tier 1 (metadata) only. This reverses the
+  earlier read-only principle; docs/AI_ASSISTANT_DESIGN.md principle 7, non-goals and
+  section 16 (procedure, checks, operations, TMDL facts, result).
+- Core: `pbi_usage_analyzer/editing/` (`tmdl_edit.py` text-preserving property edits
+  and read-back; `operations.py` kinds, `parse_operations`, `resolve_operations` with
+  `PlanIssue`s; `workspace.py` `create_working_copy`, `preview_changes`,
+  `apply_changes`, `undo_last_change`, `review_working_copy`, `desktop_checklist`).
+  Operations: `set_description` (table/column/measure, `///` lines),
+  `set_display_folder`, `set_format_string`, `set_hidden` (column/measure; columns get
+  `changedProperty = IsHidden` like Desktop).
+- Safety: apply/undo only in folders with `.pbi-model-health/workspace.json` (the
+  original is never written); trial on a temporary copy first; checks = read-back,
+  same object set, no new diagnostics, `assess_attempt` may only show resolved
+  findings; automatic roll-back if the check fails on disk; undo refused if files
+  changed afterwards; outside edits (hashes) reported.
+- MCP: tools `create_working_copy`, `preview_changes`, `apply_changes`,
+  `undo_last_change`, `review_working_copy`; prompt `improve_model`
+  (`Task.IMPROVE`, `PROMPT_VERSION = 2`); instructions describe the procedure;
+  `_check_arguments` accepts arrays of objects. Extension manifest text, manual
+  section 15 ("Let Claude make small improvements"), IT fact sheet (new row and
+  checks table), architecture and roadmap updated.
+- Found while testing on real projects: AdventureWorks `Measure Table[Weekend Orders]`
+  is written by Desktop with a ``` fence (trailing whitespace in its DAX); fences are
+  supported (content may have any indentation). Read-only previews of one operation
+  of each kind on every business object: AW Mess 381, AW Good 89, AdventureWorks 201
+  operations, all checks pass. Apply/review/undo on a copy of AW Mess byte-exact.
+- Verified: compile, fixture drift, 370 tests (2 skipped) with all three real-project
+  integration tests and offscreen GUI tests, synthetic validation 365/365, runtime
+  smoke test. No analysis code changed.
+- Not yet verified: Power BI Desktop opening a working copy with these edits and
+  keeping them on save (notably a quoted format string such as `"""$""#,0.00"`), and
+  the new tools in the user's Claude Desktop (install the rebuilt `.mcpb`). Next
+  options: that live test; tune the prompt from real use; later tiers (removing
+  Likely-unused objects with per-object confirmation) only by a new owner decision.
+
+## Previous change: change ratings in the desktop app (2026-10-05)
 
 - User request: "Show the risk ratings in the desktop app". Details: GUI_DESIGN.md
   section 16 ("Change ratings").

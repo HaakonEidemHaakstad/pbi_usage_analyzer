@@ -320,10 +320,22 @@ It contains no network code and no AI SDK (import guard in `tests/test_assistant
 
 `pbi_usage_analyzer_mcp` is a front end like the GUI: a standard-library Model Context
 Protocol server on stdio that Claude Desktop starts. Its tools call `analyze_project`
-afresh and render `assistant`/`views` output; the only state it writes is a per-project
-baseline in the user's analyzer data folder (`views.history.state_file`). It never
-writes to the project and makes no network connections (import guard in
-`tests/test_mcp_server.py`).
+afresh and render `assistant`/`views`/`editing` output; it writes a per-project
+baseline in the user's analyzer data folder (`views.history.state_file`) and, through
+`editing`, working copies. It never writes to the original project and makes no
+network connections (import guard in `tests/test_mcp_server.py`).
+
+### Assisted changes (`editing`)
+
+`pbi_usage_analyzer.editing` applies metadata operations (description, display folder,
+format string, hidden) to a working copy (AI_ASSISTANT_DESIGN.md section 16).
+`tmdl_edit` changes single property lines and reads them back, keeping everything
+else byte for byte; `operations` validates operations against an `AnalysisResult`
+with structured `PlanIssue`s; `workspace` owns the working-copy record, the trial on a
+temporary copy, backups, the deterministic checks (read-back, object set,
+diagnostics, `assess_attempt` with only resolved findings allowed), automatic
+roll-back, undo and review. It is a consumer of the analysis like `views`: parsers,
+graph, classification and rules know nothing about it.
 
 ### Public application API
 

@@ -1,7 +1,8 @@
 # AI assistant design — Power BI Model Health Analyzer
 
 Status: accepted 2026-10-05. Phase A0 (core briefing, attempt assessment, prompts)
-and phase A1 (MCP server for Claude Desktop) are implemented; sections 13–14. This document fixes the architecture and scope of the optional AI
+and phase A1 (MCP server for Claude Desktop) are implemented; sections 13–14.
+Amended 2026-10-06: assisted changes in a working copy (phase A4, section 16). This document fixes the architecture and scope of the optional AI
 layer (AGENTS.md, "Future AI layer"; ROADMAP Phase 5).
 
 Owner decisions (2026-10-05):
@@ -38,6 +39,7 @@ BI Desktop, re-running the analyzer after each change.
 | Interpret | One analysis | The overall picture, the important findings grouped by theme, what the counts do and do not mean, limits of the analysis. |
 | Next steps | One analysis (plus acknowledgements) | A short prioritized plan; each step says what to do, why, which findings it addresses and what the next analysis should show. |
 | Evaluate an attempt | Current analysis, previous run, deterministic assessment, optionally the previous advice | What improved, what regressed, anything risky (first), whether the planned effects happened, what to do next. |
+| Improve (A4) | One analysis, the change tools | Metadata improvements made batch by batch in a checked working copy, other advice listed for the user, and a Power BI Desktop checklist (section 16). |
 
 ## 3. Principles
 
@@ -62,8 +64,12 @@ BI Desktop, re-running the analyzer after each change.
    the MCP server talks to Claude Desktop over stdio only; neither has network code
    or an SDK dependency (tested by import guards). Claude Desktop, already approved,
    is what sends content to Anthropic.
-7. **Read-only.** The assistant never edits the project. Changes are made in Power BI
-   Desktop and verified by re-running the analysis.
+7. **The original is never written.** (Changed 2026-10-06; before, the assistant was
+   read-only.) The assistant may make metadata changes, but only through the
+   analyzer's deterministic editor and only in a working copy it created; each batch
+   is checked by re-analysis and rolled back automatically if anything other than the
+   intended values changed (section 16). Everything else is changed by the user in
+   Power BI Desktop and verified by re-running the analysis.
 
 ## 4. Architecture
 
@@ -74,6 +80,10 @@ pbi_usage_analyzer/                core, no network (unchanged rule)
   assistant/                       A0: UI- and provider-agnostic
     briefing.py                    AnalysisResult (+ previous run, acknowledgements) -> Briefing
     prompts.py                     Task, system prompt, build_prompt() -> Prompt
+  editing/                         A4: working copies and metadata edits (section 16)
+    tmdl_edit.py                   text-preserving TMDL property edits and read-back
+    operations.py                  operation kinds, validation against the analysis
+    workspace.py                   working copy, preview, apply with checks, undo, review
 pbi_usage_analyzer_mcp/            A1: MCP server for Claude Desktop (stdlib only)
   protocol.py                      JSON-RPC over stdio, tools and prompts, both MCP eras
   tools.py                         analyzer tools and prompt templates
@@ -163,7 +173,8 @@ local [Model Context Protocol](https://modelcontextprotocol.io) server and talks
 it over stdin/stdout. The user chats in Claude Desktop; Claude calls the analyzer's
 tools when it needs facts, and the user approves each call. No API key, no network
 code in the analyzer, no second build: the console executable serves MCP with
-`--mcp`. The tools never write to the project.
+`--mcp`. The analysis tools never write to the project; the change tools (section 16)
+write only to a working copy.
 
 | Tool | Purpose | Writes |
 | --- | --- | --- |
@@ -171,9 +182,14 @@ code in the analyzer, no second build: the console executable serves MCP with
 | `explain_object` | One column or measure (`Table[Name]`, matched like the analyzer: trimmed, case-insensitive): status, evidence path or review reason, evidence, dependencies, properties, DAX, related findings. A table name alone lists its objects. Unknown names get similar-name suggestions. | nothing |
 | `save_baseline` | Records the current analysis as the project's baseline. | the analyzer's per-user data folder only |
 | `compare_with_baseline` | Re-analyzes and returns the counts and every change with its deterministic assessment. | nothing |
+| `create_working_copy` | Copies the project next to it and records the original's analysis as the copy's baseline (section 16). | the new copy only |
+| `preview_changes` | Validates a batch of operations and tries it on a temporary copy: issues, file diffs, read-back, analysis changes. | nothing (a temporary folder) |
+| `apply_changes` | Applies a batch to a working copy with backups; re-checks and rolls back automatically on any unexpected change. | the working copy only |
+| `undo_last_change` | Restores the last batch from its backups. | the working copy only |
+| `review_working_copy` | Changes applied, analysis changes against the original, outside edits, Power BI Desktop checklist. | nothing |
 
-Prompt templates `interpret`, `next_steps` and `evaluate` (arguments: project path,
-optional question, optional previous advice for `evaluate`) return the A0 prompt,
+Prompt templates `interpret`, `next_steps`, `evaluate` and `improve_model` (arguments:
+project path, optional question, optional previous advice for `evaluate`) return the A0 prompt,
 including the briefing, as one user message. The server's `instructions` are the A0
 system prompt plus a short guide to the tools, so free-form chat follows the same
 rules.
@@ -261,11 +277,14 @@ reference in case a server-side or automated use appears:
 | A1 | MCP server for Claude Desktop (`pbi_usage_analyzer_mcp`, `--mcp` in the console exe), tools and prompt templates, tests, build smoke test. **Done; works in Claude Desktop.** |
 | A2 | One-click `.mcpb` extension, user-manual section, IT fact-sheet entry (**done**, section 15). Still open: tune tool output and prompts from real use; GUI shows assessment effects in the Changes tab and offers the copy-and-paste fallback; signing the extension. |
 | A3 | Stored plans with deterministic expected-effect checks, answer post-check, eval set from the case studies. |
+| A4 | Assisted changes, tier 1 (metadata) in a working copy: `editing` package, five MCP tools, `improve_model` prompt (section 16). **Done 2026-10-06; Power BI Desktop round trip still to be confirmed by the user.** Later tiers need their own decision. |
 
 ## 11. Non-goals
 
 - No AI parsing of PBIP files, and no AI-decided statuses or rule findings.
-- No automatic edits to the project, no generated scripts that delete objects.
+- No edits to the original project, no removal of objects, no renames, no relationship,
+  Power Query or DAX edits, and no generated scripts that delete objects (section 16
+  lists what may be changed, and only in a working copy).
 - No telemetry; nothing is sent without an explicit user action.
 - No other providers unless the owner decides otherwise.
 
@@ -367,3 +386,116 @@ unpacked it under `%APPDATA%\Claude\Claude Extensions\local.mcpb.pbi-usage-analy
 started the binary directly ("server.type is binary"), listed 4 tools and the
 prompts under the display name "Power BI Model Health Analyzer", and answered a tool
 call in 0.2 s. The user confirmed that questions and the ready-made requests work.
+
+## 16. Assisted changes in a working copy (A4)
+
+Owner decision (2026-10-06): Claude Desktop may make changes to the model based on the
+analysis, following a procedure that copies the project, makes the changes, checks
+whether anything broke and revises. Agreed design: Claude proposes, the analyzer's
+deterministic editor applies, the user verifies in Power BI Desktop; tier 1 first.
+
+### Why not free file edits
+
+Claude Desktop could edit TMDL directly through a file-system extension. That is not
+used: the analyzer catches broken DAX references and lost objects, but not malformed
+TMDL, refresh failures, visuals that no longer render or broken lineage tags. It also
+cannot see other reports on the published semantic model, and free edits give no
+statement of intent to check against. The editor instead accepts named operations,
+writes only what TMDL and Power BI Desktop write, and checks every value.
+
+### Procedure
+
+1. **Working copy.** `create_working_copy` copies the `.pbip` file and the semantic
+   model and report folders (nothing else from the project folder, caches included so
+   the report opens with data) to `<project folder> (proposed <date> <time>)` next to
+   the original, and records the original's analysis as the baseline in
+   `.pbi-model-health/workspace.json` inside the copy. That record marks the folder as
+   a working copy; `apply_changes` and `undo_last_change` refuse any folder without it,
+   so the original can never be written, even by a mistaken path.
+2. **Plan.** Claude chooses a batch of one theme (at most 50 operations; the prompt asks
+   for about 20) and agrees it with the user.
+3. **Preview.** `preview_changes` validates the batch and applies it to a temporary copy
+   (without caches): issues, unified diffs, read-back of every value and a full
+   re-analysis. Nothing in the project is written.
+4. **Apply with checks.** `apply_changes` repeats the trial, saves backups under
+   `.pbi-model-health/batches/<n>/`, writes the files atomically, re-analyzes the copy
+   and checks again. If any check fails on disk, it restores the backups and reports a
+   roll-back.
+5. **Revise or undo.** Refusals and roll-backs explain why; Claude revises the batch.
+   `undo_last_change` restores the last batch, unless its files changed afterwards (for
+   example saved by Power BI Desktop), which it refuses rather than overwrite.
+6. **Verify in Power BI Desktop.** `review_working_copy` compares the copy with the
+   original's analysis and gives a checklist (open the copy, refresh, check the changed
+   fields and every page, save, review again). Only the user can confirm refresh and
+   rendering.
+7. **Adopt.** The user decides; the tool never copies changes back. The working copy
+   becomes the project and the original stays as a backup until the published model is
+   checked.
+
+### Checks (deterministic)
+
+Each batch must pass all of them, on the trial copy and again on disk:
+
+| Check | Fails when |
+| --- | --- |
+| Read-back | A changed property does not read back as the requested value. |
+| Objects | The analyzer finds an object fewer or more than before. |
+| Diagnostics | A new analyzer diagnostic appears (by code and file). |
+| Analysis | Any status change, added or removed object, or new finding. Metadata operations may only resolve findings (for example `MEASURE_DESCRIPTION_MISSING`). |
+
+Files changed outside the analyzer since its last write (hashes of the model and
+report definition files, Power BI caches excluded) are reported with every apply and
+review: if Power BI Desktop has the copy open, its next save would overwrite the
+changes.
+
+### Operations (tier 1)
+
+| Operation | Objects | Written as |
+| --- | --- | --- |
+| `set_description` | table, column, measure | `///` lines directly above the declaration (one per line of text), replacing existing `///` lines. |
+| `set_display_folder` | column, measure | `displayFolder:` (empty value removes it). |
+| `set_format_string` | column, measure | `formatString:`; refused with a dynamic format string. |
+| `set_hidden` | column, measure | `isHidden` after `dataType`; columns also get `changedProperty = IsHidden`, as Power BI Desktop writes it. |
+
+Validation refuses unknown or ambiguous objects (with similar names), auto-date
+objects, unsupported object types, empty or multi-line values where not allowed,
+control characters, duplicates within a batch and more than 50 operations. It warns
+when hiding a field used directly by visuals (they keep working; it disappears from
+the field list) and when formatting a text column. Values already set are skipped.
+
+TMDL facts used (Microsoft Learn, "Tabular Model Definition Language", fetched
+2026-10-06): text values may be unquoted, must be quoted with leading or trailing
+whitespace, and quoted values escape `"` as `""` (the editor also quotes any value
+containing `"`); descriptions are `///` lines with nothing between them and the
+declaration; boolean properties may be written by name alone; property order is free;
+multi-line expressions are one level deeper than the properties; ``` fences are read
+verbatim and their content may have any indentation. The editor keeps line endings,
+a byte-order mark, indentation style and every other line; it refuses unterminated or
+repeated fences, `description:` properties and dynamic format strings instead of
+guessing.
+
+Not offered (later tiers need their own owner decision): removing objects (even
+Likely unused), renaming, relationships, Power Query, DAX, table visibility, report
+files.
+
+### Result
+
+Code: `pbi_usage_analyzer/editing/` (`tmdl_edit.py`, `operations.py`, `workspace.py`);
+MCP tools and `_outcome_text` in `pbi_usage_analyzer_mcp/tools.py`; `Task.IMPROVE` and
+`PROMPT_VERSION = 2` in `assistant/prompts.py`; the protocol accepts lists of objects
+as arguments. Tests: `tests/test_editing.py` (TMDL layouts from real exports, CRLF
+and BOM round trips, quoting, fences, validation, the full procedure, outside edits,
+refusal on an unexpected analysis change, roll-back after a failed check on disk,
+record tampering, copy contents, offline import guard) and `ChangeToolTests` in
+`tests/test_mcp_server.py`.
+
+Real projects (2026-10-06, read-only previews on temporary copies): one operation of
+each applicable kind on every business column, measure and table of AW Mess (381
+operations), AW Good (89) and AdventureWorks (201) passes every check. The first run
+refused one AdventureWorks measure, which Power BI Desktop had written with a
+``` fence because of trailing whitespace in its DAX; fenced expressions are now
+supported. A full apply, review and undo on a copy of AW Mess matched byte for byte.
+
+Still to confirm by the user: that Power BI Desktop opens a working copy with these
+edits, shows them, and keeps them after saving (in particular a quoted format string
+such as `"""$""#,0.00"`).

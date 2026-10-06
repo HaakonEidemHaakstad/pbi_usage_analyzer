@@ -43,7 +43,8 @@ class ManifestTests(unittest.TestCase):
 
     def test_promises_match_the_design(self):
         text = self.manifest['long_description']
-        self.assertIn('never changes them', text)
+        self.assertIn('never changes your original project', text)
+        self.assertIn('working copy', text)
         self.assertIn('no network connections', text)
         self.assertIn('not proof that deletion is safe', text)
 

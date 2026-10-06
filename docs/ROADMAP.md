@@ -93,7 +93,12 @@ Desktop is the approved route. Phase A0 is done: the offline
 prompts). Phase A1 is done: `pbi_usage_analyzer_mcp`, a local MCP server that Claude
 Desktop starts (`pbi-model-health-cli.exe --mcp`), with tools to analyze, explain an
 object, save a baseline and compare with it, and prompt templates for the three
-tasks. Next: polish from real use (A2), then stored plans and an eval set (A3).
+tasks. Phase A4 (owner decision 2026-10-06) is done: Claude can make metadata
+improvements (descriptions, display folders, format strings, hidden fields) in a
+working copy through `pbi_usage_analyzer.editing`, with automatic checks and
+roll-back; the original is never written. Next: the user's Power BI Desktop round-trip
+check of a working copy, polish from real use (A2), then stored plans and an eval set
+(A3); further change tiers only by a new owner decision.
 
 
 ## Cross-cutting validation — Database-backed integration validation

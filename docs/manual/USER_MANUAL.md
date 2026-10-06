@@ -47,7 +47,9 @@ The analyzer reads your Power BI project files and answers three questions:
   hard-coded file paths in Power Query, or measures without descriptions.
 
 The analyzer **only reads** your project. It never changes, deletes or saves
-anything in it. You make all changes yourself in Power BI Desktop.
+anything in it. You make the changes yourself in Power BI Desktop. (The one
+exception is optional: Claude can make small improvements for you in a separate
+copy of the project; see [section 15](#15-ask-claude-about-your-model).)
 
 It does not connect to your data sources and does not look at your data. It
 works from the definitions Power BI saves: tables, columns, DAX, Power Query (M),
@@ -444,7 +446,7 @@ you can allow it once or for the whole chat. Good follow-up questions:
 
 Ready-made requests are in the **+** menu of the chat box, under **Power BI Model
 Health Analyzer**: **Interpret the analysis**, **Suggest next steps** and
-**Evaluate my changes**. Choose one, enter the project's folder in
+**Evaluate my changes**, **Improve the model**. Choose one, enter the project's folder in
 **project_path** (and, if you like, a question), and send.
 
 ### Check your changes
@@ -458,6 +460,37 @@ The comparison marks each change as a *risk*, something that needs your
 *attention*, an *improvement*, a *cleanup* or *neutral*. Risks come first, for
 example a removed column that the report was using.
 
+### Let Claude make small improvements
+
+Claude can also make some improvements for you: it can write **descriptions** for
+tables, columns and measures, put measures and columns in **display folders**, set
+**format strings**, and **hide or show** columns and measures (for example key
+columns that report authors do not need). It cannot remove, rename or rewrite
+anything; those changes stay with you in Power BI Desktop.
+
+Your project is never changed. Claude works in a **working copy**:
+
+1. Choose **Improve the model** in the **+** menu (or ask, for example *Write
+   descriptions for my measures*). Claude proposes a small batch of changes and
+   asks you to agree.
+2. The first time, Claude creates the working copy, a new folder next to your
+   project named like *Sales (proposed 2026-10-06 1430)*, and tells you where it is.
+3. For each batch, the analyzer first tries the changes on a temporary copy, then
+   makes them in the working copy and analyzes it again. If anything else in the
+   model changed, it puts the files back automatically and tells Claude why.
+   You can ask Claude to **undo the last change** at any time.
+4. When Claude has finished, it gives you a checklist. Close Power BI Desktop if it
+   has the working copy open, then open the working copy's `.pbip` file, refresh,
+   look at the changed fields and every report page, and save.
+5. Ask Claude to **review the working copy** once more after saving.
+6. If you are happy, use the working copy as your project from now on. Keep the
+   original folder as a backup until you have published and checked the report.
+
+Read the descriptions Claude writes before you keep them: they are based on the
+DAX and Power Query code, and Claude is asked to leave out anything it cannot
+tell from them. While Claude is making changes, do not have the working copy open
+in Power BI Desktop: saving there would overwrite them.
+
 ### Keep in mind
 
 - Claude's suggestions are advice. Never delete an object only because Claude
@@ -467,7 +500,8 @@ example a removed column that the report was using.
   measure names, findings, file paths, server names and your DAX and Power Query
   code. They are sent to Claude as part of your conversation, under your
   organization's agreement for Claude.
-- The analyzer itself only reads the project and never changes it.
+- The analyzer never changes your original project. Improvements Claude makes go
+  only into the working copy, and only you decide whether to use it.
 
 ## 16. What the analyzer cannot see
 

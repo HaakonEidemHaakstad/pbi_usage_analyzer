@@ -1,9 +1,11 @@
 """The analyzer's MCP tools and prompts, built on `pbi_usage_analyzer.assistant`.
 
 Every call analyzes the project afresh (well under a second on real projects), so
-answers always reflect the files as saved in Power BI Desktop. The only state is
-the per-project baseline written by `save_baseline`, stored with the user's other
-analyzer state; tools never write to the project.
+answers always reflect the files as saved in Power BI Desktop. State: the
+per-project baseline written by `save_baseline`, stored with the user's other
+analyzer state, and working copies. The change tools (`pbi_usage_analyzer.editing`)
+write only to a working copy the analyzer created next to the project, never to the
+original.
 """
 from __future__ import annotations
 
@@ -13,10 +15,12 @@ from pathlib import Path
 
 from pbi_usage_analyzer import AnalysisResult, analyze_project
 from pbi_usage_analyzer.assistant import SYSTEM_PROMPT, Briefing, Task, build_briefing, build_prompt
+from pbi_usage_analyzer.editing import (MAX_OPERATIONS, ChangeOutcome, OperationKind, WorkspaceError, apply_changes,
+                                        create_working_copy, preview_changes, review_working_copy, undo_last_change)
 from pbi_usage_analyzer.model import ObjectRef, ObjectType, Status
 from pbi_usage_analyzer.util import norm
-from pbi_usage_analyzer.views import (EVIDENCE_LABELS, STATUS_INFO, Explainer, ProjectState, format_path,
-                                      health_rows, review_reason, snapshot)
+from pbi_usage_analyzer.views import (EFFECT_LABELS, EVIDENCE_LABELS, STATUS_INFO, Explainer, ProjectState,
+                                      format_path, health_rows, review_reason, snapshot)
 from pbi_usage_analyzer.views.history import state_file
 
 from .protocol import PromptArgument, PromptTemplate, Tool, ToolError
@@ -41,11 +45,36 @@ objects: status, evidence path, properties, DAX and related findings.
 - To evaluate changes: call save_baseline before the user edits the model, then \
 compare_with_baseline after they have saved it in Power BI Desktop. The comparison \
 contains the analyzer's deterministic assessment of every change.
-- The tools only read the project. The user makes all changes in Power BI Desktop."""
+- Changing the model: the tools can set descriptions, display folders and format \
+strings, and hide or show columns and measures, only in a working copy. Procedure: \
+create_working_copy once; for each small batch of one theme, preview_changes, then \
+apply_changes with the same operations (it re-checks the batch, re-analyzes the copy and \
+rolls back automatically if anything else changed); undo_last_change if the user wants a \
+batch reverted; finally review_working_copy and give the user its Power BI Desktop \
+checklist. Agree each batch with the user before applying it unless they have said \
+otherwise. Descriptions must follow from the DAX, M or data in the analysis, not from \
+guesses. Removing or renaming objects, relationships, Power Query and DAX changes are \
+advice for the user to carry out in Power BI Desktop; the tools cannot make them.
+- The original project is never written. Changes become real only when the user opens \
+the working copy in Power BI Desktop, checks it and adopts it."""
 
 _PATH = {"type": "string",
          "description": "Full path of the Power BI project folder (containing the .pbip file) or of the .pbip file."}
 _READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
+_WORKING_COPY = {"type": "string", "description": "Folder of a working copy made by create_working_copy."}
+_OPERATIONS = {
+    "type": "array", "minItems": 1, "maxItems": MAX_OPERATIONS,
+    "description": "Metadata changes, applied together as one batch.",
+    "items": {"type": "object", "properties": {
+        "op": {"type": "string", "enum": [kind.value for kind in OperationKind],
+               "description": "set_description (table, column, measure), set_display_folder and "
+                              "set_format_string (column, measure; an empty folder removes it), set_hidden "
+                              "(column, measure; value true or false)."},
+        "object": {"type": "string", "description": "Table[Name], or a table name for a table description."},
+        "object_type": {"type": "string", "enum": ["table", "column", "measure"],
+                        "description": "Only when a column and a measure share the name."},
+        "value": {"type": ["string", "boolean"], "description": "The new value (true/false for set_hidden)."}},
+        "required": ["op", "object", "value"], "additionalProperties": False}}
 
 
 def default_data_dir() -> Path:
@@ -55,6 +84,58 @@ def default_data_dir() -> Path:
 
 def _wrap(text: str) -> str:
     return f"<analysis>\n{text.rstrip()}\n</analysis>"
+
+
+def _assessment_lines(changes) -> list[str]:
+    return [f"- {EFFECT_LABELS[item.effect]}: {item.change.label}: "
+            f"{item.change.before or '(none)'} -> {item.change.after or '(none)'}. {item.note}" for item in changes]
+
+
+def _outcome_text(outcome: ChangeOutcome, *, preview: bool) -> str:
+    check = outcome.check
+    if outcome.refused:
+        head = "Refused: nothing was written. Fix the errors below and try again."
+    elif not outcome.operations:
+        head = "Nothing to do: every value is already set. Nothing was written."
+    elif outcome.rolled_back:
+        head = ("Rolled back: the change was written, but the check on the working copy failed, so the files "
+                "were restored. Nothing changed.")
+    elif check is not None and not check.passed:
+        head = "Checks failed on a trial copy, so nothing was written."
+    elif preview:
+        head = ("Preview only, nothing was written. All checks passed on a trial copy; apply_changes with the "
+                "same operations would make exactly these changes.")
+    else:
+        head = (f"Applied as change {outcome.batch.number} to the working copy. All checks passed; "
+                "undo_last_change reverts it.")
+    lines = [head]
+    if outcome.outside_changes:
+        lines.append("Note: files changed outside the analyzer since its last change (for example saved by Power "
+                     f"BI Desktop): {', '.join(outcome.outside_changes)}. If Power BI Desktop has the working copy "
+                     "open, ask the user to close it: its next save would overwrite these changes.")
+    if outcome.issues:
+        lines.append("Issues:")
+        lines += [f"- {issue.severity.value}{f' (operation {issue.index + 1})' if issue.index is not None else ''}: "
+                  f"{issue.message}" for issue in outcome.issues]
+    if outcome.operations and not outcome.refused:
+        lines.append("Operations:")
+        lines += [f"- {item.operation.describe()} [{item.ref.object_type.value.lower()} in "
+                  f"{item.file.name}]" for item in outcome.operations]
+    if check is not None:
+        ok = sum(item.ok for item in check.readback)
+        lines.append(f"Checks: {ok} of {len(check.readback)} values read back as intended; objects, diagnostics "
+                     f"and statuses {'unchanged' if check.passed else 'checked'}.")
+        if check.problems:
+            lines.append("Problems:")
+            lines += [f"- {problem}" for problem in check.problems]
+        changes = _assessment_lines(check.assessment.changes)
+        if changes:
+            lines.append("Analysis changes:")
+            lines += changes
+    if outcome.diffs:
+        lines.append("File changes:")
+        lines += [f"```diff\n{diff.diff}\n```" for diff in outcome.diffs]
+    return "\n".join(lines)
 
 
 class AnalyzerTools:
@@ -146,6 +227,73 @@ class AnalyzerTools:
                         tuple(s for s in briefing.sections if s.key in ("project", "changes")), briefing.assessment)
         return (_wrap(kept.text()) + "\n\nThe baseline is unchanged; call save_baseline to make the current "
                 "state the new baseline.")
+
+    # -- change tools (working copies only) ---------------------------------
+
+    @staticmethod
+    def _path(text: str) -> Path:
+        path = Path(text.strip().strip('"')).expanduser()
+        if not path.exists():
+            raise ToolError(f"No such folder or file: {path}.")
+        return path
+
+    def create_working_copy(self, project_path: str, target_folder: str | None = None) -> str:
+        try:
+            workspace = create_working_copy(self._path(project_path), target_folder or None)
+        except WorkspaceError as exc:
+            raise ToolError(str(exc)) from exc
+        return (f"Working copy created: {workspace.root}\nOriginal (never changed): {workspace.original}\n"
+                "The original's analysis is recorded as the baseline of this copy. Use this working copy path "
+                "with preview_changes, apply_changes, undo_last_change and review_working_copy.")
+
+    def preview_changes(self, project_path: str, operations: list) -> str:
+        try:
+            outcome = preview_changes(self._path(project_path), operations)
+        except WorkspaceError as exc:
+            raise ToolError(str(exc)) from exc
+        return _outcome_text(outcome, preview=True)
+
+    def apply_changes(self, working_copy: str, operations: list, note: str = "") -> str:
+        try:
+            outcome = apply_changes(self._path(working_copy), operations, note)
+        except WorkspaceError as exc:
+            raise ToolError(str(exc)) from exc
+        return _outcome_text(outcome, preview=False)
+
+    def undo_last_change(self, working_copy: str) -> str:
+        try:
+            batch = undo_last_change(self._path(working_copy))
+        except WorkspaceError as exc:
+            raise ToolError(str(exc)) from exc
+        lines = [f"Undid change {batch.number}{' (' + batch.note + ')' if batch.note else ''}; its files are "
+                 "restored from the backups:"]
+        lines += [f"- {name}" for name in sorted(batch.files)]
+        return "\n".join(lines)
+
+    def review_working_copy(self, working_copy: str) -> str:
+        try:
+            review = review_working_copy(self._path(working_copy))
+        except WorkspaceError as exc:
+            raise ToolError(str(exc)) from exc
+        workspace = review.workspace
+        lines = [f"Working copy: {workspace.root}", f"Original (never changed): {workspace.original}",
+                 f"Created {workspace.created_at}."]
+        if workspace.batches:
+            lines.append("Changes applied:")
+            for batch in workspace.batches:
+                state = " (undone)" if batch.undone else ""
+                lines.append(f"- Change {batch.number}{state}, {batch.applied_at}"
+                             f"{': ' + batch.note if batch.note else ''}; {len(batch.operations)} operation(s)")
+        else:
+            lines.append("No changes applied yet.")
+        if review.outside_changes:
+            lines.append("Files changed outside the analyzer since its last change (for example saved by Power BI "
+                         f"Desktop): {', '.join(review.outside_changes)}.")
+        lines.append("Compared with the original's analysis:")
+        lines += _assessment_lines(review.assessment.changes) or ["- No change in statuses or findings."]
+        lines.append("To check in Power BI Desktop (the analyzer cannot):")
+        lines += [f"{number}. {step}" for number, step in enumerate(review.checklist, 1)]
+        return "\n".join(lines)
 
     # -- formatting -------------------------------------------------------
 
@@ -267,6 +415,47 @@ class AnalyzerTools:
                  {"type": "object", "properties": {"project_path": _PATH},
                   "required": ["project_path"], "additionalProperties": False},
                  self.compare_with_baseline, _READ_ONLY),
+            Tool("create_working_copy", "Create a working copy for changes",
+                 "Copy the project (.pbip file, semantic model and report folders) to a new folder next to it and "
+                 "record the original's analysis as the copy's baseline. Changes are only ever applied to such a "
+                 "copy; the original is never written.",
+                 {"type": "object", "properties": {
+                     "project_path": _PATH,
+                     "target_folder": {"type": "string",
+                                       "description": "Optional new folder for the copy (must not exist). Default: "
+                                                      "'<project folder> (proposed <date time>)' next to it."}},
+                  "required": ["project_path"], "additionalProperties": False},
+                 self.create_working_copy,
+                 {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False}),
+            Tool("preview_changes", "Preview model changes",
+                 "Validate a batch of metadata changes and try it on a temporary copy: problems, the exact file "
+                 "changes, read-back of each value and the analysis changes. Writes nothing.",
+                 {"type": "object", "properties": {"project_path": _PATH, "operations": _OPERATIONS},
+                  "required": ["project_path", "operations"], "additionalProperties": False},
+                 self.preview_changes, _READ_ONLY),
+            Tool("apply_changes", "Apply model changes to the working copy",
+                 "Apply a batch of metadata changes to a working copy made by create_working_copy (refused for any "
+                 "other folder). Validates and tries the batch first, keeps backups, re-analyzes the copy and "
+                 "restores it automatically if anything other than the intended values changed.",
+                 {"type": "object", "properties": {
+                     "working_copy": _WORKING_COPY, "operations": _OPERATIONS,
+                     "note": {"type": "string", "description": "Short theme of the batch, kept in its history."}},
+                  "required": ["working_copy", "operations"], "additionalProperties": False},
+                 self.apply_changes,
+                 {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": False}),
+            Tool("undo_last_change", "Undo the last change",
+                 "Restore the files of the last applied change in a working copy from its backups. Refused if the "
+                 "files changed afterwards (for example saved by Power BI Desktop).",
+                 {"type": "object", "properties": {"working_copy": _WORKING_COPY},
+                  "required": ["working_copy"], "additionalProperties": False},
+                 self.undo_last_change,
+                 {"readOnlyHint": False, "destructiveHint": True, "idempotentHint": False, "openWorldHint": False}),
+            Tool("review_working_copy", "Review the working copy",
+                 "Summarize a working copy: changes applied, every analysis change compared with the original, "
+                 "files changed outside the analyzer, and what the user must still check in Power BI Desktop.",
+                 {"type": "object", "properties": {"working_copy": _WORKING_COPY},
+                  "required": ["working_copy"], "additionalProperties": False},
+                 self.review_working_copy, _READ_ONLY),
         )
 
     def prompts(self) -> tuple[PromptTemplate, ...]:
@@ -283,4 +472,8 @@ class AnalyzerTools:
                            "Assess changes made since the saved baseline (use save_baseline first).",
                            (path, question, PromptArgument("previous_advice", "Optional: the plan being followed.")),
                            lambda **a: self.prompt(Task.EVALUATE, **a)),
+            PromptTemplate("improve_model", "Improve the model",
+                           "Let Claude make metadata improvements (descriptions, display folders, format strings, "
+                           "hidden fields) in a checked working copy; the original is not changed.",
+                           (path, question), lambda **a: self.prompt(Task.IMPROVE, **a)),
         )

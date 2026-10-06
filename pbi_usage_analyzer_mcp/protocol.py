@@ -105,6 +105,11 @@ def _check_arguments(schema: dict, arguments: dict) -> str | None:
         if kind == "array":
             if not isinstance(value, list):
                 return f"Argument '{name}' must be a list."
+            if spec.get("items", {}).get("type") == "object":
+                # Item fields are checked by the tool, which explains problems per item.
+                if not all(isinstance(item, dict) for item in value):
+                    return f"Argument '{name}' must be a list of objects."
+                continue
             allowed = spec.get("items", {}).get("enum")
             for item in value:
                 if not isinstance(item, str) or (allowed is not None and item not in allowed):

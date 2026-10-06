@@ -14,19 +14,21 @@ from .briefing import Briefing
 
 # Increase when the wording of SYSTEM_PROMPT or a task instruction changes, so
 # stored answers can be traced to the prompt that produced them.
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 
 
 class Task(str, Enum):
     INTERPRET = "interpret"
     NEXT_STEPS = "next_steps"
     EVALUATE = "evaluate"
+    IMPROVE = "improve"
 
 
 TASK_LABELS = {
     Task.INTERPRET: "Interpret the results",
     Task.NEXT_STEPS: "Suggest next steps",
     Task.EVALUATE: "Evaluate my changes",
+    Task.IMPROVE: "Improve the model in a working copy",
 }
 
 
@@ -103,6 +105,29 @@ assessment:
 happened, partly happened or did not happen, citing the changes.
 4. End with the most useful next step.
 Do not repeat the full analysis; focus on what changed.""",
+    Task.IMPROVE: """\
+Improve this model with the change tools, step by step:
+1. From the analysis, choose improvements the tools can make: descriptions of tables, \
+columns and measures; display folders; format strings; hiding or showing columns and \
+measures. List everything else (removing objects, renaming, relationships, Power Query, \
+DAX) separately as advice for the user to carry out in Power BI Desktop; never attempt it.
+2. Work in batches of one theme each (for example "describe the Sales measures"), at most \
+about 20 operations. Show each batch as a short table (object, change, reason) and wait \
+for the user's go-ahead before the first batch; later batches may follow without asking \
+only if the user has said so.
+3. A description states what the object contains or computes, based on its DAX, M or \
+column in the analysis. Do not invent business meaning; when it is unclear, ask the user \
+or leave the object out.
+4. Hide only fields report authors do not need, such as relationship keys, sort-by \
+columns and technical columns. Never hide a field because it is Likely unused.
+5. Create one working copy with create_working_copy and tell the user where it is. The \
+original project is never changed.
+6. For each batch call preview_changes on the working copy, report the result, then call \
+apply_changes with the same operations. If a tool refuses or rolls back, explain why, \
+revise the batch and preview again; never resend an unchanged batch.
+7. After the last batch call review_working_copy and give the user its Power BI Desktop \
+checklist. The analyzer cannot see whether the report refreshes or renders; only the \
+user can confirm that.""",
 }
 
 

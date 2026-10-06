@@ -65,7 +65,12 @@ class ProtocolTests(ServerTestCase):
         tools = self.request('tools/list', modern=True)['result']
         self.assertEqual(tools['resultType'], 'complete')
         self.assertEqual([t['name'] for t in tools['tools']],
-                         ['analyze_model', 'explain_object', 'save_baseline', 'compare_with_baseline'])
+                         ['analyze_model', 'explain_object', 'save_baseline', 'compare_with_baseline',
+                          'create_working_copy', 'preview_changes', 'apply_changes', 'undo_last_change',
+                          'review_working_copy'])
+        annotations = {t['name']: t['annotations'] for t in tools['tools']}
+        self.assertTrue(annotations['preview_changes']['readOnlyHint'])
+        self.assertTrue(annotations['apply_changes']['destructiveHint'])
 
     def test_version_and_metadata_errors(self):
         meta = {'io.modelcontextprotocol/protocolVersion': '2099-01-01', 'io.modelcontextprotocol/clientCapabilities': {}}
@@ -176,10 +181,61 @@ class ToolTests(ServerTestCase):
         self.assertIn('- Column|Budget|Note (acknowledged 2026-10-01): kept for finance', text)
 
 
+class ChangeToolTests(ServerTestCase):
+    OPERATIONS = [{'op': 'set_description', 'object': 'Sales[Missing]', 'value': 'The constant 2.'},
+                  {'op': 'set_display_folder', 'object': 'Sales[Missing]', 'value': 'Constants'}]
+
+    def test_change_procedure(self):
+        project = self.copy('20_measure_descriptions')
+        original = (project / '20_measure_descriptions.SemanticModel/definition/tables/Sales.tmdl').read_bytes()
+        text, error = self.call('apply_changes', working_copy=str(project), operations=self.OPERATIONS)
+        self.assertTrue(error)
+        self.assertIn('not a working copy', text)
+
+        text, error = self.call('create_working_copy', project_path=str(project))
+        self.assertFalse(error)
+        copy = Path(text.splitlines()[0].split(': ', 1)[1])
+        self.assertTrue((copy / '.pbi-model-health' / 'workspace.json').exists())
+
+        text, error = self.call('preview_changes', project_path=str(copy), operations=self.OPERATIONS)
+        self.assertFalse(error)
+        self.assertTrue(text.startswith('Preview only, nothing was written.'))
+        self.assertIn('Checks: 2 of 2 values read back as intended', text)
+        self.assertIn('- Improvement: Sales[Missing]: Document this measure -> (none).', text)
+        self.assertIn('+    /// The constant 2.', text)
+
+        text, error = self.call('apply_changes', working_copy=str(copy), operations=self.OPERATIONS,
+                                note='describe constants')
+        self.assertFalse(error)
+        self.assertTrue(text.startswith('Applied as change 1 to the working copy.'), text)
+        text, _ = self.call('review_working_copy', working_copy=str(copy))
+        self.assertIn('- Change 1, ', text)
+        self.assertIn(': describe constants; 2 operation(s)', text)
+        self.assertIn('To check in Power BI Desktop (the analyzer cannot):\n1. ', text)
+        text, error = self.call('undo_last_change', working_copy=str(copy))
+        self.assertFalse(error)
+        self.assertIn('Undid change 1 (describe constants)', text)
+        self.assertEqual((project / '20_measure_descriptions.SemanticModel/definition/tables/Sales.tmdl')
+                         .read_bytes(), original)
+
+    def test_refusals_are_explained(self):
+        project = str(SUITE / '20_measure_descriptions')
+        text, error = self.call('preview_changes', project_path=project, operations=[
+            {'op': 'set_hidden', 'object': 'Sales[Nope]', 'value': True},
+            {'op': 'set_description', 'object': 'Sales[Documented]', 'value': 'Revenue in local currency.\nExcludes tax.'}])
+        self.assertFalse(error)  # a refusal is a normal answer with reasons, not a tool failure
+        self.assertTrue(text.startswith('Refused: nothing was written.'))
+        self.assertIn("- error (operation 1): No column or measure named 'Sales[Nope]'.", text)
+        self.assertIn('- skipped (operation 2):', text)
+        text, error = self.call('preview_changes', project_path=project, operations=['x'])
+        self.assertTrue(error)
+        self.assertIn('must be a list of objects', text)
+
+
 class PromptTests(ServerTestCase):
     def test_prompt_list_and_get(self):
         prompts = self.request('prompts/list')['result']['prompts']
-        self.assertEqual([p['name'] for p in prompts], ['interpret', 'next_steps', 'evaluate'])
+        self.assertEqual([p['name'] for p in prompts], ['interpret', 'next_steps', 'evaluate', 'improve_model'])
         self.assertTrue(prompts[0]['arguments'][0]['required'])
         result = self.request('prompts/get', {'name': 'next_steps', 'arguments': {
             'project_path': str(SUITE / '02_dax_transitive'), 'question': 'Focus on DAX.'}})['result']
@@ -197,6 +253,13 @@ class PromptTests(ServerTestCase):
             'project_path': str(SUITE / '02_dax_transitive')}})['error']
         self.assertEqual(error['code'], INVALID_PARAMS)
         self.assertIn('save_baseline', error['message'])
+
+    def test_improve_prompt(self):
+        result = self.request('prompts/get', {'name': 'improve_model', 'arguments': {
+            'project_path': str(SUITE / '20_measure_descriptions')}})['result']
+        text = result['messages'][0]['content']['text']
+        self.assertIn('create_working_copy', text)
+        self.assertIn('Never hide a field because it is Likely unused', text)
 
     def test_evaluate_after_baseline(self):
         project = self.copy('41_m_usage_aware_lineage')
